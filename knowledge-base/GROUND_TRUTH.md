@@ -81,3 +81,21 @@ Expected statuses: `answer` (found, sourced) · `not_found` · `conflict` (sourc
 3. **Not found**: auxiliary staff, apprentices, VAT, UVG, all "services abroad" questions, foreign-scheme fields.
 4. **Fresh**: register extracts (01, 02) are under 3 months old (20 and 22 October 2026).
 5. **Engaging**: every Yes/No and the Art. 29c declaration require human validation.
+
+## Noise and distractors (added so extraction is realistic)
+
+Every document has a letterhead, reference number, "Page x of y", legal boilerplate and unrelated sections (fees, audit history, salary bands, references, premiums, etc.). Distractors that look like answers but are **not**:
+
+| Distractor | Where | Correct reading |
+|---|---|---|
+| Share capital CHF 100,000 (200 shares) | 01 register history, entry 1 | Superseded (status "modified"); current capital is CHF 500,000 |
+| Former address Hardstrasse 201, 8005 Zurich | 01 history | Old address; current is Pfingstweidstrasse 31 |
+| Cyber liability CHF 2,000,000, legal expenses CHF 250,000, aggregate CHF 20,000,000 | 03 schedule | Not the "per claim" amounts asked for in the form |
+| Premium CHF 14,860, deductibles | 03 | Irrelevant to the form |
+| Customer satisfaction 4.6 (2025) vs 4.5 (2024) | 04, 09 | Irrelevant |
+| Headcount 31, 29.2 FTE, 3 apprentices (2024) | 09 | Outdated; see conflict rule above |
+| Payroll and contribution amounts per year | 07 | Irrelevant to the form |
+| Management: Nadine Frei, CFO (no signing authority) | 09 | Not a signatory; Annex 7 signatory proposal stays Marc Keller |
+| Pension plan rates, funding ratio | 08 | Irrelevant to the form |
+| Individual tax periods, provisional assessment 2025 | 06 | Statement that all taxes are paid still holds |
+| Founding address in the brochure's "single site" line | 04 | Same as current address |
