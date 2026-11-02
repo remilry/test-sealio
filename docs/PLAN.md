@@ -35,11 +35,11 @@ Légende : ⬜ à faire · 🟦 en cours · ✅ fait. Chaque étape produit un l
 - Lire les formulaires, écrire ce plan, valider les décisions ouvertes (section 5).
 - Livrable : `docs/PLAN.md` validé (2026-11-02).
 
-### Étape 1 — Entreprise fictive et base de connaissances ⬜
+### Étape 1 — Entreprise fictive et base de connaissances ✅
 - Inventer le soumissionnaire : une société suisse crédible dans les services de transformation digitale / IA (cohérent avec l'appel d'offres de l'Annex 4), fiche d'identité complète (raison sociale, UID, forme juridique, siège, capital, actionnariat, effectifs par catégorie, certifications, assurances, offices fiscal/AVS/LPP, contact).
 - Produire des **documents réalistes**, dans des formats variés, c'est ce qui rend la démo crédible : extrait du registre du commerce, attestation d'assurance RC, plaquette de présentation, rapport annuel / comptes, certificats (ISO 27001…), règlement du personnel, etc.
 - Y mettre volontairement des **pièges** pour tester la fiabilité : une info absente (→ « non trouvé »), deux documents contradictoires ou une donnée périmée (→ conflit signalé), une réponse Oui/Non non documentée (→ question à l'humain).
-- Livrable : `knowledge-base/` + une « vérité terrain » (`knowledge-base/GROUND_TRUTH.md`) servant de référence aux tests.
+- Livrable : `knowledge-base/documents/` (11 documents PDF/DOCX, générés par `knowledge-base/generator/generate.py`) + `knowledge-base/GROUND_TRUTH.md` (valeurs attendues, statuts, pièges) servant de référence aux tests. Entreprise : **Alpenlogic AG**.
 
 ### Étape 2 — Parcours utilisateur ⬜
 - Définir le flux de bout en bout et les écrans (esquisses simples), voir section 4.
@@ -135,3 +135,4 @@ UI (relecture)  ──►  API locale
 | 2026-11-02 | Plan général rédigé | validé |
 | 2026-11-02 | Tranches verticales : UI + tests e2e dans chaque étape, walking skeleton sur l'Annex 7 d'abord | validé |
 | 2026-11-02 | Stack Next.js + FastAPI ; façade LLM interchangeable (Claude/OpenAI à trancher) ; tout en anglais ; entreprise PME IT/IA zurichoise ~40 pers. ; base en PDF + DOCX | validé |
+| 2026-11-02 | Entreprise fictive Alpenlogic AG validée ; assureur fictif « Limmat Versicherungen AG » (pas de vraie marque) ; 11 documents générés | validé |
