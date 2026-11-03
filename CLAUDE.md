@@ -46,6 +46,13 @@ validation, export to the original format) must be covered by tests.
 - AI: Claude via an LLM facade; hybrid RAG in PostgreSQL (local fastembed embeddings in pgvector + full-text search); one LLM call per form section. V1 has no fact extraction at ingestion: Company knowledge lists documents only, and doubts (conflict, outdated) are detected during filling.
 - Architecture (global, front, back): `docs/ARCHITECTURE.md`. Frontend tests follow the `screen-tests` skill (Vitest screen integration tests + one Playwright e2e for the main scenario).
 - Project plan and decision log: `docs/PLAN.md`.
+- Tender forms are not uploaded by the user: in the product they come from an external source, so the tender and its two annexes are already present (seeded by the back at startup).
+
+## Stack and commands
+
+- Monorepo: `frontend/` (Next.js 16.4, React 19, TanStack Query, Tailwind 4 + shadcn/ui `base-nova`, Vitest + MSW 3, Playwright; pnpm 12) and `backend/` (Python 3.14, FastAPI with native SSE, SQLAlchemy 2.1 + Alembic, PostgreSQL 18 + pgvector 0.8 in Docker; uv, ruff, pyright, pytest). Node 26 LTS pinned in `.nvmrc`.
+- One command: `make dev` (db + API on :8000 + UI on :3000). Also `make test`, `make test-slow`, `make lint`, `make typecheck`, `make gen-api` (regenerates the front's TS types from the API's OpenAPI).
+- Each app has its own `CLAUDE.md` with commands and conventions. Project skills in `.claude/skills/` (Next.js: `next-dev-loop`, `shadcn`, Vercel React; back: `fastapi`, `uv`, `pydantic`, `supabase-postgres-best-practices`; tests: `screen-tests`).
 
 ## How we work
 

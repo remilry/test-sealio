@@ -1,0 +1,21 @@
+# PostgreSQL + pgvector only; frontend and backend run locally (docs/ARCHITECTURE.md).
+services:
+  db:
+    image: pgvector/pgvector:0.8.7-pg18-trixie
+    environment:
+      POSTGRES_USER: formpilot
+      POSTGRES_PASSWORD: formpilot
+      POSTGRES_DB: formpilot
+    ports:
+      - "5432:5432"
+    volumes:
+      # Postgres 18 images keep data under /var/lib/postgresql/<major>/docker: mount the parent.
+      - db-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U formpilot -d formpilot"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  db-data:

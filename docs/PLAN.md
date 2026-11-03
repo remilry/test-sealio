@@ -2,7 +2,7 @@
 
 > Document vivant. Chaque étape y est cochée et détaillée au fur et à mesure.
 > Contexte produit et priorités : voir `CLAUDE.md`. Échéance : jeudi 5 novembre.
-> Statut : étapes 0 à 3 validées. Parcours détaillé : `docs/USER_FLOW.md`. Les choix techniques marqués _proposition_ restent à confirmer à l'étape 3.
+> Statut : étapes 0 à 4 faites ; prochaine : 4.5 (Annex 7 sans IA). Parcours détaillé : `docs/USER_FLOW.md`. Les choix techniques marqués _proposition_ restent à confirmer à l'étape 3.
 
 ## 1. Ce qu'on a appris des deux formulaires
 
@@ -55,10 +55,17 @@ Chaque étape à partir de la 4 livre une **fonctionnalité utilisable de bout e
 - un test de bout en bout navigateur (Playwright) qui rejoue le parcours de la tranche sur les vrais formulaires ;
 - une démo manuelle possible en une commande.
 
-### Étape 4 — Walking skeleton (Annex 7 de bout en bout, sans IA) ⬜
-- Repo git, outillage (lint, tests, lancement local en une commande).
-- Parcours minimal complet : déposer l'Annex 7 (PDF) → champs détectés affichés → l'utilisateur les saisit à la main → export du PDF rempli → téléchargement.
-- C'est volontairement la partie la plus risquée (parsing PDF à plat + superposition de texte) : on la valide en premier, avec l'UI en place dès le départ.
+### Étape 4 — Socle + premier écran *Tender* (front + back) ✅
+- Repo, outillage (lint, tests, `make dev` en une commande), Docker Compose PostgreSQL + pgvector, skills d'agent.
+- L'offre et ses annexes sont déjà présentes : dans le produit elles viennent d'une source externe, ici seedées au démarrage depuis `forms/` (copie dans `data/`).
+- Back : tables `tender` / `form`, API `GET /tenders`, `GET /tenders/{id}`, `GET /forms/{id}/file`.
+- Front : barre latérale, écran *Tender* (en-tête, échéance au format suisse, cartes des formulaires avec format et statut) ; « Fill with AI » visible mais désactivé jusqu'à l'écran *Setup*. Utilitaires partagés : `shared/utils/date.ts`, `useHandleKeyDown`.
+- Tests : API (pytest), écrans *Tender* / accueil / coquille (Vitest + MSW), scénario Playwright contre le vrai back.
+- Mergé dans `main` le 2026-11-03.
+
+### Étape 4.5 — Annex 7 de bout en bout, sans IA ⬜
+- Parcours : *Tender* → Annex 7 (PDF) → champs détectés affichés sur l'aperçu → l'utilisateur les saisit à la main → export du PDF rempli → téléchargement.
+- C'est volontairement la partie la plus risquée (parsing PDF à plat + superposition de texte) : on la valide avant l'IA, avec l'UI en place.
 - Tests : parseur PDF (schéma attendu), export (texte au bon endroit, reste inchangé), e2e du parcours.
 
 ### Étape 5 — Base de connaissances + réponse IA sur l'Annex 7 ⬜ _(critique, testé)_
@@ -144,3 +151,7 @@ UI (relecture)  ──►  API locale
 | 2026-11-03 | Archi back : modules métier (`knowledge`, `tenders`, `forms`, `filling`, `export`) + `llm/` ; briques critiques pures ; champs `user_only` classés par le LLM ; tests chargeant le modèle d'embeddings marqués `slow` | validé |
 | 2026-11-03 | PostgreSQL + pgvector (remplace SQLite), recherche hybride conservée (pgvector + `tsvector`, fusion RRF) ; Docker Compose pour Postgres seulement ; `created_at` / `updated_at` sur toutes les tables | validé |
 | 2026-11-03 | V1 sans extraction de faits à l'ingestion (coût) : *Company knowledge* liste les documents ; conflits et péremption détectés au remplissage (date de validité renvoyée par le LLM avec citation vérifiée) | validé |
+| 2026-11-03 | Étape 4, setup front : Node 26 LTS (`.nvmrc`), pnpm 12, Next 16.4 (défauts create-next-app : Turbopack, Cache Components, AGENTS.md), shadcn/ui preset `base-nova` (Base UI), MSW 3 ; règles de modules vérifiées par `eslint-plugin-boundaries` ; skills `next-dev-loop`, `shadcn`, `vercel-react-best-practices`, `vercel-composition-patterns` + MCP `next-devtools` | à valider |
+| 2026-11-03 | Étape 4, setup back : Python 3.14 (3.15 bloqué par onnxruntime/fastembed), uv, FastAPI 0.162 avec SSE natif (pas de `sse-starlette`), SQLAlchemy 2.1, PostgreSQL 18 + pgvector 0.8.7 (`docker-compose.yml`), migrations Alembic au démarrage, base `formpilot_test` pour pytest ; SQLAlchemy et pyright conservés malgré le skill FastAPI (SQLModel, ty en bêta) ; skills `fastapi`, `uv`, `pydantic`, `supabase-postgres-best-practices` ; `make dev` lance db + back + front | à valider |
+| 2026-11-03 | Pas de dépôt des formulaires par l'utilisateur : l'offre et ses annexes viennent d'une source externe (seed au démarrage depuis `forms/`, copie dans `data/`) ; première page = *Tender* | validé |
+| 2026-11-03 | Étape 4 recentrée sur le socle + premier écran *Tender* (front + back), mergée dans `main` ; parsing, saisie manuelle et export de l’Annex 7 déplacés en étape 4.5 | validé |
