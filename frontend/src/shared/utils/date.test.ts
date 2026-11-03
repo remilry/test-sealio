@@ -6,12 +6,12 @@ describe("date helpers", () => {
   it("reads an ISO date as that calendar day, at local midnight", () => {
     const date = parseIsoDate("2026-11-19");
 
-    expect(formatDate(date)).toBe("19 Nov 2026");
+    expect(formatDate(date)).toBe("19.11.2026");
     expect(daysBetween(date, addHours(date, 23))).toBe(0);
   });
 
-  it("formats a date as day, short month and year", () => {
-    expect(formatDate(parseIsoDate("2026-01-05"))).toBe("5 Jan 2026");
+  it("formats a date the Swiss way: dd.mm.yyyy", () => {
+    expect(formatDate(parseIsoDate("2026-01-05"))).toBe("05.01.2026");
   });
 
   it("counts calendar days, whatever the time of day", () => {

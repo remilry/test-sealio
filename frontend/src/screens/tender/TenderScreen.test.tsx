@@ -31,7 +31,7 @@ describe("Tender", () => {
       ),
     ).toBeInTheDocument();
     const due = screen.getByRole("group", { name: "Submission due" });
-    expect(within(due).getByText("19 Nov 2026 · 16 days")).toBeInTheDocument();
+    expect(within(due).getByText("19.11.2026 · 16 days")).toBeInTheDocument();
   });
 
   it("lists the forms to complete in order, with their original format", async () => {
@@ -95,9 +95,9 @@ describe("Tender", () => {
   });
 
   it.each([
-    ["2026-11-18", "19 Nov 2026 · 1 day"],
-    ["2026-11-19", "19 Nov 2026 · due today"],
-    ["2026-11-20", "19 Nov 2026 · closed"],
+    ["2026-11-18", "19.11.2026 · 1 day"],
+    ["2026-11-19", "19.11.2026 · due today"],
+    ["2026-11-20", "19.11.2026 · closed"],
   ])("on %s, the deadline reads “%s”", async (today, expected) => {
     // Given today's date
     freezeToday(today);

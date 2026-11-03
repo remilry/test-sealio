@@ -17,6 +17,7 @@ Node 26 (see `../.nvmrc`, run `fnm use`), pnpm 12 via corepack.
 | `pnpm dlx shadcn@latest add <component>`       | add a shadcn component into `src/shared/ui`                                                  |
 
 Conventions:
-- Dates: never handled by hand. Use the helpers of `src/shared/utils/date.ts` (parse, today, day counts, formatting); add one there if missing, with a case in `date.test.ts`. ESLint forbids `Date`, `Intl.DateTimeFormat` and `toLocale*String` elsewhere, so swapping in a date library only touches that file.
+
+- Dates: never handled by hand. Use the helpers of `src/shared/utils/date.ts` (parse, today, day counts, Swiss formatting `dd.mm.yyyy`); add one there if missing, with a case in `date.test.ts`. ESLint forbids `Date`, `Intl.DateTimeFormat` and `toLocale*String` elsewhere, so swapping in a date library only touches that file.
 
 Skills for this app: `next-dev-loop` (verify at runtime after edits), `shadcn`, `vercel-react-best-practices`, `vercel-composition-patterns`, `screen-tests`.

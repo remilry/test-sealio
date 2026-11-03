@@ -10,9 +10,10 @@ export type IsoDate = string;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const MS_PER_HOUR = 60 * 60 * 1000;
 
-const displayFormat = new Intl.DateTimeFormat("en-GB", {
-  day: "numeric",
-  month: "short",
+// Swiss format (dd.mm.yyyy); `en-CH` keeps Swiss conventions with the English UI.
+const displayFormat = new Intl.DateTimeFormat("en-CH", {
+  day: "2-digit",
+  month: "2-digit",
   year: "numeric",
 });
 
@@ -50,7 +51,7 @@ export function daysUntil(isoDate: IsoDate): number {
   return daysBetween(startOfToday(), parseIsoDate(isoDate));
 }
 
-/** "19 Nov 2026" */
+/** "19.11.2026" */
 export function formatDate(date: Date | IsoDate): string {
   return displayFormat.format(typeof date === "string" ? parseIsoDate(date) : date);
 }
