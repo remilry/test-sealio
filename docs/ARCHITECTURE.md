@@ -75,6 +75,7 @@ frontend/src/
 │  ├─ api/               client.ts (initialisation du client HTTP typé) · schema.gen.ts (généré)
 │  ├─ ui/                composants shadcn, StatusBadge, tokens de couleur
 │  ├─ lib/               utilitaires sans dépendance métier
+│  ├─ utils/date.ts      seul point de manipulation des dates (règle ESLint), remplaçable par une lib
 │  └─ test/              setup, serveur MSW, handlers, fixtures typées, renderScreen, fillStream
 │
 frontend/e2e/            # un test Playwright : le scénario principal

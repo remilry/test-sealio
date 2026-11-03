@@ -26,6 +26,7 @@ export function HomeScreen() {
       </div>
     );
   }
+
   if (tenders && tenders.length === 0) {
     return (
       <Empty>

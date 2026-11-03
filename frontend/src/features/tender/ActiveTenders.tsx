@@ -14,7 +14,8 @@ import {
   SidebarMenuSkeleton,
 } from "@/shared/ui/sidebar";
 import { tenderQueries } from "./api";
-import { daysUntil, formatDaysLeft } from "./deadline";
+import { daysUntil } from "@/shared/utils/date";
+import { formatDaysLeft } from "./deadline";
 
 export const tenderHref = (tenderId: number) => `/tenders/${tenderId}`;
 

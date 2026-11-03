@@ -64,6 +64,28 @@ const eslintConfig = defineConfig([
       ],
     },
   },
+  // Dates are only handled through src/shared/utils/date.ts (one place to swap for a date library).
+  {
+    files: ["src/**/*.{ts,tsx}"],
+    ignores: ["src/shared/utils/date.ts"],
+    rules: {
+      "no-restricted-globals": [
+        "error",
+        { name: "Date", message: "Use the helpers of @/shared/utils/date instead of Date." },
+      ],
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "MemberExpression[object.name='Intl'][property.name='DateTimeFormat']",
+          message: "Format dates with formatDate from @/shared/utils/date.",
+        },
+        {
+          selector: "CallExpression[callee.property.name=/^toLocale(Date|Time)?String$/]",
+          message: "Format dates with formatDate from @/shared/utils/date.",
+        },
+      ],
+    },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     ".next/**",
