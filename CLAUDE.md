@@ -43,7 +43,7 @@ validation, export to the original format) must be covered by tests.
 - No form- or field-specific rules: the AI decides per field using generic criteria (verified evidence, conflicting sources, outdated source, user-only field).
 - Yes/No declarations are auto-ticked when evidence is found (proof shown, editable), left empty otherwise. Signature and stamp are never filled.
 - Export is allowed with a warning for empty fields and doubts; only an unanswered declaration blocks it. Export in the original format only.
-- AI: Claude via an LLM facade; hybrid RAG (local fastembed embeddings + BM25 in SQLite); one LLM call per form section. V1 has no fact extraction at ingestion: Company knowledge lists documents only, and doubts (conflict, outdated) are detected during filling.
+- AI: Claude via an LLM facade; hybrid RAG in PostgreSQL (local fastembed embeddings in pgvector + full-text search); one LLM call per form section. V1 has no fact extraction at ingestion: Company knowledge lists documents only, and doubts (conflict, outdated) are detected during filling.
 - Architecture (global, front, back): `docs/ARCHITECTURE.md`. Frontend tests follow the `screen-tests` skill (Vitest screen integration tests + one Playwright e2e for the main scenario).
 - Project plan and decision log: `docs/PLAN.md`.
 

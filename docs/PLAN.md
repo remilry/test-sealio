@@ -2,7 +2,7 @@
 
 > Document vivant. Chaque étape y est cochée et détaillée au fur et à mesure.
 > Contexte produit et priorités : voir `CLAUDE.md`. Échéance : jeudi 5 novembre.
-> Statut : étapes 0 à 2 validées. Parcours détaillé : `docs/USER_FLOW.md`. Les choix techniques marqués _proposition_ restent à confirmer à l'étape 3.
+> Statut : étapes 0 à 3 validées. Parcours détaillé : `docs/USER_FLOW.md`. Les choix techniques marqués _proposition_ restent à confirmer à l'étape 3.
 
 ## 1. Ce qu'on a appris des deux formulaires
 
@@ -45,7 +45,7 @@ Légende : ⬜ à faire · 🟦 en cours · ✅ fait. Chaque étape produit un l
 - Flux : Company knowledge → Tender (offre fictive avec les 2 formulaires) → Setup → **Live fill** (l'IA remplit sous les yeux de l'utilisateur, qui corrige en parallèle) → Export. *AI filling* + *Review* en repli technique.
 - Livrable : `docs/USER_FLOW.md` + maquettes Claude Design `docs/design/Formpilot.dc.html`.
 
-### Étape 3 — Architecture 🟦
+### Étape 3 — Architecture ✅ (validée)
 - Choix de la stack, découpage en modules, modèle de données, contrats entre modules, stratégie de test. Pistes en section 6.
 - Livrable : `docs/ARCHITECTURE.md` (+ décisions consignées).
 
@@ -141,4 +141,6 @@ UI (relecture)  ──►  API locale
 | 2026-11-03 | LLM : Claude (via la façade) ; un appel par section du formulaire, événement SSE par champ | validé |
 | 2026-11-03 | RAG (pour passer à l'échelle) : embeddings locaux (fastembed) + recherche hybride BM25/vecteurs dans SQLite (`sqlite-vec`) ; « introuvable » formulé honnêtement | validé |
 | 2026-11-03 | Archi front : `app → screens → features → shared`, `api.ts` par feature, `shared/api` = init client + types générés, pas d'import entre features (par défaut), TanStack Query sans store global, `docx-preview` + `react-pdf` ; tests Vitest par écran (skill `screen-tests`) + 1 Playwright scénario principal | validé |
+| 2026-11-03 | Archi back : modules métier (`knowledge`, `tenders`, `forms`, `filling`, `export`) + `llm/` ; briques critiques pures ; champs `user_only` classés par le LLM ; tests chargeant le modèle d'embeddings marqués `slow` | validé |
+| 2026-11-03 | PostgreSQL + pgvector (remplace SQLite), recherche hybride conservée (pgvector + `tsvector`, fusion RRF) ; Docker Compose pour Postgres seulement ; `created_at` / `updated_at` sur toutes les tables | validé |
 | 2026-11-03 | V1 sans extraction de faits à l'ingestion (coût) : *Company knowledge* liste les documents ; conflits et péremption détectés au remplissage (date de validité renvoyée par le LLM avec citation vérifiée) | validé |
