@@ -55,3 +55,10 @@ export function daysUntil(isoDate: IsoDate): number {
 export function formatDate(date: Date | IsoDate): string {
   return displayFormat.format(typeof date === "string" ? parseIsoDate(date) : date);
 }
+
+const timeFormat = new Intl.DateTimeFormat("en-CH", { hour: "2-digit", minute: "2-digit" });
+
+/** A timestamp as sent by the back (ISO 8601 with offset) → "14:32", in local time. */
+export function formatTime(isoDateTime: string): string {
+  return timeFormat.format(new Date(isoDateTime));
+}

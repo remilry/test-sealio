@@ -38,6 +38,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/forms/{form_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Form
+         * @description A form with its detected fields, in reading order.
+         */
+        get: operations["get_form_forms__form_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/forms/{form_id}/file": {
         parameters: {
             query?: never;
@@ -47,6 +67,77 @@ export interface paths {
         };
         /** Download Original Form */
         get: operations["download_original_form_forms__form_id__file_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/forms/{form_id}/answers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Answers */
+        get: operations["get_answers_forms__form_id__answers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/forms/{form_id}/fields/{field_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Field
+         * @description Save the value the user entered. Returns the whole fill state (counts change).
+         */
+        patch: operations["update_field_forms__form_id__fields__field_id__patch"];
+        trace?: never;
+    };
+    "/forms/{form_id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Export Summary */
+        get: operations["get_export_summary_forms__form_id__export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/forms/{form_id}/export/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download Filled Form */
+        get: operations["download_filled_form_forms__form_id__export_file_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -76,11 +167,137 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AnswerOut */
+        AnswerOut: {
+            /** Field Id */
+            field_id: number;
+            /** Value */
+            value: string | null;
+            resolved_by: components["schemas"]["ResolvedBy"];
+            /**
+             * Resolved At
+             * Format: date-time
+             */
+            resolved_at: string;
+        };
+        /**
+         * AnswerUpdate
+         * @description A value entered by the user; null or blank leaves the field empty.
+         */
+        AnswerUpdate: {
+            /** Value */
+            value: string | null;
+        };
+        /**
+         * Box
+         * @description A rectangle in PDF points, origin at the top-left corner of the page (PyMuPDF convention).
+         */
+        Box: {
+            /** X0 */
+            x0: number;
+            /** Y0 */
+            y0: number;
+            /** X1 */
+            x1: number;
+            /** Y1 */
+            y1: number;
+        };
+        /**
+         * ExportSummary
+         * @description What the export will contain, and what the user should know before downloading.
+         */
+        ExportSummary: {
+            file_format: components["schemas"]["FileFormat"];
+            /** Fillable */
+            fillable: number;
+            /** Filled */
+            filled: number;
+            /** Empty Fields */
+            empty_fields: components["schemas"]["FieldRef"][];
+            /** Sign By Hand */
+            sign_by_hand: components["schemas"]["FieldRef"][];
+        };
+        /**
+         * FieldCounts
+         * @description What the parser found in a form, as shown on its card.
+         */
+        FieldCounts: {
+            /** Fields */
+            fields: number;
+            /** Yes No */
+            yes_no: number;
+            /** Signatures */
+            signatures: number;
+        };
+        /**
+         * FieldKind
+         * @enum {string}
+         */
+        FieldKind: "text" | "number" | "date" | "yes_no" | "signature";
+        /** FieldOut */
+        FieldOut: {
+            /** Id */
+            id: number;
+            /** Key */
+            key: string;
+            /** Section */
+            section: string;
+            /** Label */
+            label: string;
+            kind: components["schemas"]["FieldKind"];
+            locator: components["schemas"]["PdfLocator"];
+        };
+        /** FieldRef */
+        FieldRef: {
+            /** Id */
+            id: number;
+            /** Label */
+            label: string;
+        };
         /**
          * FileFormat
          * @enum {string}
          */
         FileFormat: "pdf" | "docx";
+        /**
+         * FillCounts
+         * @description Fields the user can fill (signatures excluded), and how many have a value.
+         */
+        FillCounts: {
+            /** Fillable */
+            fillable: number;
+            /** Filled */
+            filled: number;
+            /** Empty */
+            empty: number;
+        };
+        /**
+         * FillState
+         * @description The answers of a form so far. Fields without an answer are not listed.
+         */
+        FillState: {
+            counts: components["schemas"]["FillCounts"];
+            /** Answers */
+            answers: components["schemas"]["AnswerOut"][];
+        };
+        /** FormDetail */
+        FormDetail: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string;
+            /** File Name */
+            file_name: string;
+            file_format: components["schemas"]["FileFormat"];
+            status: components["schemas"]["FormStatus"];
+            field_counts: components["schemas"]["FieldCounts"] | null;
+            /** Tender Id */
+            tender_id: number;
+            /** Pages */
+            pages: components["schemas"]["PageSize"][];
+            /** Fields */
+            fields: components["schemas"]["FieldOut"][];
+        };
         /**
          * FormStatus
          * @enum {string}
@@ -99,6 +316,7 @@ export interface components {
             file_name: string;
             file_format: components["schemas"]["FileFormat"];
             status: components["schemas"]["FormStatus"];
+            field_counts: components["schemas"]["FieldCounts"] | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -112,6 +330,42 @@ export interface components {
             /** Database */
             database: string;
         };
+        /** PageSize */
+        PageSize: {
+            /** Width */
+            width: number;
+            /** Height */
+            height: number;
+        };
+        /**
+         * PdfLocator
+         * @description Where a field's answer goes in a flat PDF.
+         */
+        PdfLocator: {
+            /**
+             * Format
+             * @default pdf
+             * @constant
+             */
+            format: "pdf";
+            /** Page */
+            page: number;
+            box: components["schemas"]["Box"];
+            /** Baseline */
+            baseline: number;
+            /** Font Size */
+            font_size: number;
+            /**
+             * Erase
+             * @default []
+             */
+            erase: components["schemas"]["Box"][];
+        };
+        /**
+         * ResolvedBy
+         * @enum {string}
+         */
+        ResolvedBy: "ai" | "user";
         /** TenderDetail */
         TenderDetail: {
             /** Id */
@@ -228,6 +482,44 @@ export interface operations {
             };
         };
     };
+    get_form_forms__form_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                form_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormDetail"];
+                };
+            };
+            /** @description Unknown form */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     download_original_form_forms__form_id__file_get: {
         parameters: {
             query?: never;
@@ -254,6 +546,157 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+        };
+    };
+    get_answers_forms__form_id__answers_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                form_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FillState"];
+                };
+            };
+            /** @description Unknown form */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_field_forms__form_id__fields__field_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                form_id: number;
+                field_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnswerUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FillState"];
+                };
+            };
+            /** @description Unknown form or field */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The field cannot be filled (signature, stamp) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_export_summary_forms__form_id__export_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                form_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportSummary"];
+                };
+            };
+            /** @description Unknown form */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    download_filled_form_forms__form_id__export_file_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                form_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The filled form, in its original format and layout. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown form */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The form's format cannot be exported yet */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

@@ -23,7 +23,7 @@ class FormSummary(BaseModel):
     file_format: FileFormat
     status: FormStatus
     # Null while the form's format cannot be parsed yet (it cannot be filled either).
-    field_counts: FieldCounts | None = None
+    field_counts: FieldCounts | None
 
 
 class FieldOut(BaseModel):

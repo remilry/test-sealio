@@ -1,4 +1,12 @@
-import { addHours, daysBetween, daysUntil, formatDate, parseIsoDate, startOfToday } from "./date";
+import {
+  addHours,
+  daysBetween,
+  daysUntil,
+  formatDate,
+  formatTime,
+  parseIsoDate,
+  startOfToday,
+} from "./date";
 
 // Contract of the date helpers: these tests must keep passing if the implementation
 // switches to a date library.
@@ -34,5 +42,11 @@ describe("date helpers", () => {
     expect(daysBetween(startOfToday(), parseIsoDate("2026-11-03"))).toBe(0);
     expect(daysUntil("2026-11-19")).toBe(16);
     expect(daysUntil("2026-11-02")).toBe(-1);
+  });
+
+  it("formats a timestamp from the back as a local time: hh:mm", () => {
+    // Zurich is UTC+1 in November.
+    expect(formatTime("2026-11-03T13:32:10.123456Z")).toBe("14:32");
+    expect(formatTime("2026-11-03T09:05:00+01:00")).toBe("09:05");
   });
 });

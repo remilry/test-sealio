@@ -11,6 +11,8 @@ export function form(overrides: Partial<FormSummary> = {}): FormSummary {
     file_name: "Annex_4_Conditions of Participation and Company Self-Declaration.docx",
     file_format: "docx",
     status: "not_started",
+    // Word forms are not parsed yet.
+    field_counts: null,
     ...overrides,
   };
 }
@@ -32,6 +34,7 @@ export function tender(overrides: Partial<TenderDetail> = {}): TenderDetail {
         title: "Annex 7 — Sanctions self-declaration (Art. 29c)",
         file_name: "Annex_7_Self-Declaration_Art29c_Ukraine_Ordinance.pdf",
         file_format: "pdf",
+        field_counts: { fields: 10, yes_no: 0, signatures: 1 },
       }),
     ],
     ...overrides,
