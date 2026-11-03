@@ -36,6 +36,15 @@ of the README and are implemented only if time allows.
 Testing is not secondary: the critical parts (form parsing, answer
 validation, export to the original format) must be covered by tests.
 
+### Product decisions (current state)
+
+- One fictitious tender (Cloud Platform Services – Canton of Zurich) holding both forms; bidder Alpenlogic AG.
+- Flow: Company knowledge → Tender → Setup → Live fill → Export. Details in `docs/USER_FLOW.md`, mockups in `docs/design/`.
+- No form- or field-specific rules: the AI decides per field using generic criteria (verified evidence, conflicting sources, outdated source, user-only field).
+- Yes/No declarations are auto-ticked when evidence is found (proof shown, editable), left empty otherwise. Signature and stamp are never filled.
+- Export is allowed with a warning for empty fields and doubts; only an unanswered declaration blocks it. Export in the original format only.
+- Project plan and decision log: `docs/PLAN.md`.
+
 ## How we work
 
     - Work in small steps, with tests for the critical parts, and commit as we go
