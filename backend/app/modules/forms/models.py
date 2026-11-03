@@ -1,9 +1,13 @@
+from datetime import datetime
 from enum import StrEnum
+from typing import Any
 
-from sqlalchemy import BigInteger, ForeignKey, UniqueConstraint
+from sqlalchemy import BigInteger, DateTime, ForeignKey, UniqueConstraint
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import Base, TimestampMixin, id_column, str_enum
+from app.modules.forms.parsing.schema import FieldKind
 
 
 class FileFormat(StrEnum):
@@ -38,3 +42,28 @@ class Form(TimestampMixin, Base):
     status: Mapped[FormStatus] = mapped_column(
         str_enum(FormStatus), default=FormStatus.NOT_STARTED, server_default=FormStatus.NOT_STARTED
     )
+    # Set once the file has been parsed into fields; null while its format has no parser yet.
+    parsed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Page sizes in points ([{width, height}]), for the preview overlay.
+    pages: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list, server_default="[]")
+
+
+class Field(TimestampMixin, Base):
+    """A blank of a form to fill, as detected by the parser."""
+
+    __tablename__ = "field"
+    __table_args__ = (
+        # (form_id, position) also serves the foreign-key lookups: no separate form_id index.
+        UniqueConstraint("form_id", "position"),
+        UniqueConstraint("form_id", "key"),
+    )
+
+    id: Mapped[int] = id_column()
+    form_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("form.id", ondelete="CASCADE"))
+    position: Mapped[int]
+    key: Mapped[str]
+    section: Mapped[str]
+    label: Mapped[str]
+    kind: Mapped[FieldKind] = mapped_column(str_enum(FieldKind))
+    # Where the answer goes in the original file (PdfLocator for now), see parsing/schema.py.
+    locator: Mapped[dict[str, Any]] = mapped_column(JSONB)
