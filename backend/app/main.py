@@ -7,8 +7,12 @@ from pydantic import BaseModel
 from sqlalchemy import text
 
 from app.core.config import get_settings
-from app.core.db import SessionDep
+from app.core.db import SessionDep, SessionLocal
+from app.core.errors import register_error_handlers
 from app.core.migrations import upgrade_to_head
+from app.modules.forms.router import router as forms_router
+from app.modules.tenders.router import router as tenders_router
+from app.seed import seed
 
 
 @asynccontextmanager
@@ -16,6 +20,8 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     upgrade_to_head(settings.database_url)
     settings.data_dir.mkdir(parents=True, exist_ok=True)
+    with SessionLocal() as session:
+        seed(session, settings)
     yield
 
 
@@ -26,6 +32,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+register_error_handlers(app)
+app.include_router(tenders_router)
+app.include_router(forms_router)
 
 
 class Health(BaseModel):

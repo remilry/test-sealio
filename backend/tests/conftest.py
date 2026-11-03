@@ -2,6 +2,7 @@
 
 import os
 from collections.abc import Iterator
+from pathlib import Path
 
 import psycopg
 import pytest
@@ -21,6 +22,7 @@ os.environ["FORMPILOT_DATABASE_URL"] = TEST_DATABASE_URL
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import text  # noqa: E402
 
+from app.core.config import get_settings  # noqa: E402
 from app.core.db import Base, engine  # noqa: E402
 from app.core.migrations import upgrade_to_head  # noqa: E402
 from app.main import app  # noqa: E402
@@ -38,6 +40,21 @@ def _create_test_database() -> None:
 def database() -> None:
     _create_test_database()
     upgrade_to_head(TEST_DATABASE_URL)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def data_dir(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Path]:
+    """Uploads and copied forms go to a temporary folder, never to the repo's data/."""
+    path = tmp_path_factory.mktemp("data")
+    previous = os.environ.get("FORMPILOT_DATA_DIR")
+    os.environ["FORMPILOT_DATA_DIR"] = str(path)
+    get_settings.cache_clear()
+    yield path
+    if previous is None:
+        os.environ.pop("FORMPILOT_DATA_DIR")
+    else:
+        os.environ["FORMPILOT_DATA_DIR"] = previous
+    get_settings.cache_clear()
 
 
 @pytest.fixture(autouse=True)

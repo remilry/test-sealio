@@ -15,6 +15,8 @@ class Settings(BaseSettings):
 
     database_url: str = "postgresql+psycopg://formpilot:formpilot@localhost:5432/formpilot"
     data_dir: Path = REPO_ROOT / "data"
+    # Stand-in for the external source the tender forms come from in the real product.
+    seed_forms_dir: Path = REPO_ROOT / "forms"
     cors_origins: list[str] = ["http://localhost:3000"]
 
     llm_provider: Literal["anthropic", "fake"] = "fake"
