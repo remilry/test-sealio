@@ -34,13 +34,12 @@ Tender (offre fictive) ──► Setup (modale) ──► Live fill ──► Ex
 
 ### 3.1 Company knowledge
 
-But : savoir **sur quoi l'IA s'appuie** et ce qui pose problème, avant même de remplir.
+But : savoir **sur quoi l'IA s'appuie**.
 
-- En-tête : nom de l'entreprise, `11 documents · N facts extracted · last sync`.
-- **Alertes** en haut (ambre) :
-  - document périmé : « Liability insurance certificate expired on … — answers from it are flagged in every form » + lien *Upload a new one* ;
-  - documents contradictoires : « 2 documents disagree on the AHV compensation office address ».
-- Tableau des documents : type (PDF/DOC), nom, **faits extraits** (2 visibles + `+n`), date de validité/émission, statut : `Indexed` · `Outdated` · `Conflict` · `Processing` (avec progression « Reading… 3/5 pages ») · `Error` (fichier illisible, avec message).
+> **V1 (décision 2026-11-03)** : pas d'extraction de faits à l'ingestion (coût). L'écran liste seulement les documents enregistrés ; les doutes (périmé, conflit) sont détectés pendant le remplissage. Les faits extraits et les alertes au niveau de la base passent en *Remaining features*.
+
+- En-tête : nom de l'entreprise, `11 documents · last sync`.
+- Tableau des documents : type (PDF/DOC), nom, nombre de pages, date d'ajout, statut : `Indexed` · `Processing` (avec progression « Reading… 3/5 pages ») · `Error` (fichier illisible, avec message).
 - Bouton **Add documents** : dépôt PDF/DOCX → la ligne apparaît en `Processing` puis passe à son statut final. Retour immédiat par document, pas de rechargement de page.
 - Pré-chargé avec les 11 documents de `knowledge-base/documents/`.
 
@@ -54,14 +53,14 @@ But : voir ce qui est demandé et lancer le remplissage.
   - format (DOCX/PDF), titre, méta : `N fields detected · N Yes/No declarations · 1 signature` ;
   - statut : `Not started` · `In review · x/y` · `✓ Ready` ;
   - actions : `✦ Fill with AI` (non commencé) · `Continue review` + `✦` relancer (commencé) · `⤓ DOCX` / `⤓ PDF` (prêt, format d'origine uniquement).
-- Carte **Company knowledge** résumée : nombre de documents/faits + les mêmes alertes que §3.1, lien *Manage*.
+- Carte **Company knowledge** résumée : nombre de documents, lien *Manage*.
 
 ### 3.3 Setup (modale avant remplissage)
 
 But : un dernier coup d'œil, un clic pour lancer.
 
 - Fichier détecté : nom, `N fields detected · N Yes/No declarations · 1 signature`.
-- Source utilisée : *Company knowledge* (`11 documents · N facts`) avec l'avertissement « 1 expired certificate and 1 conflict will be flagged for you ».
+- Source utilisée : *Company knowledge* (`11 documents`) + *Tender details*. Pas d'avertissement préalable en V1 (doutes détectés pendant le remplissage).
 - Durée estimée (« Takes about 15 seconds »), boutons `Cancel` / `✦ Start filling`.
 
 ### 3.4 Live fill (écran principal)
@@ -84,7 +83,7 @@ But : un dernier coup d'œil, un clic pour lancer.
 | Type | Ce que voit l'utilisateur | Action principale |
 |---|---|---|
 | Auto (sûr) | valeur + source + citation surlignée, « Filled automatically » | `Change` (édition) |
-| Introuvable | note « Searched 11 documents… never mentioned », champ de saisie | `Save` (ou laisser vide) |
+| Introuvable | note « Not found in the passages searched in your 11 documents » (formulation honnête : la recherche RAG peut rater), champ de saisie | `Save` (ou laisser vide) |
 | Manuel (lieu/date…) | « Only you can fill this », valeur pré-écrite si possible (date du jour) | `Save` |
 | Périmé | valeur + note « The certificate expired on … » | `Keep this value` · `Enter new value` · `Replace certificate` (→ Knowledge) |
 | Conflit | 2 options radio, chacune avec source, page, date, citation ; la plus récente pré-sélectionnée et marquée *most recent* ; option « Enter another value » | `Use this one` |
@@ -98,7 +97,7 @@ But : un dernier coup d'œil, un clic pour lancer.
 
 - Onglets `Form` / `Source`.
 - **Form** : aperçu fidèle du formulaire d'origine, mis à jour en direct. Légende : *Filled by AI* (bleu) · *Doubt* (ambre) · *Missing* (hachuré rose) · *Reviewed by you* (vert). Les Oui/Non montrent ☐/☒ et « awaiting you » si non tranchés. Zones signature / cachet visibles, jamais remplies.
-- **Source** : le passage du document cité, ouvert à la page, citation surlignée, « Used for: <champ> ». Si aucune source : « No source for this field — we searched all 11 documents… ».
+- **Source** : le passage du document cité, ouvert à la page, citation surlignée, « Used for: <champ> ». Si aucune source : « No source for this field — nothing relevant found in the passages searched ».
 - **Synchronisation** : cliquer un champ à gauche cadre et surligne sa zone à droite (défilement automatique), et inversement.
 
 **Déroulé du remplissage en direct** (phases affichées) :
@@ -106,7 +105,7 @@ But : un dernier coup d'œil, un clic pour lancer.
 1. *Reading the form* — format, pages, sections.
 2. *Detecting fields to fill* — nombre de champs, déclarations, signature.
 3. *Searching company knowledge* — les champs se remplissent **un par un** dans le document (« Searching… » sur le champ en cours) et apparaissent dans la file à gauche.
-4. *Cross-checking sources* — conflits et documents périmés détectés.
+4. *Cross-checking sources* — conflits (valeurs candidates divergentes) et sources périmées (date de validité renvoyée par le LLM avec citation vérifiée, comparée à la date du jour) détectés.
 5. *Preparing your review* — tri ; fin : « Done. 20 of 23 fields filled in 14 seconds », sélection automatique du premier champ ouvert.
 
 L'utilisateur peut corriger un champ signalé **pendant** le remplissage.
@@ -164,6 +163,7 @@ Les exemples de ce document (assurance, AVS, TVA…) illustrent ces critères ; 
 **→ « Remaining features » du README** :
 - *Remember new answers* : réinjecter les réponses saisies dans la base pour les formulaires suivants.
 - *Declarations audit trail* joint à l'export.
+- Extraction de faits à l'ingestion : « N facts extracted », alertes *périmé* / *conflit* et statuts `Outdated` / `Conflict` dans *Company knowledge*, avertissement dans *Setup* (retiré de la V1 le 2026-11-03 pour réduire les coûts).
 - Résoudre un conflit une fois pour tous les formulaires depuis *Company knowledge* (probablement fait après coup si le temps le permet).
 - Source *Previous submissions* (formulaires déjà remplis).
 - Plusieurs offres, *Forms library*, *Settings*, recherche ⌘K, onglets *Overview / Tender documents / Proposal*, *Submission package*, notifications « on vous prévient quand c'est prêt ».

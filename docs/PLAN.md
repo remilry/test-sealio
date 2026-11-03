@@ -45,7 +45,7 @@ Légende : ⬜ à faire · 🟦 en cours · ✅ fait. Chaque étape produit un l
 - Flux : Company knowledge → Tender (offre fictive avec les 2 formulaires) → Setup → **Live fill** (l'IA remplit sous les yeux de l'utilisateur, qui corrige en parallèle) → Export. *AI filling* + *Review* en repli technique.
 - Livrable : `docs/USER_FLOW.md` + maquettes Claude Design `docs/design/Formpilot.dc.html`.
 
-### Étape 3 — Architecture ⬜
+### Étape 3 — Architecture 🟦
 - Choix de la stack, découpage en modules, modèle de données, contrats entre modules, stratégie de test. Pistes en section 6.
 - Livrable : `docs/ARCHITECTURE.md` (+ décisions consignées).
 
@@ -102,7 +102,7 @@ Détaillé dans `docs/USER_FLOW.md` (validé le 2026-11-03).
 - **Ordre des étapes** : conservé pour l'instant, révisable.
 
 **Encore ouvert (à traiter à l'étape concernée)**
-- Fournisseur LLM final et disponibilité d'une clé API (étape 3/5).
+- ~~Fournisseur LLM final~~ → Claude (2026-11-03).
 - Rigueur de la comparaison visuelle à l'export : seuil d'image ou vérification structurelle seulement (étape 4/7).
 
 ## 6. Pistes d'architecture (_propositions à discuter à l'étape 3_)
@@ -137,3 +137,8 @@ UI (relecture)  ──►  API locale
 | 2026-11-03 | Export autorisé avec avertissement (champs vides, doutes) ; bloqué seulement par une déclaration sans réponse ; format d'origine uniquement | validé |
 | 2026-11-03 | Aucune règle propre à un formulaire ou un champ : l'IA juge avec des critères génériques (preuve, conflit, péremption, champ réservé à l'utilisateur) | validé |
 | 2026-11-03 | Remember answers, audit trail, résolution de conflit dans la base, sources « previous submissions » → Remaining features | validé |
+| 2026-11-03 | Archi globale : monorepo `frontend/` (Next.js, client seul) + `backend/` (FastAPI, source de vérité), REST + SSE, types TS générés depuis l'OpenAPI, remplissage en job back avec événements persistés, SQLite + fichiers, `FakeLLM` pour des tests déterministes | validé |
+| 2026-11-03 | LLM : Claude (via la façade) ; un appel par section du formulaire, événement SSE par champ | validé |
+| 2026-11-03 | RAG (pour passer à l'échelle) : embeddings locaux (fastembed) + recherche hybride BM25/vecteurs dans SQLite (`sqlite-vec`) ; « introuvable » formulé honnêtement | validé |
+| 2026-11-03 | Archi front : `app → screens → features → shared`, `api.ts` par feature, `shared/api` = init client + types générés, pas d'import entre features (par défaut), TanStack Query sans store global, `docx-preview` + `react-pdf` ; tests Vitest par écran (skill `screen-tests`) + 1 Playwright scénario principal | validé |
+| 2026-11-03 | V1 sans extraction de faits à l'ingestion (coût) : *Company knowledge* liste les documents ; conflits et péremption détectés au remplissage (date de validité renvoyée par le LLM avec citation vérifiée) | validé |
