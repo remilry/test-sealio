@@ -77,6 +77,15 @@ function FillWorkspace({ form, fill }: { form: FormDetail; fill: FillState }) {
   const save = useSaveAnswer(form.id);
 
   const answers = new Map(fill.answers.map((answer) => [answer.field_id, answer]));
+  // Text being typed, not saved yet: shown on the document at every keystroke.
+  const [drafts, setDrafts] = useState<ReadonlyMap<number, string>>(new Map());
+  const setDraft = (fieldId: number, text: string | null) =>
+    setDrafts((previous) => {
+      const next = new Map(previous);
+      if (text === null) next.delete(fieldId);
+      else next.set(fieldId, text);
+      return next;
+    });
   const fields: QueueField[] = form.fields.map((field) => ({
     id: field.id,
     label: field.label,
@@ -84,15 +93,18 @@ function FillWorkspace({ form, fill }: { form: FormDetail; fill: FillState }) {
     value: answers.get(field.id)?.value ?? null,
     enteredAt: answers.get(field.id)?.resolved_at ?? null,
   }));
-  const zones: PreviewZone[] = form.fields.map((field, index) => ({
-    id: field.id,
-    label: field.label,
-    page: field.locator.page,
-    box: field.locator.box,
-    fontSize: field.locator.font_size,
-    value: fields[index].value,
-    tone: !fields[index].fillable ? "signature" : fields[index].value ? "entered" : "empty",
-  }));
+  const zones: PreviewZone[] = form.fields.map((field, index) => {
+    const value = (drafts.get(field.id) ?? fields[index].value ?? "").trim() || null;
+    return {
+      id: field.id,
+      label: field.label,
+      page: field.locator.page,
+      box: field.locator.box,
+      fontSize: field.locator.font_size,
+      value,
+      tone: !fields[index].fillable ? "signature" : value ? "entered" : "empty",
+    };
+  });
   const fillable = fields.filter((field) => field.fillable);
 
   const [chosenId, setChosenId] = useState<number | null>(null);
@@ -172,8 +184,13 @@ function FillWorkspace({ form, fill }: { form: FormDetail; fill: FillState }) {
             selectedId={selectedId}
             focusRequest={focusRequest}
             onSelect={setChosenId}
-            onSave={(fieldId, value) => save.mutate({ fieldId, value })}
+            onSave={(fieldId, value) => {
+              // The saved answer takes over from the draft (and comes back if the save fails).
+              setDraft(fieldId, null);
+              save.mutate({ fieldId, value });
+            }}
             onNext={focusNextFillable}
+            onDraft={setDraft}
           />
         </div>
         <div className="min-h-0 overflow-y-auto bg-muted/40 p-6">

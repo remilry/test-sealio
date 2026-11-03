@@ -29,10 +29,15 @@ test("I fill Annex 7 by hand and download it in its original PDF layout", async 
   // Type two values: each is saved and shown on the form.
   await fields.getByRole("textbox", { name: "Name and legal form" }).fill("Alpenlogic AG");
   await page.keyboard.press("Enter");
-  await expect(fields.getByRole("textbox", { name: "Business address" })).toBeFocused();
-  await page.keyboard.type("Pfingstweidstrasse 31, 8005 Zürich");
+  const address = fields.getByRole("textbox", { name: "Business address" });
+  await expect(address).toBeFocused();
+  // Replaces a value left by a previous run; the document follows each keystroke.
+  await address.clear();
+  await address.pressSequentially("Pfingstweidstrasse 31");
+  await expect(preview.getByText("Pfingstweidstrasse 31", { exact: true })).toBeVisible();
+  await address.pressSequentially(", 8005 Zürich");
   await page.keyboard.press("Tab");
-  await expect(page.getByRole("status")).toHaveText(/Saved/);
+  await expect(page.getByRole("status")).toHaveText(/saved/i);
   await expect(preview.getByText("Pfingstweidstrasse 31, 8005 Zürich")).toBeVisible();
 
   // Export: the download is the filled PDF, under the original file name.

@@ -131,6 +131,25 @@ describe("Live fill (manual)", () => {
     expect(card.getByText("Entered by you · 14:45")).toBeInTheDocument();
   });
 
+  it("shows what I type on the form at every keystroke, before it is saved", async () => {
+    // Given an empty form
+    const { saved, user } = given();
+    const telephone = await screen.findByRole("textbox", { name: "Telephone" });
+
+    // When I type the first characters
+    await user.type(telephone, "+4");
+
+    // Then the document shows them already, though nothing is saved yet
+    expect(within(zone(6)).getByText("+4")).toBeInTheDocument();
+    await user.type(telephone, "1");
+    expect(within(zone(6)).getByText("+41")).toBeInTheDocument();
+    expect(saved.requests).toEqual([]);
+
+    // And erasing everything shows the field empty again
+    await user.clear(telephone);
+    expect(within(zone(6)).queryByText(/\+4/)).not.toBeInTheDocument();
+  });
+
   it("does not save a field I only passed through", async () => {
     // Given a form with a saved telephone number
     const { saved, user } = given(annex7(), fillState([answer(6, "+41 44 512 38 00")]));

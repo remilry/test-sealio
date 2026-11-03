@@ -22,7 +22,8 @@ export type FocusRequest = { fieldId: number; at: number };
 
 /**
  * The fields of the form, in order, each with its input. A value is saved when the user leaves
- * the input or presses Enter (which also moves on to the next field).
+ * the input or presses Enter (which also moves on to the next field). Every keystroke is reported
+ * through `onDraft`, so the document can show the text while it is typed.
  */
 export function FieldList({
   fields,
@@ -31,6 +32,7 @@ export function FieldList({
   onSelect,
   onSave,
   onNext,
+  onDraft,
 }: {
   fields: QueueField[];
   selectedId: number | null;
@@ -38,6 +40,7 @@ export function FieldList({
   onSelect: (fieldId: number) => void;
   onSave: (fieldId: number, value: string | null) => void;
   onNext: (fieldId: number) => void;
+  onDraft: (fieldId: number, text: string) => void;
 }) {
   const inputs = useRef(new Map<number, HTMLInputElement>());
 
@@ -68,6 +71,7 @@ export function FieldList({
               onFocus={() => onSelect(field.id)}
               onSave={(value) => onSave(field.id, value)}
               onNext={() => onNext(field.id)}
+              onDraft={(text) => onDraft(field.id, text)}
             />
           ) : (
             <div className="flex flex-col gap-1">
@@ -90,12 +94,14 @@ function FieldInput({
   onFocus,
   onSave,
   onNext,
+  onDraft,
 }: {
   field: QueueField;
   inputRef: (input: HTMLInputElement | null) => void;
   onFocus: () => void;
   onSave: (value: string | null) => void;
   onNext: () => void;
+  onDraft: (text: string) => void;
 }) {
   const inputId = `field-${field.id}`;
   // The last value sent (or saved), so Enter then leaving the input saves once.
@@ -130,6 +136,7 @@ function FieldInput({
         defaultValue={field.value ?? ""}
         autoComplete="off"
         onFocus={onFocus}
+        onChange={(event) => onDraft(event.currentTarget.value)}
         onBlur={(event) => saveIfChanged(event.currentTarget)}
       />
       <p className="text-xs text-muted-foreground">
