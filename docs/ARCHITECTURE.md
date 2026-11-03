@@ -114,7 +114,7 @@ SSE ─► fill-session (reducer) ─► setQueryData(["form", id])
 ## 3. Architecture back
 
 ### Stack
-Python 3.12 · FastAPI · SQLAlchemy 2 + psycopg 3 · Alembic (migrations) · PostgreSQL + pgvector · `fastembed` · SDK Anthropic (dans `llm/` uniquement) · PyMuPDF · python-docx · pytest · uv, ruff, pyright.
+Python 3.14 · FastAPI (SSE natif `fastapi.sse`) · SQLAlchemy 2.1 + psycopg 3 · Alembic (migrations) · PostgreSQL + pgvector · `fastembed` · SDK Anthropic (dans `llm/` uniquement) · PyMuPDF · python-docx · pytest · uv, ruff, pyright.
 
 ### Arborescence (modules métier)
 

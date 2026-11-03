@@ -1,0 +1,62 @@
+[project]
+name = "formpilot-backend"
+version = "0.1.0"
+description = "AI form filler API: parse tender forms, answer from the company knowledge base, export the filled file."
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "alembic>=1.20.1",
+    "anthropic>=2.4.0",
+    "fastapi[standard]>=0.162.0",
+    "fastembed>=0.9.1",
+    "pgvector>=0.5.1",
+    "psycopg[binary,pool]>=3.3.7",
+    "pydantic-settings>=2.16.2",
+    "pymupdf>=2.1",
+    "python-docx>=1.2.0",
+    "python-multipart>=0.0.33",
+    "sqlalchemy>=2.1.6",
+]
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.414",
+    "pytest>=9.2.0",
+    "pytest-asyncio>=1.4.1.post1",
+    "ruff>=0.17.3",
+]
+
+[tool.fastapi]
+entrypoint = "app.main:app"
+
+[tool.alembic]
+script_location = "%(here)s/migrations"
+file_template = "%%(year)d_%%(month).2d_%%(day).2d_%%(hour).2d%%(minute).2d-%%(rev)s_%%(slug)s"
+prepend_sys_path = ["."]
+
+[[tool.alembic.post_write_hooks]]
+name = "ruff"
+type = "module"
+module = "ruff"
+options = "format REVISION_SCRIPT_FILENAME"
+
+[tool.pytest]
+testpaths = ["tests"]
+addopts = ["-m", "not slow", "--strict-markers"]
+markers = ["slow: loads the real embedding model (run with `make test-slow`)"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "FAST", "PT"]
+
+[tool.pyright]
+include = ["app", "tests", "migrations"]
+pythonVersion = "3.14"
+typeCheckingMode = "standard"
+venvPath = "."
+venv = ".venv"
