@@ -44,3 +44,6 @@ next-env.d.ts
 /test-results/
 /playwright-report/
 /playwright/.cache/
+
+# local test reports (RTK)
+/.vitest/

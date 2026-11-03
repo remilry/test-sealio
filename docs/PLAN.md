@@ -57,7 +57,8 @@ Chaque étape à partir de la 4 livre une **fonctionnalité utilisable de bout e
 
 ### Étape 4 — Walking skeleton (Annex 7 de bout en bout, sans IA) ⬜
 - Repo git, outillage (lint, tests, lancement local en une commande).
-- Parcours minimal complet : déposer l'Annex 7 (PDF) → champs détectés affichés → l'utilisateur les saisit à la main → export du PDF rempli → téléchargement.
+- Parcours minimal complet : ouvrir l'offre (les annexes sont déjà présentes : dans le produit elles viennent d'une source externe, ici seedées depuis `forms/`) → Annex 7 (PDF) → champs détectés affichés → l'utilisateur les saisit à la main → export du PDF rempli → téléchargement.
+- ✅ Fait : API `GET /tenders`, `GET /tenders/{id}`, `GET /forms/{id}/file` + écran *Tender* (barre latérale, en-tête, échéance, cartes des formulaires) ; « Fill with AI » visible mais désactivé jusqu'à l'écran *Setup*.
 - C'est volontairement la partie la plus risquée (parsing PDF à plat + superposition de texte) : on la valide en premier, avec l'UI en place dès le départ.
 - Tests : parseur PDF (schéma attendu), export (texte au bon endroit, reste inchangé), e2e du parcours.
 
@@ -146,3 +147,4 @@ UI (relecture)  ──►  API locale
 | 2026-11-03 | V1 sans extraction de faits à l'ingestion (coût) : *Company knowledge* liste les documents ; conflits et péremption détectés au remplissage (date de validité renvoyée par le LLM avec citation vérifiée) | validé |
 | 2026-11-03 | Étape 4, setup front : Node 26 LTS (`.nvmrc`), pnpm 12, Next 16.4 (défauts create-next-app : Turbopack, Cache Components, AGENTS.md), shadcn/ui preset `base-nova` (Base UI), MSW 3 ; règles de modules vérifiées par `eslint-plugin-boundaries` ; skills `next-dev-loop`, `shadcn`, `vercel-react-best-practices`, `vercel-composition-patterns` + MCP `next-devtools` | à valider |
 | 2026-11-03 | Étape 4, setup back : Python 3.14 (3.15 bloqué par onnxruntime/fastembed), uv, FastAPI 0.162 avec SSE natif (pas de `sse-starlette`), SQLAlchemy 2.1, PostgreSQL 18 + pgvector 0.8.7 (`docker-compose.yml`), migrations Alembic au démarrage, base `formpilot_test` pour pytest ; SQLAlchemy et pyright conservés malgré le skill FastAPI (SQLModel, ty en bêta) ; skills `fastapi`, `uv`, `pydantic`, `supabase-postgres-best-practices` ; `make dev` lance db + back + front | à valider |
+| 2026-11-03 | Pas de dépôt des formulaires par l'utilisateur : l'offre et ses annexes viennent d'une source externe (seed au démarrage depuis `forms/`, copie dans `data/`) ; première page = *Tender* | validé |

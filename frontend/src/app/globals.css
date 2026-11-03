@@ -35,6 +35,10 @@
   --color-secondary: var(--secondary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary: var(--primary);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
   --color-popover-foreground: var(--popover-foreground);
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
@@ -48,15 +52,20 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* Formpilot palette (docs/design mockups): grey page, white cards, indigo actions. */
 :root {
-  --background: oklch(1 0 0);
+  --background: oklch(0.984 0.002 264);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
+  --primary: oklch(0.523 0.196 268.5);
   --primary-foreground: oklch(0.985 0 0);
+  --success: oklch(0.53 0.11 163);
+  --success-foreground: oklch(0.985 0 0);
+  --warning: oklch(0.56 0.15 45);
+  --warning-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
@@ -90,8 +99,12 @@
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
+  --primary: oklch(0.68 0.15 268);
+  --primary-foreground: oklch(0.145 0 0);
+  --success: oklch(0.72 0.13 163);
+  --success-foreground: oklch(0.145 0 0);
+  --warning: oklch(0.75 0.14 60);
+  --warning-foreground: oklch(0.145 0 0);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);

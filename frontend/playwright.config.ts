@@ -15,10 +15,20 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
-  webServer: {
-    command: `pnpm build && pnpm start --port ${PORT}`,
-    url: baseURL,
-    reuseExistingServer: !process.env.CI,
-    timeout: 180_000,
-  },
+  // The real back (needs PostgreSQL: `make db`, done by `make e2e`) and the production front.
+  webServer: [
+    {
+      command: "uv run fastapi run --port 8000",
+      cwd: "../backend",
+      url: "http://localhost:8000/health",
+      reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
+    },
+    {
+      command: `pnpm build && pnpm start --port ${PORT}`,
+      url: baseURL,
+      reuseExistingServer: !process.env.CI,
+      timeout: 180_000,
+    },
+  ],
 });
