@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>*{box-sizing:border-box}body{margin:0;background:#f7f8fa;color:#101828;-webkit-font-smoothing:antialiased}a{color:#3b5bdb;text-decoration:none;cursor:pointer}a:hover{color:#2f49b0;text-decoration:underline}button,input{font-family:inherit}input:focus{outline:none;border-color:#3b5bdb !important;box-shadow:0 0 0 3px #eef2ff}::selection{background:#dbe4ff}</style>
+</helmet>
+<div style="display:flex;height:100vh;min-width:760px;font-family:Geist,system-ui,sans-serif;font-size:13px;color:#101828;background:#f7f8fa;position:relative">
+
+<sc-if value="{{ showSidebar }}" hint-placeholder-val="{{ true }}">
+<aside style="width:236px;flex:none;background:#fbfbfc;border-right:1px solid #e4e7ec;display:flex;flex-direction:column;padding:14px 10px">
+  <div style="display:flex;align-items:center;gap:9px;padding:4px 8px 16px">
+    <div style="width:24px;height:24px;border-radius:7px;background:#101828;color:#fff;display:grid;place-items:center;font-weight:700;font-size:12px">F</div>
+    <span style="font-weight:600;font-size:14.5px;letter-spacing:-.01em">Formpilot</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;padding:7px 8px;border:1px solid #e4e7ec;border-radius:8px;background:#fff;margin-bottom:16px;box-shadow:0 1px 2px rgba(16,24,40,.04)">
+    <div style="width:20px;height:20px;border-radius:5px;background:#dbe4ff;color:#3b5bdb;font-size:9.5px;font-weight:700;display:grid;place-items:center">AL</div>
+    <span style="flex:1;font-weight:500">Alpenlogic AG</span><span style="color:#98a2b3;font-size:11px">▾</span>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:2px">
+    <sc-for list="{{ nav }}" as="n" hint-placeholder-count="4">
+      <div onClick="{{ n.onClick }}" style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:7px;cursor:pointer;background:{{ n.bg }};color:{{ n.color }};font-weight:{{ n.weight }}" style-hover="background:#f2f4f7">
+        <span style="flex:1">{{ n.label }}</span><span style="font-size:11px;color:#98a2b3">{{ n.badge }}</span>
+      </div>
+    </sc-for>
+  </div>
+  <div style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#98a2b3;font-weight:600;padding:22px 10px 8px">Active tenders</div>
+  <div style="display:flex;flex-direction:column;gap:2px">
+    <div onClick="{{ goTender }}" style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:7px;cursor:pointer;color:#344054" style-hover="background:#f2f4f7"><span style="width:7px;height:7px;border-radius:50%;background:#3b5bdb;flex:none"></span><span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Cloud Platform Services</span><span style="font-size:11px;color:#b54708">16d</span></div>
+    <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:7px;color:#344054"><span style="width:7px;height:7px;border-radius:50%;background:#d0d5dd;flex:none"></span><span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">IT Security Audit — SBB</span><span style="font-size:11px;color:#98a2b3">31d</span></div>
+    <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:7px;color:#344054"><span style="width:7px;height:7px;border-radius:50%;background:#d0d5dd;flex:none"></span><span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Data Centre Migration — Bern</span><span style="font-size:11px;color:#98a2b3">48d</span></div>
+  </div>
+  <div style="flex:1"></div>
+  <div style="display:flex;align-items:center;gap:9px;padding:10px 8px;border-top:1px solid #eef0f3">
+    <div style="flex:none;width:28px;height:28px;border-radius:50%;background:#dbe4ff;color:#3b5bdb;display:grid;place-items:center;font-weight:600;font-size:11px">MK</div>
+    <div style="line-height:1.3"><div style="font-weight:500">Marc Keller</div><div style="font-size:11.5px;color:#667085">Head of Bids</div></div>
+  </div>
+</aside>
+</sc-if>
+
+<div style="flex:1;min-width:0;display:flex;flex-direction:column;position:relative">
+
+<!-- ===== TENDER ===== -->
+<sc-if value="{{ isTender }}" hint-placeholder-val="{{ true }}">
+<div style="flex:1;overflow:auto">
+  <div style="height:52px;background:#fff;border-bottom:1px solid #e4e7ec;display:flex;align-items:center;padding:0 24px;gap:8px;position:sticky;top:0;z-index:2">
+    <span style="color:#667085">Tenders</span><span style="color:#d0d5dd">/</span><span style="font-weight:500">Cloud Platform Services</span>
+    <div style="flex:1"></div>
+    <div style="display:flex;align-items:center;gap:8px;height:30px;padding:0 10px;border:1px solid #e4e7ec;border-radius:8px;color:#98a2b3;width:220px;font-size:12.5px"><span style="flex:1">Search tenders, forms…</span><span style="font-family:'Geist Mono',monospace;font-size:10.5px;border:1px solid #d0d5dd;border-radius:4px;padding:0 4px">⌘K</span></div>
+  </div>
+  <div style="max-width:1160px;margin:0 auto;padding:28px 32px 96px">
+    <div style="display:flex;flex-wrap:wrap;align-items:flex-start;gap:16px;margin-bottom:22px">
+      <div style="flex:1 1 420px">
+        <div style="display:flex;gap:6px;margin-bottom:10px"><span style="font-size:11px;font-weight:500;padding:2px 8px;border-radius:99px;background:#f2f4f7;color:#475467">Open procedure</span><span style="font-size:11px;font-weight:500;padding:2px 8px;border-radius:99px;background:#f2f4f7;color:#475467">Ref. ZH-2026-0412</span></div>
+        <h1 style="margin:0 0 6px;font-size:24px;font-weight:600;letter-spacing:-.02em">Cloud Platform Services – Canton of Zurich</h1>
+        <div style="color:#667085;font-size:13.5px">Office for Information Technology · 4-year framework contract · Lots 1 and 2</div>
+      </div>
+      <div style="text-align:right;border:1px solid #fde3c3;background:#fff9f0;border-radius:10px;padding:10px 14px">
+        <div style="font-size:11.5px;color:#b54708;font-weight:500">Submission due</div>
+        <div style="font-size:16px;font-weight:600;letter-spacing:-.01em">19 Nov 2026 · 16 days</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:20px;border-bottom:1px solid #e4e7ec;margin-bottom:24px;white-space:nowrap;overflow-x:auto">
+      <span style="padding:9px 0;color:#667085">Overview</span>
+      <span style="padding:9px 0;color:#667085">Tender documents</span>
+      <span style="padding:9px 0;color:#667085">Proposal</span>
+      <span style="padding:9px 0;font-weight:600;box-shadow:inset 0 -2px 0 #101828">Forms <span style="font-size:11px;color:#667085;background:#f2f4f7;border-radius:99px;padding:1px 6px;margin-left:3px">3</span></span>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start"><div style="flex:1 1 520px;min-width:0">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px">
+          <div style="font-size:15px;font-weight:600">Forms to complete</div>
+          <div style="color:#667085;font-size:12px">Buyer templates · filled in place, layout preserved</div>
+        </div>
+        <div style="background:#fff;border:1px solid #e4e7ec;border-radius:12px;overflow:hidden;box-shadow:0 1px 2px rgba(16,24,40,.04)">
+          <div style="display:grid;grid-template-columns:36px minmax(0,1fr) auto auto;gap:16px;align-items:center;padding:16px 18px;border-bottom:1px solid #eef0f3;background:{{ a4RowBg }}">
+            <div style="width:34px;height:40px;border-radius:6px;background:#1570ef;color:#fff;display:grid;place-items:center;font-size:8.5px;font-weight:700;font-family:'Geist Mono',monospace">DOCX</div>
+            <div style="min-width:0"><div style="font-weight:600;font-size:14px">Annex 4 — Bidder questionnaire</div><div style="color:#667085;font-size:12px;margin-top:3px">{{ a4Meta }}</div></div>
+            <div style="display:flex;flex-direction:column;gap:6px"><span style="align-self:flex-start;font-size:11.5px;font-weight:500;padding:2px 8px;border-radius:99px;background:{{ a4StatusBg }};color:{{ a4StatusFg }}">{{ a4Status }}</span><sc-if value="{{ a4Started }}"><div style="width:120px;height:4px;background:#eaecf0;border-radius:9px;overflow:hidden"><div style="height:100%;width:{{ pctResolved }}%;background:#12805c"></div></div></sc-if></div>
+            <div style="display:flex;justify-content:flex-end">
+              <sc-if value="{{ a4NotStarted }}"><button onClick="{{ goSetup }}" style="height:32px;padding:0 12px;border-radius:8px;border:1px solid #3b5bdb;background:#3b5bdb;color:#fff;font-weight:500;font-size:13px;display:inline-flex;align-items:center;gap:6px;cursor:pointer;box-shadow:0 1px 2px rgba(16,24,40,.1),inset 0 1px 0 rgba(255,255,255,.15)" style-hover="background:#3451c7">✦ Fill with AI</button></sc-if>
+              <sc-if value="{{ a4Started }}"><button onClick="{{ goSetup }}" title="Re-run AI fill" style="height:32px;width:32px;margin-right:6px;border-radius:8px;border:1px solid #d0d5dd;background:#fff;color:#3b5bdb;font-size:13px;cursor:pointer;box-shadow:0 1px 2px rgba(16,24,40,.05)">✦</button></sc-if><sc-if value="{{ a4Started }}"><button onClick="{{ goReview }}" style="height:32px;padding:0 12px;border-radius:8px;border:1px solid #d0d5dd;background:#fff;color:#101828;font-weight:500;font-size:13px;cursor:pointer;white-space:nowrap;box-shadow:0 1px 2px rgba(16,24,40,.05)">Continue review</button></sc-if>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:36px minmax(0,1fr) auto auto;gap:16px;align-items:center;padding:16px 18px;border-bottom:1px solid #eef0f3">
+            <div style="width:34px;height:40px;border-radius:6px;background:#1570ef;color:#fff;display:grid;place-items:center;font-size:8.5px;font-weight:700;font-family:'Geist Mono',monospace">DOCX</div>
+            <div><div style="font-weight:600;font-size:14px">Annex 2 — Reference projects</div><div style="color:#667085;font-size:12px;margin-top:3px">3 references × 6 fields · from previous submissions</div></div>
+            <div style="display:flex;flex-direction:column;gap:6px"><span style="align-self:flex-start;font-size:11.5px;font-weight:500;padding:2px 8px;border-radius:99px;background:#eef2ff;color:#3b5bdb">In review · 11/18</span><div style="width:120px;height:4px;background:#eaecf0;border-radius:9px;overflow:hidden"><div style="height:100%;width:61%;background:#12805c"></div></div></div>
+            <div style="display:flex;justify-content:flex-end"><button style="height:32px;padding:0 12px;border-radius:8px;border:1px solid #d0d5dd;background:#fff;color:#101828;font-weight:500;font-size:13px;cursor:pointer;white-space:nowrap;box-shadow:0 1px 2px rgba(16,24,40,.05)">Continue review</button></div>
+          </div>
+          <div style="display:grid;grid-template-columns:36px minmax(0,1fr) auto auto;gap:16px;align-items:center;padding:16px 18px">
+            <div style="width:34px;height:40px;border-radius:6px;background:#d92d20;color:#fff;display:grid;place-items:center;font-size:8.5px;font-weight:700;font-family:'Geist Mono',monospace">PDF</div>
+            <div><div style="font-weight:600;font-size:14px">Annex 7 — Sanctions declaration</div><div style="color:#667085;font-size:12px;margin-top:3px">8 fields · 1 legal declaration · sign by hand</div></div>
+            <div><span style="font-size:11.5px;font-weight:500;padding:2px 8px;border-radius:99px;background:#e8f6f0;color:#12805c">✓ Ready</span></div>
+            <div style="display:flex;justify-content:flex-end;gap:6px"><button style="height:32px;padding:0 12px;border-radius:8px;border:1px solid #d0d5dd;background:#fff;color:#101828;font-weight:500;font-size:13px;cursor:pointer;box-shadow:0 1px 2px rgba(16,24,40,.05)">⤓ PDF</button></div>
+          </div>
+        </div>
+      </div>
+      <div style="flex:1 1 280px;max-width:420px;display:flex;flex-direction:column;gap:16px">
+        <div style="background:#fff;border:1px solid #e4e7ec;border-radius:12px;padding:16px;box-shadow:0 1px 2px rgba(16,24,40,.04)">
+          <div style="display:flex;justify-content:space-between;align-items:baseline"><div style="font-weight:600">Company knowledge</div><a onClick="{{ goKnowledge }}" style="font-size:12px;font-weight:500">Manage</a></div>
+          <div style="color:#667085;font-size:12px;margin:3px 0 12px">What AI answers from</div>
+          <div style="display:flex;gap:20px;margin-bottom:14px"><div><div style="font-size:20px;font-weight:600;letter-spacing:-.02em">11</div><div style="font-size:11.5px;color:#667085">documents</div></div><div><div style="font-size:20px;font-weight:600;letter-spacing:-.02em">64</div><div style="font-size:11.5px;color:#667085">facts extracted</div></div></div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <div style="display:flex;gap:8px;padding:8px 10px;border-radius:8px;background:#fff6e5;color:#b54708;font-size:12px;line-height:1.4"><span>!</span><span><b style="font-weight:600">Liability certificate expired</b> on 30 Sep 2026</span></div>
+            <div style="display:flex;gap:8px;padding:8px 10px;border-radius:8px;background:#fff6e5;color:#b54708;font-size:12px;line-height:1.4"><span>⇄</span><span><b style="font-weight:600">2 documents disagree</b> on the AHV office address</span></div>
+          </div>
+        </div>
+        <div style="background:#fff;border:1px solid #e4e7ec;border-radius:12px;padding:16px;box-shadow:0 1px 2px rgba(16,24,40,.04)">
+          <div style="font-weight:600;margin-bottom:12px">Submission package</div>
+          <div style="display:flex;flex-direction:column;gap:10px;font-size:12.5px">
+            <div style="display:flex;align-items:center;gap:8px"><span style="width:16px;height:16px;border-radius:50%;background:#12805c;color:#fff;font-size:9px;display:grid;place-items:center">✓</span><span style="flex:1">Technical proposal</span><span style="color:#667085">Word · drafted</span></div>
+            <div style="display:flex;align-items:center;gap:8px"><span style="width:16px;height:16px;border-radius:50%;border:1.5px solid #d0d5dd"></span><span style="flex:1">Price sheet</span><span style="color:#667085">Excel</span></div>
+            <div style="display:flex;align-items:center;gap:8px"><span style="width:16px;height:16px;border-radius:50%;border:1.5px solid #3b5bdb;background:#eef2ff"></span><span style="flex:1">Forms</span><span style="color:#667085">1 of 3 ready</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<!-- ===== KNOWLEDGE ===== -->
+<sc-if value="{{ isKnowledge }}" hint-placeholder-val="{{ false }}">
+<div style="flex:1;overflow:auto">
+  <div style="height:52px;background:#fff;border-bottom:1px solid #e4e7ec;display:flex;align-items:center;padding:0 24px;gap:8px;position:sticky;top:0;z-index:2">
+    <span style="font-weight:500">Company knowledge</span><div style="flex:1"></div>
+    <button style="height:32px;padding:0 12px;border-radius:8px;border:1px solid #3b5bdb;background:#3b5bdb;color:#fff;font-weight:500;font-size:13px;cursor:pointer">＋ Add documents</button>
+  </div>
+  <div style="max-width:1100px;margin:0 auto;padding:28px 32px 96px">
+    <h1 style="margin:0 0 4px;font-size:22px;font-weight:600;letter-spacing:-.02em">Alpenlogic AG</h1>
+    <div style="color:#667085;margin-bottom:18px">11 documents · 64 facts extracted · last sync 2 min ago</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px">
+      <div style="display:flex;gap:10px;padding:12px 14px;border-radius:10px;background:#fff6e5;color:#b54708;font-size:12.5px;line-height:1.45"><span style="font-weight:700">!</span><div><b style="font-weight:600">Liability insurance certificate expired on 30 Sep 2026.</b> Answers from it are flagged in every form. <a style="color:#b54708;text-decoration:underline">Upload a new one</a></div></div>
+      <div style="display:flex;gap:10px;padding:12px 14px;border-radius:10px;background:#fff6e5;color:#b54708;font-size:12.5px;line-height:1.45"><span style="font-weight:700">⇄</span><div><b style="font-weight:600">2 documents disagree</b> on the AHV compensation office address. <a style="color:#b54708;text-decoration:underline">Resolve once for all forms</a></div></div>
+    </div>
+    <div style="background:#fff;border:1px solid #e4e7ec;border-radius:12px;overflow:hidden;box-shadow:0 1px 2px rgba(16,24,40,.04)">
+      <div style="display:grid;grid-template-columns:28px minmax(0,1fr) 170px 110px;gap:14px;padding:10px 16px;border-bottom:1px solid #e4e7ec;background:#fbfbfc;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:#98a2b3;font-weight:600"><span></span><span>Document · facts extracted</span><span>Validity</span><span>Status</span></div>
+      <sc-for list="{{ kbRows }}" as="d" hint-placeholder-count="6">
+        <div style="display:grid;grid-template-columns:28px minmax(0,1fr) 170px 110px;gap:14px;align-items:center;padding:12px 16px;border-bottom:1px solid #eef0f3">
+          <div style="width:28px;height:32px;border-radius:5px;background:{{ d.typeBg }};color:#fff;display:grid;place-items:center;font-size:8.5px;font-weight:700;font-family:'Geist Mono',monospace">{{ d.type }}</div>
+          <div style="min-width:0"><div style="font-weight:500">{{ d.name }}</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:5px">
+              <sc-for list="{{ d.facts }}" as="ft"><span style="font-size:11px;background:#f2f4f7;border-radius:5px;padding:2px 6px;color:#475467">{{ ft.k }} <b style="font-family:'Geist Mono',monospace;font-weight:500;color:#101828">{{ ft.v }}</b></span></sc-for>
+              <sc-if value="{{ d.hasMore }}"><span style="font-size:11px;background:#f2f4f7;border-radius:5px;padding:2px 6px;color:#667085">{{ d.more }}</span></sc-if>
+              <sc-if value="{{ d.processing }}"><div style="width:220px;height:5px;background:#eaecf0;border-radius:9px;overflow:hidden;margin-top:5px"><div style="width:60%;height:100%;background:#3b5bdb"></div></div></sc-if>
+            </div>
+          </div>
+          <span style="font-size:12px;color:{{ d.dateColor }}">{{ d.date }}</span>
+          <span style="justify-self:start;font-size:11.5px;font-weight:500;padding:2px 8px;border-radius:99px;background:{{ d.sBg }};color:{{ d.sFg }}">{{ d.status }}</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<!-- ===== RUNNING ===== -->
+<sc-if value="{{ isRunning }}" hint-placeholder-val="{{ false }}">
+<div style="flex:1;display:flex;flex-direction:column;min-height:0">
+  <div style="height:52px;background:#fff;border-bottom:1px solid #e4e7ec;display:flex;align-items:center;padding:0 16px;gap:10px">
+    <button onClick="{{ goTender }}" style="flex:none;height:30px;width:30px;border-radius:8px;border:1px solid #e4e7ec;background:#fff;cursor:pointer;color:#475467">←</button>
+    <div style="flex:none;width:22px;height:22px;border-radius:6px;background:#101828;color:#fff;display:grid;place-items:center;font-weight:700;font-size:11px">F</div>
+    <span style="color:#667085">Cloud Platform Services</span><span style="color:#d0d5dd">/</span><span style="font-weight:500">Annex 4 · Bidder questionnaire</span>
+  </div>
+  <div style="flex:1;overflow:auto;display:flex;justify-content:center;padding:56px 24px">
+    <div style="width:100%;max-width:900px">
+      <div style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:#3b5bdb;background:#eef2ff;border-radius:99px;padding:3px 10px;margin-bottom:12px">✦ {{ runTag }}</div>
+      <h1 style="margin:0 0 6px;font-size:24px;font-weight:600;letter-spacing:-.02em">{{ runHead }}</h1>
+      <div style="color:#667085;font-size:13.5px;margin-bottom:20px">{{ runSub }}</div>
+      <div style="height:6px;background:#eaecf0;border-radius:99px;overflow:hidden;margin-bottom:28px"><div style="height:100%;width:{{ runPct }}%;background:#3b5bdb;border-radius:99px;transition:width .2s"></div></div>
+      <div style="display:grid;grid-template-columns:minmax(0,320px) minmax(0,1fr);gap:20px;align-items:start">
+        <div style="background:#fff;border:1px solid #e4e7ec;border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:16px;box-shadow:0 1px 2px rgba(16,24,40,.04)">
+          <sc-for list="{{ phases }}" as="ph" hint-placeholder-count="5">
+            <div style="display:flex;gap:12px">
+              <div style="width:18px;height:18px;border-radius:50%;flex:none;margin-top:1px;display:grid;place-items:center;color:#fff;font-size:10px;background:{{ ph.dotBg }};border:1.5px solid {{ ph.dotBorder }};box-shadow:{{ ph.dotRing }}">{{ ph.mark }}</div>
+              <div><div style="font-weight:500;color:{{ ph.color }}">{{ ph.label }}</div><sc-if value="{{ ph.hasDetail }}"><div style="font-size:12px;color:#667085;margin-top:2px;line-height:1.4">{{ ph.detail }}</div></sc-if></div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="background:#fff;border:1px solid #e4e7ec;border-radius:12px;overflow:hidden;box-shadow:0 1px 2px rgba(16,24,40,.04)">
+          <div style="display:flex;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #eef0f3"><span style="font-weight:600">Answers found</span><span style="color:#667085;font-family:'Geist Mono',monospace;font-size:12px">{{ matched }} / {{ total }}</span></div>
+          <div style="height:372px;overflow:hidden">
+            <sc-if value="{{ feedEmpty }}"><div style="padding:40px 16px;text-align:center;color:#98a2b3">Reading the form…</div></sc-if>
+            <sc-for list="{{ feed }}" as="fd" hint-placeholder-count="0">
+              <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:9px 16px;border-bottom:1px solid #f2f4f7">
+                <div style="min-width:0"><div style="font-size:11.5px;color:#667085;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ fd.label }}</div><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{ fd.color }};font-weight:{{ fd.weight }}">{{ fd.val }}</div></div>
+                <div style="display:flex;gap:6px;align-items:center"><sc-if value="{{ fd.hasFlag }}"><span style="font-size:10.5px;font-weight:600;padding:2px 6px;border-radius:5px;background:#fff6e5;color:#b54708">{{ fd.flag }}</span></sc-if><span style="font-size:11px;color:#98a2b3">{{ fd.src }}</span></div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+      <sc-if value="{{ runDone }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top:20px;display:flex;align-items:center;gap:16px;background:#fff;border:1px solid #e4e7ec;border-radius:12px;padding:16px 18px;box-shadow:0 4px 16px rgba(16,24,40,.06)">
+          <div style="flex:1;display:flex;gap:18px;align-items:center">
+            <span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:#3b5bdb"></span><b style="font-weight:600">17</b> filled automatically</span>
+            <span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:#b54708"></span><b style="font-weight:600">3</b> with a doubt</span>
+            <span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:#c01048"></span><b style="font-weight:600">3</b> without a value</span>
+          </div>
+          <button onClick="{{ goReview }}" style="height:36px;padding:0 16px;border-radius:8px;border:1px solid #3b5bdb;background:#3b5bdb;color:#fff;font-weight:500;font-size:13.5px;cursor:pointer;box-shadow:0 1px 2px rgba(16,24,40,.1)">Open the form →</button>
+        </div>
+      </sc-if>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<!-- ===== REVIEW ===== -->
+<sc-if value="{{ isReview }}" hint-placeholder-val="{{ false }}">
+<div style="flex:1;display:flex;flex-direction:column;min-height:0">
+  <div style="height:52px;background:#fff;border-bottom:1px solid #e4e7ec;display:flex;align-items:center;padding:0 16px;gap:10px;flex:none">
+    <button onClick="{{ goTender }}" style="flex:none;height:30px;width:30px;border-radius:8px;border:1px solid #e4e7ec;background:#fff;cursor:pointer;color:#475467">←</button>
+    <div style="flex:none;width:22px;height:22px;border-radius:6px;background:#101828;color:#fff;display:grid;place-items:center;font-weight:700;font-size:11px">F</div>
+    <span style="font-weight:500;white-space:nowrap">Annex 4 · Bidder questionnaire</span>
+    <div style="flex:1"></div>
+    <span style="color:#98a2b3;font-size:12px;white-space:nowrap">✓ Saved</span>
+    <div style="display:flex;align-items:center;gap:10px;color:#667085;font-size:12px;margin:0 6px">
+      <div style="width:140px;height:6px;background:#eaecf0;border-radius:99px;overflow:hidden"><div style="height:100%;width:{{ pctFilled }}%;background:#12805c;transition:width .25s"></div></div>
+      <span style="white-space:nowrap"><b style="color:#101828;font-weight:600">{{ filled }}</b> / {{ total }} filled</span><sc-if value="{{ hasAttention }}"><span style="white-space:nowrap;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:99px;background:#fff6e5;color:#b54708">{{ attentionLabel }}</span></sc-if>
+    </div>
+    <button onClick="{{ onExport }}" style="height:32px;padding:0 12px;border-radius:8px;font-weight:500;font-size:13px;cursor:pointer;white-space:nowrap;flex:none;display:inline-flex;align-items:center;gap:6px;border:1px solid {{ exportBorder }};background:{{ exportBg }};color:{{ exportFg }}">{{ exportLabel }}</button>
+    <div style="flex:none;width:28px;height:28px;border-radius:50%;background:#dbe4ff;color:#3b5bdb;display:grid;place-items:center;font-weight:600;font-size:11px">MK</div>
+  </div>
+
+  <div style="flex:1;min-height:0;display:grid;grid-template-columns:minmax(340px,440px) minmax(0,1fr)">
+    <div style="background:#fff;border-right:1px solid #e4e7ec;display:flex;flex-direction:column;min-height:0">
+      <div style="padding:16px 16px 14px;border-bottom:1px solid #e4e7ec">
+        <div style="display:flex;justify-content:space-between;align-items:baseline"><h2 style="margin:0;font-size:15px;font-weight:600;letter-spacing:-.01em">{{ panelHead }}</h2><span style="color:#98a2b3;font-size:11.5px">from 11 documents</span></div>
+        <div style="color:#667085;font-size:12px;margin:3px 0 12px">Confident answers are already in the form. Only doubts and empty fields are flagged.</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">
+          <sc-for list="{{ chips }}" as="c" hint-placeholder-count="4">
+            <div onClick="{{ c.onClick }}" style="border:1px solid {{ c.border }};background:{{ c.bg }};border-radius:8px;padding:8px 9px;cursor:pointer;transition:background .15s">
+              <div style="font-size:18px;font-weight:600;line-height:1;color:{{ c.color }}">{{ c.num }}</div>
+              <div style="font-size:11px;color:#667085;margin-top:5px;display:flex;align-items:center;gap:5px;white-space:nowrap"><span style="width:6px;height:6px;border-radius:50%;background:{{ c.color }}"></span>{{ c.label }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      <div id="fp-list" style="flex:1;overflow:auto;padding:4px 8px 24px">
+        <sc-if value="{{ isLive }}">
+          <div style="margin:10px 4px 4px;padding:12px 14px;border-radius:10px;background:#f5f7ff;border:1px solid #dbe4ff">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span style="color:#3b5bdb;font-weight:600">✦</span><span style="font-weight:600;flex:1">{{ livePhase }}</span><span style="font-family:'Geist Mono',monospace;font-size:12px;color:#3b5bdb">{{ liveCount }} / {{ total }}</span></div>
+            <div style="height:4px;background:#dbe4ff;border-radius:99px;overflow:hidden"><div style="height:100%;width:{{ runPct }}%;background:#3b5bdb;transition:width .2s"></div></div>
+            <div style="font-size:12px;color:#667085;margin-top:8px">Watch the form fill on the right. You can already fix anything flagged below.</div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ liveDone }}">
+          <div style="margin:10px 4px 4px;padding:10px 14px;border-radius:10px;background:#e8f6f0;color:#12805c;display:flex;gap:8px;align-items:center;font-size:12.5px"><span style="font-weight:700">✓</span><span><b style="font-weight:600">Done.</b> 20 of 23 fields filled in 14 seconds.</span></div>
+        </sc-if>
+        <sc-if value="{{ allDone }}">
+          <div style="margin:12px 8px;padding:16px;border-radius:10px;background:#e8f6f0;color:#12805c;display:flex;align-items:center;gap:12px"><span style="width:28px;height:28px;border-radius:50%;background:#12805c;color:#fff;display:grid;place-items:center">✓</span><div style="flex:1"><div style="font-weight:600">Nothing left to check</div><div style="font-size:12px">All {{ total }} fields are filled. Ready to export.</div></div><button onClick="{{ onExport }}" style="height:30px;padding:0 12px;border-radius:7px;border:1px solid #12805c;background:#12805c;color:#fff;font-weight:500;cursor:pointer">Export</button></div>
+        </sc-if>
+        <sc-for list="{{ groups }}" as="g" hint-placeholder-count="2">
+          <div>
+            <div onClick="{{ g.onToggle }}" style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#98a2b3;font-weight:600;padding:14px 8px 6px;display:flex;justify-content:space-between;cursor:{{ g.cursor }}"><span>{{ g.label }}</span><span style="color:{{ g.rightColor }};letter-spacing:0;text-transform:none;font-weight:500">{{ g.right }}</span></div>
+            <sc-if value="{{ g.showBulk }}">
+              <div style="margin:2px 0 6px;padding:10px 12px;border:1px dashed #d0d5dd;border-radius:8px;display:flex;align-items:center;justify-content:space-between;color:#667085;font-size:12px"><span>{{ g.bulkText }}</span><button onClick="{{ approveAll }}" style="height:26px;padding:0 9px;border-radius:6px;border:1px solid #d0d5dd;background:#fff;color:#101828;font-weight:500;font-size:12px;cursor:pointer">Approve all</button></div>
+            </sc-if>
+            <sc-if value="{{ g.collapsed }}"><div onClick="{{ g.onToggle }}" style="margin:2px 0 6px;padding:10px 12px;border:1px solid #eef0f3;background:#fbfbfc;border-radius:8px;display:flex;align-items:center;gap:10px;color:#667085;font-size:12px;cursor:pointer" style-hover="background:#f5f6f8"><span style="width:20px;height:20px;border-radius:6px;background:#e8f6f0;color:#12805c;display:grid;place-items:center;font-size:10.5px;font-weight:700">✓</span><span style="flex:1">{{ g.collapsedText }}</span><span style="color:#3b5bdb;font-weight:500">Show</span></div></sc-if>
+            <sc-for list="{{ g.items }}" as="it" hint-placeholder-count="3">
+              <div id="{{ it.domId }}">
+                <sc-if value="{{ it.notSel }}">
+                  <div onClick="{{ it.onSelect }}" style="display:flex;gap:10px;align-items:center;padding:9px 10px;border-radius:8px;cursor:pointer" style-hover="background:#f9fafb">
+                    <div style="width:20px;height:20px;border-radius:6px;display:grid;place-items:center;font-size:10.5px;font-weight:700;flex:none;background:{{ it.icBg }};color:{{ it.icFg }}">{{ it.icon }}</div>
+                    <div style="flex:1;min-width:0"><div style="color:#667085;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ it.label }}</div><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{ it.valColor }};font-style:{{ it.valStyle }};font-weight:{{ it.valWeight }};font-family:{{ it.valFont }}">{{ it.val }}</div></div>
+                    <sc-if value="{{ it.hasQuick }}"><button onClick="{{ it.onQuick }}" style="height:26px;padding:0 9px;border-radius:6px;border:1px solid #d0d5dd;background:#fff;color:#101828;font-weight:500;font-size:12px;cursor:pointer;white-space:nowrap" style-hover="border-color:#6941c6;color:#6941c6">{{ it.quickLabel }}</button></sc-if>
+                    <span style="font-size:10.5px;font-weight:600;padding:2px 6px;border-radius:5px;white-space:nowrap;background:{{ it.tagBg }};color:{{ it.tagFg }}">{{ it.tag }}</span>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ it.selected }}">
+                  <div style="border:1px solid #3b5bdb;box-shadow:0 0 0 3px #eef2ff,0 6px 16px rgba(16,24,40,.06);border-radius:10px;padding:12px;margin:4px 0 8px;background:#fff">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:9px"><div style="font-weight:600;font-size:13px;line-height:1.35">{{ it.label }}</div><span style="font-size:10.5px;font-weight:600;padding:2px 6px;border-radius:5px;white-space:nowrap;background:{{ it.tagBg }};color:{{ it.tagFg }}">{{ it.tag }}</span></div>
+                    <sc-if value="{{ it.hasNote }}"><div style="font-size:12px;line-height:1.45;border-radius:6px;padding:7px 9px;margin-bottom:9px;color:{{ it.noteFg }};background:{{ it.noteBg }}">{{ it.note }}</div></sc-if>
+
+                    <sc-if value="{{ it.isRes }}"><div style="font-weight:500;font-size:13.5px;font-family:{{ it.valFont }}">{{ it.resValue }}</div></sc-if>
+
+                    <sc-if value="{{ it.showConflict }}">
+                      <div style="display:flex;flex-direction:column;gap:6px">
+                        <sc-for list="{{ it.options }}" as="o">
+                          <div onClick="{{ o.onPick }}" style="display:flex;gap:10px;border-radius:8px;padding:9px 10px;align-items:flex-start;cursor:pointer;border:1px solid {{ o.border }};background:{{ o.bg }}">
+                            <div style="width:14px;height:14px;border-radius:50%;flex:none;margin-top:2px;border:{{ o.radio }}"></div>
+                            <div style="min-width:0">
+                              <div style="font-weight:500">{{ o.value }}</div>
+                              <div style="font-size:11.5px;color:#667085;margin-top:4px;display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span style="font:600 8.5px 'Geist Mono',monospace;color:#fff;border-radius:3px;padding:1px 3px;background:{{ o.srcTypeBg }}">{{ o.srcType }}</span><a onClick="{{ o.onSrc }}" style="font-weight:500">{{ o.srcName }}</a><span>· p.{{ o.page }} · {{ o.meta }}</span><sc-if value="{{ o.recent }}"><span style="font-size:10.5px;font-weight:600;padding:1px 6px;border-radius:5px;background:#e8f6f0;color:#12805c">most recent</span></sc-if></div>
+                              <sc-if value="{{ o.on }}"><div style="margin-top:7px;font-size:12px;color:#344054;background:#f9fafb;padding:6px 8px;border-radius:6px;line-height:1.5;border:1px solid #eef0f3">“…{{ o.q.b }}<mark style="background:#fff1b8;padding:0 1px;border-radius:2px;color:inherit">{{ o.q.m }}</mark>{{ o.q.a }}…”</div></sc-if>
+                            </div>
+                          </div>
+                        </sc-for>
+                        <div onClick="{{ it.onCustom }}" style="display:flex;gap:10px;border-radius:8px;padding:9px 10px;align-items:flex-start;cursor:pointer;border:1px solid {{ it.customBorder }};background:{{ it.customBg }}">
+                          <div style="width:14px;height:14px;border-radius:50%;flex:none;margin-top:2px;border:{{ it.customRadio }}"></div>
+                          <div style="flex:1;min-width:0">
+                            <div style="font-weight:500">Enter another value</div>
+                            <sc-if value="{{ it.customOn }}"><input value="{{ it.draft }}" onChange="{{ it.onDraft }}" placeholder="Type the correct value" autofocus style="margin-top:7px;width:100%;height:32px;border:1px solid #d0d5dd;border-radius:7px;padding:0 9px;font-size:13px;color:#101828;background:#fff"></sc-if>
+                          </div>
+                        </div>
+                      </div>
+                    </sc-if>
+
+                    <sc-if value="{{ it.showInput }}">
+                      <input value="{{ it.draft }}" onChange="{{ it.onDraft }}" placeholder="{{ it.placeholder }}" style="width:100%;height:34px;border:1px solid #d0d5dd;border-radius:8px;padding:0 10px;font-size:13px;color:#101828;background:#fff">
+                      <sc-if value="{{ it.hasChips }}"><div style="display:flex;gap:6px;margin-top:7px"><sc-for list="{{ it.chips }}" as="ch"><button onClick="{{ ch.onClick }}" style="height:24px;padding:0 8px;border-radius:99px;border:1px solid #e4e7ec;background:#f9fafb;font-size:11.5px;color:#344054;cursor:pointer">{{ ch.label }}</button></sc-for></div></sc-if>
+                    </sc-if>
+
+                    <sc-if value="{{ it.showDecl }}">
+                      <div style="font-size:12px;color:#475467;margin-bottom:8px">{{ it.declLead }}</div>
+                      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+                        <sc-for list="{{ it.yn }}" as="b">
+                          <button onClick="{{ b.onClick }}" style="height:40px;border-radius:8px;cursor:pointer;font-weight:600;font-size:13px;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.15;border:{{ b.border }};background:{{ b.bg }};color:{{ b.color }}"><span>{{ b.box }} {{ b.label }}</span><sc-if value="{{ b.hasSub }}"><span style="font-size:10px;font-weight:500;opacity:.8">{{ b.sub }}</span></sc-if></button>
+                        </sc-for>
+                      </div>
+                    </sc-if>
+
+                    <sc-if value="{{ it.showValue }}"><div style="font-weight:500;font-size:14px;font-family:{{ it.valFont }}">{{ it.value }}</div></sc-if>
+
+                    <sc-if value="{{ it.hasSrc }}">
+                      <div style="font-size:11.5px;color:#667085;margin-top:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span style="font:600 8.5px 'Geist Mono',monospace;color:#fff;border-radius:3px;padding:1px 3px;background:{{ it.srcTypeBg }}">{{ it.srcType }}</span><a onClick="{{ it.onSrc }}" style="font-weight:500">{{ it.srcName }}</a><span>· p.{{ it.page }} ·</span><span style="color:{{ it.srcDateColor }}">{{ it.srcDate }}</span></div>
+                      <sc-if value="{{ it.hasQuote }}"><div style="margin-top:6px;font-size:12px;color:#344054;background:#f9fafb;padding:6px 8px;border-radius:6px;line-height:1.5;border:1px solid #eef0f3">“…{{ it.q.b }}<mark style="background:#fff1b8;padding:0 1px;border-radius:2px;color:inherit">{{ it.q.m }}</mark>{{ it.q.a }}…”</div></sc-if>
+                    </sc-if>
+
+                    <sc-if value="{{ it.showDecl }}"><div style="font-size:11px;color:#98a2b3;margin-top:8px;line-height:1.4">You declare this on behalf of Alpenlogic AG.</div></sc-if>
+
+                    <sc-if value="{{ it.isRes }}">
+                      <div style="display:flex;align-items:center;gap:6px;margin-top:10px"><span style="color:{{ it.byColor }};font-size:12px;font-weight:500">✓ {{ it.byText }}</span><div style="flex:1"></div><button onClick="{{ it.onUndo }}" style="height:26px;padding:0 9px;border-radius:6px;border:1px solid #d0d5dd;background:#fff;color:#101828;font-weight:500;font-size:12px;cursor:pointer">{{ it.undoLabel }}</button></div>
+                    </sc-if>
+                    <sc-if value="{{ it.showActions }}">
+                      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:11px;align-items:center">
+                        <button onClick="{{ it.onConfirm }}" style="height:28px;padding:0 11px;border-radius:7px;border:1px solid #3b5bdb;background:#3b5bdb;color:#fff;font-weight:500;font-size:12.5px;cursor:pointer;white-space:nowrap;opacity:{{ it.confirmOpacity }}">{{ it.confirmLabel }}</button>
+                        <sc-if value="{{ it.hasSec }}"><button onClick="{{ it.onSec }}" style="height:28px;padding:0 11px;border-radius:7px;border:1px solid #d0d5dd;background:#fff;color:#101828;font-weight:500;font-size:12.5px;cursor:pointer;white-space:nowrap">{{ it.secLabel }}</button></sc-if>
+                        <sc-if value="{{ it.hasSec2 }}"><button onClick="{{ it.onSec2 }}" style="height:28px;padding:0 6px;border:none;background:transparent;color:#3b5bdb;font-weight:500;font-size:12.5px;cursor:pointer;white-space:nowrap">Replace certificate</button></sc-if>
+                      </div>
+                    </sc-if>
+                  </div>
+                </sc-if>
+              </div>
+            </sc-for>
+          </div>
+        </sc-for>
+      </div>
+      <div style="border-top:1px solid #eef0f3;padding:9px 16px;display:flex;gap:14px;color:#98a2b3;font-size:11px;align-items:center;white-space:nowrap;overflow:hidden">
+        <span style="display:flex;gap:4px;align-items:center"><span style="font-family:'Geist Mono',monospace;font-size:10.5px;border:1px solid #d0d5dd;border-bottom-width:2px;border-radius:4px;padding:0 4px;color:#667085">↑</span><span style="font-family:'Geist Mono',monospace;font-size:10.5px;border:1px solid #d0d5dd;border-bottom-width:2px;border-radius:4px;padding:0 4px;color:#667085">↓</span>move</span>
+        <span style="display:flex;gap:4px;align-items:center"><span style="font-family:'Geist Mono',monospace;font-size:10.5px;border:1px solid #d0d5dd;border-bottom-width:2px;border-radius:4px;padding:0 4px;color:#667085">↵</span>confirm &amp; next</span>
+        
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;min-height:0;background:#f2f4f7">
+      <div style="height:44px;display:flex;align-items:center;gap:12px;padding:0 16px;border-bottom:1px solid #e4e7ec;background:#fff;color:#667085;font-size:12px;flex:none;overflow:hidden;white-space:nowrap">
+        <div style="flex:none;display:inline-flex;border:1px solid #e4e7ec;border-radius:7px;overflow:hidden;padding:2px;gap:2px;background:#f9fafb">
+          <span onClick="{{ showDoc }}" style="padding:3px 10px;border-radius:5px;cursor:pointer;background:{{ segDocBg }};color:{{ segDocFg }};box-shadow:{{ segDocSh }}">Form</span>
+          <span onClick="{{ showSrc }}" style="padding:3px 10px;border-radius:5px;cursor:pointer;background:{{ segSrcBg }};color:{{ segSrcFg }};box-shadow:{{ segSrcSh }}">Source</span>
+        </div>
+        <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1 1 0">{{ viewerLabel }}</span>
+        <sc-if value="{{ isDocView }}">
+          <div style="display:flex;gap:14px;align-items:center;white-space:nowrap;min-width:0;overflow:hidden">
+            <span style="display:flex;align-items:center;gap:5px"><i style="display:inline-block;width:14px;height:8px;border-radius:2px;background:rgba(59,91,219,.25)"></i>Filled by AI</span>
+            <span style="display:flex;align-items:center;gap:5px"><i style="display:inline-block;width:14px;height:8px;border-radius:2px;background:rgba(181,71,8,.3)"></i>Doubt</span>
+            <span style="display:flex;align-items:center;gap:5px"><i style="display:inline-block;width:14px;height:8px;border-radius:2px;background:repeating-linear-gradient(45deg,rgba(192,16,72,.35) 0 3px,transparent 3px 6px)"></i>Missing</span>
+            <span style="display:flex;align-items:center;gap:5px"><i style="display:inline-block;width:14px;height:8px;border-radius:2px;background:rgba(18,128,92,.3)"></i>Reviewed by you</span>
+          </div>
+        </sc-if>
+      </div>
+      <div id="fp-canvas" style="flex:1;overflow:auto;padding:28px;display:flex;justify-content:center;align-items:flex-start">
+        <sc-if value="{{ isDocView }}">
+          <div style="width:100%;max-width:660px;flex:none;background:#fff;box-shadow:0 1px 3px rgba(16,24,40,.1),0 8px 24px rgba(16,24,40,.06);padding:44px 52px 56px;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#111">
+            <div style="display:flex;justify-content:space-between;font-size:9.5px;color:#555;margin-bottom:22px;border-bottom:1px solid #ccc;padding-bottom:8px"><span>Canton of Zurich · Office for Information Technology</span><span>ZH-2026-0412</span></div>
+            <div style="font-size:14px;font-weight:700;margin-bottom:3px">Annex 4 — Information on the bidder</div>
+            <div style="font-size:10px;color:#444;margin-bottom:18px">Cloud Platform Services · Open procedure · To be returned signed with the tender</div>
+            <sc-for list="{{ docSecs }}" as="sec" hint-placeholder-count="3">
+              <div style="margin-bottom:16px">
+                <div style="font-weight:700;font-size:11px;margin-bottom:5px">{{ sec.title }}</div>
+                <div style="border-top:1px solid #8a8a8a">
+                  <sc-for list="{{ sec.rows }}" as="r">
+                    <div id="{{ r.domId }}" onClick="{{ r.onClick }}" style="display:grid;grid-template-columns:46% 1fr;cursor:pointer;background:{{ r.rowBg }}">
+                      <div style="border-left:1px solid #8a8a8a;border-right:1px solid #8a8a8a;border-bottom:1px solid #8a8a8a;padding:7px 8px;background:#fafafa;line-height:1.35">{{ r.label }}</div>
+                      <div style="border-right:1px solid #8a8a8a;border-bottom:1px solid #8a8a8a;padding:7px 8px;line-height:1.35">
+                        <sc-if value="{{ r.isText }}"><span style="display:inline-block;min-height:14px;border-radius:3px;padding:1px 4px;margin:-1px -4px;transition:background .2s;min-width:{{ r.minW }};background:{{ r.bg }};box-shadow:{{ r.sh }};outline:{{ r.outline }};outline-offset:2px">{{ r.txt }}</span></sc-if>
+                        <sc-if value="{{ r.isYN }}"><span style="display:inline-flex;gap:14px;align-items:center;border-radius:3px;padding:1px 4px;margin:-1px -4px;outline:{{ r.outline }};outline-offset:2px;background:{{ r.bg }}"><span>{{ r.yes }} Yes</span><span>{{ r.no }} No</span><sc-if value="{{ r.awaiting }}"><span style="font-family:Geist,system-ui,sans-serif;font-size:10px;font-weight:600;padding:1px 6px;border-radius:5px;background:#f4f0ff;color:#6941c6">awaiting you</span></sc-if></span></sc-if>
+                      </div>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-for>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:28px">
+              <div><div style="border-bottom:1px solid #111;height:28px"></div><div style="font-size:9.5px;color:#444;margin-top:4px">Signature</div></div>
+              <div><div style="border-bottom:1px solid #111;height:28px"></div><div style="font-size:9.5px;color:#444;margin-top:4px">Company stamp</div></div>
+            </div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ hasSrcView }}">
+          <div style="width:100%;max-width:660px;flex:none;display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#475467"><span style="font:600 9px 'Geist Mono',monospace;color:#fff;border-radius:3px;padding:2px 4px;background:{{ sv.typeBg }}">{{ sv.type }}</span><b style="font-weight:600;color:#101828">{{ sv.name }}</b><span>· page {{ sv.page }} · {{ sv.date }}</span><div style="flex:1"></div><span style="background:#101828;color:#fff;border-radius:6px;padding:3px 8px;font-size:11px">Used for: {{ selLabel }}</span></div>
+            <div style="background:#fff;box-shadow:0 1px 3px rgba(16,24,40,.1),0 8px 24px rgba(16,24,40,.06);padding:48px 56px 64px;font-family:Georgia,'Times New Roman',serif;font-size:12px;color:#222;line-height:1.7">
+              <div style="height:9px;width:38%;background:#e4e7ec;border-radius:3px;margin-bottom:22px"></div>
+              <div style="display:flex;flex-direction:column;gap:9px;margin-bottom:20px"><div style="height:7px;width:100%;background:#eef0f3;border-radius:3px"></div><div style="height:7px;width:94%;background:#eef0f3;border-radius:3px"></div><div style="height:7px;width:97%;background:#eef0f3;border-radius:3px"></div><div style="height:7px;width:62%;background:#eef0f3;border-radius:3px"></div></div>
+              <p style="margin:0 0 20px">{{ sv.b }}<mark style="background:#fff1b8;box-shadow:0 0 0 3px #fff1b8;border-radius:2px;color:inherit">{{ sv.m }}</mark>{{ sv.a }}.</p>
+              <div style="display:flex;flex-direction:column;gap:9px"><div style="height:7px;width:100%;background:#eef0f3;border-radius:3px"></div><div style="height:7px;width:88%;background:#eef0f3;border-radius:3px"></div><div style="height:7px;width:96%;background:#eef0f3;border-radius:3px"></div><div style="height:7px;width:91%;background:#eef0f3;border-radius:3px"></div><div style="height:7px;width:45%;background:#eef0f3;border-radius:3px"></div></div>
+            </div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ noSrcView }}">
+          <div style="width:420px;margin-top:80px;text-align:center;color:#667085;line-height:1.5"><div style="font-weight:600;color:#101828;font-size:14px;margin-bottom:4px">No source for this field</div>We searched all 11 documents in your company knowledge and found nothing that answers “{{ selLabel }}”.</div>
+        </sc-if>
+      </div>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<!-- ===== EXPORT ===== -->
+<sc-if value="{{ isExport }}" hint-placeholder-val="{{ false }}">
+<div style="flex:1;display:flex;flex-direction:column;min-height:0">
+  <div style="height:52px;background:#fff;border-bottom:1px solid #e4e7ec;display:flex;align-items:center;padding:0 16px;gap:10px;flex:none">
+    <button onClick="{{ goReview }}" style="flex:none;height:30px;width:30px;border-radius:8px;border:1px solid #e4e7ec;background:#fff;cursor:pointer;color:#475467">←</button>
+    <div style="flex:none;width:22px;height:22px;border-radius:6px;background:#101828;color:#fff;display:grid;place-items:center;font-weight:700;font-size:11px">F</div>
+    <span style="color:#667085">Cloud Platform Services</span><span style="color:#d0d5dd">/</span><span style="font-weight:500">Annex 4 · Export</span>
+  </div>
+  <div style="flex:1;overflow:auto">
+    <div style="max-width:1040px;margin:0 auto;padding:44px 32px 96px;display:grid;grid-template-columns:minmax(0,1fr) minmax(200px,320px);gap:36px;align-items:start">
+      <div>
+        <sc-if value="{{ exportOpen }}"><div style="display:flex;gap:10px;align-items:center;padding:10px 14px;border-radius:10px;background:#fff0f3;color:#c01048;margin-bottom:20px;font-size:12.5px"><b style="font-weight:600">{{ exportBannerHead }}</b><span style="flex:1">{{ exportBannerSub }}</span><a onClick="{{ goReview }}" style="color:#c01048;font-weight:600">Back to review</a></div></sc-if>
+        <sc-if value="{{ noEmpty }}"><div style="width:40px;height:40px;border-radius:50%;background:#e8f6f0;color:#12805c;display:grid;place-items:center;font-size:18px;margin-bottom:16px">✓</div></sc-if>
+        <h1 style="margin:0 0 6px;font-size:26px;font-weight:600;letter-spacing:-.02em">{{ exportTitle }}</h1>
+        <div style="color:#667085;font-size:14px;margin-bottom:22px;line-height:1.5">{{ exportSummary }}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px">
+          <button style="height:38px;padding:0 16px;border-radius:8px;border:1px solid #3b5bdb;background:#3b5bdb;color:#fff;font-weight:500;font-size:13.5px;cursor:pointer;box-shadow:0 1px 2px rgba(16,24,40,.1)">⤓ Download DOCX</button>
+          <button style="height:38px;padding:0 14px;border-radius:8px;border:1px solid #d0d5dd;background:#fff;color:#101828;font-weight:500;font-size:13.5px;cursor:pointer">⤓ PDF</button>
+          <button onClick="{{ goTender }}" style="height:38px;padding:0 14px;border-radius:8px;border:1px solid #d0d5dd;background:#fff;color:#101828;font-weight:500;font-size:13.5px;cursor:pointer">Add to submission package</button>
+        </div>
+        <div style="color:#98a2b3;font-size:12px;margin-bottom:28px">Buyer’s original layout preserved · answers written into the existing fields</div>
+
+        <div style="background:#fff;border:1px solid #e4e7ec;border-radius:12px;margin-bottom:14px;box-shadow:0 1px 2px rgba(16,24,40,.04)">
+          <div style="padding:13px 16px;border-bottom:1px solid #eef0f3;font-weight:600">Before you submit</div>
+          <div style="padding:12px 16px;display:flex;gap:10px;align-items:flex-start;border-bottom:1px solid #f2f4f7"><span style="width:18px;height:18px;border-radius:5px;background:#f2f4f7;color:#475467;display:grid;place-items:center;font-size:10px;flex:none">✎</span><div><div style="font-weight:500">Sign and stamp page 3 by hand</div><div style="color:#667085;font-size:12px">Signatory: Anna Brunner, CEO (individual signature)</div></div></div>
+          <sc-if value="{{ hasKept }}"><div style="padding:12px 16px;display:flex;gap:10px;align-items:flex-start"><span style="width:18px;height:18px;border-radius:5px;background:#fff6e5;color:#b54708;display:grid;place-items:center;font-size:10px;font-weight:700;flex:none">!</span><div style="flex:1"><div style="font-weight:500">You kept {{ keptOutdated }} values from an expired certificate</div><div style="color:#667085;font-size:12px">Attach a valid liability certificate to avoid exclusion.</div></div><a onClick="{{ goKnowledge }}" style="font-size:12px;font-weight:500;white-space:nowrap">Upload new</a></div></sc-if>
+        </div>
+
+        <div style="background:#fff;border:1px solid #e4e7ec;border-radius:12px;margin-bottom:14px;box-shadow:0 1px 2px rgba(16,24,40,.04)">
+          <div style="padding:13px 16px;display:flex;gap:12px;align-items:center;border-bottom:1px solid #eef0f3">
+            <div style="flex:1"><div style="font-weight:600">Remember new answers</div><div style="color:#667085;font-size:12px;margin-top:2px">Next form, these are filled automatically.</div></div>
+            <div onClick="{{ toggleKb }}" style="width:34px;height:20px;border-radius:99px;cursor:pointer;position:relative;transition:background .15s;background:{{ kbTrack }}"><div style="position:absolute;top:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2);transition:left .15s;left:{{ kbKnob }}"></div></div>
+          </div>
+          <sc-if value="{{ hasNewAnswers }}"><sc-for list="{{ newAnswers }}" as="na"><div style="padding:10px 16px;display:flex;justify-content:space-between;border-bottom:1px solid #f2f4f7"><span style="color:#667085">{{ na.label }}</span><span style="font-weight:500;font-family:'Geist Mono',monospace">{{ na.value }}</span></div></sc-for></sc-if>
+          <sc-if value="{{ noNewAnswers }}"><div style="padding:12px 16px;color:#98a2b3;font-size:12px">Answers you type during review appear here.</div></sc-if>
+        </div>
+
+        <div style="background:#fff;border:1px solid #e4e7ec;border-radius:12px;box-shadow:0 1px 2px rgba(16,24,40,.04)">
+          <div style="padding:13px 16px;border-bottom:1px solid #eef0f3;display:flex;justify-content:space-between"><span style="font-weight:600">Declarations audit trail</span><span style="color:#98a2b3;font-size:12px">Kept with the export</span></div>
+          <sc-if value="{{ hasAudit }}"><sc-for list="{{ audit }}" as="au"><div style="padding:10px 16px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;border-bottom:1px solid #f2f4f7;align-items:center"><span style="color:#344054;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ au.label }}</span><span style="font-size:12px;color:#667085;white-space:nowrap"><b style="color:#6941c6;font-weight:600">{{ au.answer }}</b> · {{ au.who }}</span></div></sc-for></sc-if>
+          <sc-if value="{{ noAudit }}"><div style="padding:12px 16px;color:#98a2b3;font-size:12px">No declarations confirmed yet.</div></sc-if>
+        </div>
+      </div>
+      <div style="position:sticky;top:24px">
+        <div style="background:#fff;box-shadow:0 1px 3px rgba(16,24,40,.1),0 12px 32px rgba(16,24,40,.08);padding:26px 24px;aspect-ratio:1/1.414;display:flex;flex-direction:column;gap:8px">
+          <div style="height:6px;width:55%;background:#d0d5dd;border-radius:2px"></div>
+          <div style="height:4px;width:75%;background:#eaecf0;border-radius:2px;margin-bottom:10px"></div>
+          <sc-for list="{{ miniRows }}" as="mr" hint-placeholder-count="10"><div style="display:grid;grid-template-columns:46% 1fr;gap:8px;align-items:center;border-bottom:1px solid #f2f4f7;padding-bottom:6px"><div style="height:4px;background:#eaecf0;border-radius:2px;width:{{ mr.l }}"></div><div style="height:6px;border-radius:2px;width:{{ mr.r }};background:{{ mr.c }}"></div></div></sc-for>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:12px;color:#667085;font-size:12px"><span>Annex_4_Alpenlogic.docx</span><span>3 pages</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<!-- ===== SETUP MODAL ===== -->
+<sc-if value="{{ isSetup }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;inset:0;background:rgba(16,24,40,.36);display:flex;align-items:center;justify-content:center;z-index:20;padding:24px">
+  <div style="width:100%;max-width:580px;max-height:100%;overflow:auto;background:#fff;border-radius:14px;box-shadow:0 24px 64px rgba(16,24,40,.24)">
+    <div style="padding:22px 24px 16px;display:flex;gap:12px;align-items:flex-start">
+      <div style="flex:1">
+        <div style="display:inline-flex;font-size:11.5px;font-weight:500;color:#3b5bdb;background:#eef2ff;border-radius:99px;padding:2px 9px;margin-bottom:10px">✦ AI fill</div>
+        <div style="font-size:18px;font-weight:600;letter-spacing:-.01em;margin-bottom:4px">Fill Annex 4 with AI</div>
+        <div style="color:#667085;line-height:1.5">We read the form, find each answer in your company documents, and show you the exact source for every value.</div>
+      </div>
+      <button onClick="{{ goTender }}" style="width:28px;height:28px;border-radius:7px;border:none;background:transparent;color:#98a2b3;font-size:16px;cursor:pointer">×</button>
+    </div>
+    <div style="margin:0 24px;padding:12px 14px;border:1px solid #e4e7ec;border-radius:10px;display:flex;gap:12px;align-items:center;background:#fbfbfc">
+      <div style="width:30px;height:36px;border-radius:5px;background:#1570ef;color:#fff;display:grid;place-items:center;font-size:8px;font-weight:700;font-family:'Geist Mono',monospace">DOCX</div>
+      <div style="flex:1;min-width:0"><div style="font-weight:500">Annex_4_Bidder_questionnaire.docx</div><div style="color:#667085;font-size:12px;margin-top:2px">23 fields detected · 5 Yes/No declarations · 1 signature</div></div>
+      <a style="font-size:12px;font-weight:500">Preview</a>
+    </div>
+    <div style="padding:18px 24px 4px">
+      <div style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#98a2b3;font-weight:600;margin-bottom:8px">Answer from</div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <sc-for list="{{ setupSrc }}" as="o" hint-placeholder-count="3">
+          <div onClick="{{ o.onToggle }}" style="display:flex;gap:11px;align-items:flex-start;padding:10px 12px;border:1px solid #e4e7ec;border-radius:9px;cursor:pointer" style-hover="background:#f9fafb">
+            <div style="width:16px;height:16px;border-radius:4px;flex:none;margin-top:1px;display:grid;place-items:center;color:#fff;font-size:10px;background:{{ o.boxBg }};border:1.5px solid {{ o.boxBorder }}">{{ o.mark }}</div>
+            <div style="flex:1"><div style="font-weight:500">{{ o.label }}</div><div style="color:#667085;font-size:12px;margin-top:1px">{{ o.sub }}</div><sc-if value="{{ o.hasWarn }}"><div style="color:#b54708;font-size:12px;margin-top:4px">{{ o.warn }}</div></sc-if></div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    <div style="padding:18px 24px;display:flex;align-items:center;gap:8px;border-top:1px solid #eef0f3;margin-top:20px;background:#fbfbfc">
+      <span style="color:#98a2b3;font-size:12px;flex:1">Takes about 15 seconds</span>
+      <button onClick="{{ goTender }}" style="height:34px;padding:0 14px;border-radius:8px;border:1px solid #d0d5dd;background:#fff;color:#101828;font-weight:500;font-size:13px;cursor:pointer">Cancel</button>
+      <button onClick="{{ startRun }}" style="height:34px;padding:0 14px;border-radius:8px;border:1px solid #3b5bdb;background:#3b5bdb;color:#fff;font-weight:500;font-size:13px;cursor:pointer;box-shadow:0 1px 2px rgba(16,24,40,.1),inset 0 1px 0 rgba(255,255,255,.15)">✦ Start filling</button>
+    </div>
+  </div>
+</div>
+</sc-if>
+</div>
+
+<sc-if value="{{ showFlowNav }}" hint-placeholder-val="{{ true }}">
+  <div style="position:fixed;right:16px;bottom:16px;z-index:50;display:flex;align-items:center;gap:2px;padding:4px;background:rgba(16,24,40,.92);border-radius:10px;box-shadow:0 8px 24px rgba(16,24,40,.25);backdrop-filter:blur(8px)">
+    <span style="color:#98a2b3;font-size:11px;padding:0 8px 0 6px;font-family:'Geist Mono',monospace">FLOW</span>
+    <sc-for list="{{ flow }}" as="fl" hint-placeholder-count="6">
+      <span onClick="{{ fl.onClick }}" style="padding:5px 10px;border-radius:7px;font-size:12px;cursor:pointer;white-space:nowrap;background:{{ fl.bg }};color:{{ fl.color }}">{{ fl.label }}</span>
+    </sc-for>
+  </div>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;startScreen&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;tender&quot;,&quot;setup&quot;,&quot;running&quot;,&quot;review&quot;,&quot;export&quot;,&quot;knowledge&quot;,&quot;live&quot;],&quot;default&quot;:&quot;tender&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;showFlowNav&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;},&quot;docHighlights&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;}}">
+class Component extends DCLogic {
+  state = { screen: null, started: false, filter: 'all', sel: 9, autoOpen: false, viewer: 'doc', tick: 0, fields: this.initFields(), srcKb: true, srcPrev: true, srcProp: false, saveKb: true };
+
+  src() {
+    return {
+      reg: { name: '01 Commercial register extract', short: '01 Register', type: 'PDF', date: 'Issued 12 Oct 2026', facts: [['UID', 'CHE-123.456.789'], ['Capital', 'CHF 500,000']], more: 6, status: 'ok' },
+      debt: { name: '02 Debt enforcement extract', short: '02 Debt extract', type: 'PDF', date: 'Issued 2 Oct 2026', facts: [['Proceedings', 'none']], more: 1, status: 'ok' },
+      ins: { name: '03 Liability insurance certificate', short: '03 Insurance', type: 'PDF', date: 'Expired 30 Sep 2026', facts: [['Insurer', 'Limmat Vers.'], ['Injury', 'CHF 10M']], more: 2, status: 'warn' },
+      tax: { name: '04 Tax attestation 2025', short: '04 Tax', type: 'PDF', date: 'Issued 18 Jun 2026', facts: [['Office', 'Steueramt ZH']], more: 2, status: 'ok' },
+      iso: { name: '05 ISO 9001 certificate', short: '05 ISO 9001', type: 'PDF', date: 'Valid to May 2028', facts: [], more: 0, status: 'processing' },
+      eq: { name: '06 Equal pay analysis 2025', short: '06 Equal pay', type: 'PDF', date: 'Certified 12 May 2025', facts: [['Gender effect', '2.1%']], more: 1, status: 'ok' },
+      soc: { name: '07 Social insurance certificate', short: '07 Social ins.', type: 'PDF', date: 'Issued 4 Mar 2026', facts: [['AHV office', 'SVA Zurich']], more: 3, status: 'conflict' },
+      bvg: { name: '08 BVG affiliation contract', short: '08 BVG', type: 'PDF', date: 'Signed 9 Jan 2025', facts: [['Fund', 'Sammelstiftung Limmat']], more: 2, status: 'ok' },
+      ar: { name: '09 Annual report 2024', short: '09 Annual report', type: 'DOC', date: 'FY 2024', facts: [['Headcount', '31'], ['Tertiary', '14']], more: 11, status: 'ok' },
+      hr: { name: '10 HR compliance policy', short: '10 HR policy', type: 'DOC', date: 'Rev. Feb 2026', facts: [['OHS', 'ArG, UVG']], more: 4, status: 'ok' },
+      org: { name: '11 Organisation chart', short: '11 Org chart', type: 'PDF', date: 'Updated Aug 2026', facts: [['Head of Bids', 'M. Keller']], more: 4, status: 'ok' }
+    };
+  }
+
+  initFields() {
+    const F = [
+      { id: 1, sec: 'A', label: 'Exact company name', kind: 'ok', value: 'Alpenlogic AG', src: 'reg', page: 1, q: ['Firm: ', 'Alpenlogic AG', ', company limited by shares, registered office Zurich'] },
+      { id: 2, sec: 'A', label: 'UID', kind: 'ok', value: 'CHE-123.456.789', mono: true, src: 'reg', page: 1, q: ['Company identification number (UID): ', 'CHE-123.456.789', ''] },
+      { id: 3, sec: 'A', label: 'Legal form', kind: 'ok', value: 'Company limited by shares (AG)', src: 'reg', page: 1, q: ['Legal form: ', 'Aktiengesellschaft (AG)', ', entered 14 Mar 2011'] },
+      { id: 4, sec: 'A', label: 'Registered address', kind: 'ok', value: 'Seefeldstrasse 45, 8008 Zurich', src: 'reg', page: 1, q: ['Domicile: ', 'Seefeldstrasse 45, 8008 Zürich', ''] },
+      { id: 5, sec: 'A', label: 'Share capital', kind: 'ok', value: 'CHF 500,000', mono: true, src: 'reg', page: 1, q: ['Share capital: ', 'CHF 500,000.00', ', fully paid in'] },
+      { id: 6, sec: 'A', label: 'Contact person for this tender', kind: 'ok', value: 'Marc Keller, Head of Bids · +41 44 512 30 18', src: 'org', page: 1, q: ['Bids & Tenders: ', 'Marc Keller, Head of Bids', ', +41 44 512 30 18'] },
+      { id: 7, sec: 'B', label: 'Employees with higher professional training', kind: 'ok', value: '14', mono: true, src: 'ar', page: 12, q: ['Of our 31 employees, ', '14 hold a tertiary degree', ' and 9 a federal VET diploma'] },
+      { id: 8, sec: 'B', label: 'Employees with professional training', kind: 'ok', value: '9', mono: true, src: 'ar', page: 12, q: ['14 hold a tertiary degree and ', '9 a federal VET diploma', ''] },
+      { id: 9, sec: 'B', label: 'Auxiliary staff', kind: 'missing', value: '', draft: '', note: 'Searched 11 documents. Staff categories stop at VET level; auxiliary staff is never mentioned.' },
+      { id: 10, sec: 'B', label: 'Apprentices', kind: 'missing', value: '', draft: '', note: 'No apprenticeship programme found in your documents.' },
+      { id: 11, sec: 'C', label: 'Liability insurer', kind: 'ok', value: 'Limmat Versicherungen AG', src: 'ins', page: 1, q: ['Insurer: ', 'Limmat Versicherungen AG', ', Zurich'] },
+      { id: 12, sec: 'C', label: 'Amount per claim, personal injury', kind: 'warn', value: 'CHF 10,000,000', mono: true, src: 'ins', page: 1, note: 'The certificate expired on 30 Sep 2026. Buyers usually require a valid one.', q: ['Sum insured per claim, personal injury: ', 'CHF 10,000,000', ''] },
+      { id: 13, sec: 'C', label: 'Amount per claim, property damage', kind: 'warn', value: 'CHF 5,000,000', mono: true, src: 'ins', page: 1, note: 'Same expired certificate (03). Replace it once to clear both warnings.', q: ['Sum insured per claim, property damage: ', 'CHF 5,000,000', ''] },
+      { id: 14, sec: 'C', label: 'AHV compensation office', kind: 'conflict', choice: 0, note: 'Your documents give two different addresses. We pre-selected the most recent official document.', options: [
+        { value: 'SVA Zurich, Hardturmstrasse 120, 8005 Zurich', src: 'soc', page: 1, meta: 'issued Mar 2026', recent: true, q: ['affiliated with the ', 'SVA Zürich, Hardturmstrasse 120, 8005 Zürich', ' under member no. 512.874'] },
+        { value: 'SVA Zurich, Röntgenstrasse 17, 8005 Zurich', src: 'ar', page: 6, meta: 'FY 2024 · also 10 HR policy §6', recent: false, q: ['Social security is handled by ', 'SVA Zürich, Röntgenstrasse 17', ''] }] },
+      { id: 15, sec: 'C', label: 'BVG pension fund', kind: 'ok', value: 'Sammelstiftung Limmat BVG', src: 'bvg', page: 2, q: ['The employer joins the ', 'Sammelstiftung Limmat BVG', ' for all insured staff'] },
+      { id: 16, sec: 'C', label: 'Competent tax office', kind: 'ok', value: 'Cantonal Tax Office Zurich, Corporate Taxes', src: 'tax', page: 1, q: ['Issued by: ', 'Kantonales Steueramt Zürich, Juristische Personen', ''] },
+      { id: 17, sec: 'D', label: 'Are debt enforcement, bankruptcy or collection proceedings pending?', kind: 'decl', suggest: 'No', answer: null, src: 'debt', page: 1, q: ['There are ', 'no debt enforcement proceedings', ' registered against the above company'] },
+      { id: 18, sec: 'D', label: 'Have all social security contributions been paid?', kind: 'decl', suggest: 'Yes', answer: null, src: 'soc', page: 2, q: ['All contributions due up to 31 Dec 2025 ', 'have been paid in full', ''] },
+      { id: 19, sec: 'D', label: 'Are occupational health and safety provisions complied with?', kind: 'decl', suggest: 'Yes', answer: null, src: 'hr', page: 1, q: ['§1 Alpenlogic ', 'complies with all occupational health and safety provisions', ' (ArG, UVG)'] },
+      { id: 20, sec: 'D', label: 'Is equal pay for women and men complied with?', kind: 'decl', suggest: 'Yes', answer: null, src: 'eq', page: 3, q: ['The analysis shows ', 'no statistically significant gender effect', ' (threshold 5%)'] },
+      { id: 21, sec: 'D', label: 'Has VAT been paid in full?', kind: 'decl', suggest: null, answer: null, note: 'No evidence. Your tax attestation (04) covers direct taxes only, not VAT.' },
+      { id: 22, sec: 'E', label: 'Place and date', kind: 'manual', value: '', draft: 'Zurich, 3 Nov 2026', note: 'Only you can fill this. We pre-wrote today’s date.' },
+      { id: 23, sec: 'E', label: 'Authorised signatory', kind: 'ok', value: 'Anna Brunner, CEO (individual signature)', src: 'reg', page: 2, q: ['Brunner, Anna, from Winterthur, CEO, ', 'with individual signature', ''] }
+    ];
+    return F.map(f => (f.kind === 'ok' || f.kind === 'manual' || (f.kind === 'decl' && f.suggest)) ? { ...f, answer: f.suggest || null, value: f.kind === 'manual' ? f.draft : f.kind === 'decl' ? f.suggest : f.value, resolved: true, by: 'ai', at: '' } : f);
+  }
+
+  scr() { return this.state.screen || this.props.startScreen || 'tender'; }
+  now() { return new Date().toTimeString().slice(0, 5); }
+  grp(f) { if (f.kind === 'missing' || (f.kind === 'decl' && !f.suggest)) return 'need'; if (f.kind === 'warn' || f.kind === 'conflict') return 'warn'; return 'auto'; }
+  ordered(fields) {
+    const rank = { missing: 0, decl: 1, conflict: 0, warn: 1 }, out = [];
+    ['need', 'warn', 'auto'].forEach(k => { const g = fields.filter(f => this.grp(f) === k); if (k !== 'auto') g.sort((a, b) => rank[a.kind] - rank[b.kind]); out.push(...g); });
+    return out;
+  }
+  nextOpen(fields, id) {
+    const o = this.ordered(fields), i = o.findIndex(f => f.id === id);
+    const n = o.slice(i + 1).concat(o.slice(0, i)).find(f => !f.resolved);
+    return n ? n.id : id;
+  }
+  step(d) {
+    const s = this.state; let o = this.ordered(s.fields);
+    if (s.filter !== 'all') o = o.filter(f => this.grp(f) === s.filter);
+    const i = o.findIndex(f => f.id === s.sel), n = o[Math.max(0, Math.min(o.length - 1, i + d))];
+    if (n) this.setState({ sel: n.id });
+  }
+  patch(id, o, andConfirm) {
+    this.setState(s => ({ fields: s.fields.map(f => f.id === id ? { ...f, ...o } : f) }), () => { if (andConfirm) this.confirm(id, andConfirm === 'keep'); });
+  }
+  confirm(id, keepSel) {
+    this.setState(s => {
+      const f0 = s.fields.find(f => f.id === id); if (!f0 || f0.resolved) return null;
+      let value = f0.value;
+      if (f0.kind === 'conflict' && f0.choice >= 0) value = f0.options[f0.choice].value;
+      else if (f0.kind === 'conflict') { value = (f0.draft || '').trim(); if (!value) return null; }
+      else if (f0.kind === 'missing' || f0.kind === 'manual' || f0.editing) { value = (f0.draft || '').trim(); if (!value) return null; }
+      else if (f0.kind === 'decl') { if (!f0.answer) return null; value = f0.answer; }
+      const by = (f0.editing || (f0.kind === 'conflict' && f0.choice < 0)) ? 'you' : (f0.kind === 'warn' || f0.kind === 'conflict') ? 'kept' : 'you';
+      const fields = s.fields.map(f => f.id === id ? { ...f, value, resolved: true, editing: false, by, at: this.now() } : f);
+      return keepSel ? { fields } : { fields, sel: this.nextOpen(fields, id) };
+    });
+  }
+  approveAll() { const t = this.now(); this.setState(s => ({ fields: s.fields.map(f => f.kind === 'ok' && !f.resolved ? { ...f, resolved: true, by: 'approved', at: t } : f) })); }
+  go(screen) { clearInterval(this._iv); this.setState({ screen, started: this.state.started || screen === 'review' || screen === 'export' }); if (screen === 'running') this.startRun(); if (screen === 'live') this.startRun('live'); }
+  startRun(mode) {
+    clearInterval(this._iv);
+    const live = mode === 'live';
+    this.setState({ screen: live ? 'live' : 'running', tick: 0, fields: this.initFields(), sel: live ? -1 : 9, filter: 'all', autoOpen: false, viewer: 'doc', started: true });
+    this._iv = setInterval(() => this.setState(s => { if (s.tick >= 41) { clearInterval(this._iv); return null; } const nt = s.tick + 1; return (nt >= 41 && this.scr() === 'live') ? { tick: nt, sel: this.nextOpen(s.fields, -1) } : { tick: nt }; }), live ? 220 : 130);
+  }
+  scrollIn(cid, eid) {
+    const c = document.getElementById(cid), e = document.getElementById(eid); if (!c || !e) return;
+    const cr = c.getBoundingClientRect(), er = e.getBoundingClientRect();
+    if (er.top < cr.top + 16 || er.bottom > cr.bottom - 16) c.scrollTo({ top: c.scrollTop + er.top - cr.top - Math.min(120, cr.height / 4), behavior: 'smooth' });
+  }
+  componentDidMount() {
+    this._key = e => {
+      if (this.scr() !== 'review' && this.scr() !== 'live') return;
+      const tag = e.target.tagName;
+      if (e.key === 'Enter') { e.preventDefault(); this.confirm(this.state.sel); return; }
+      if (tag === 'INPUT') return;
+      if (e.key === 'ArrowDown' || e.key === 'j') { e.preventDefault(); this.step(1); }
+      if (e.key === 'ArrowUp' || e.key === 'k') { e.preventDefault(); this.step(-1); }
+    };
+    window.addEventListener('keydown', this._key);
+    if (this.scr() === 'running') this.startRun();
+    if (this.scr() === 'live') this.startRun('live');
+  }
+  componentWillUnmount() { window.removeEventListener('keydown', this._key); clearInterval(this._iv); }
+  componentDidUpdate(pp, ps) {
+    if (pp.startScreen !== this.props.startScreen) { this.go(this.props.startScreen || 'tender'); return; }
+    if (ps.tick !== this.state.tick && this.scr() === 'live' && this.state.tick < 41 && this.state.tick > 10) this.scrollIn('fp-canvas', 'fp-row-' + Math.min(23, this.state.tick - 9));
+    if ((ps.sel !== this.state.sel || ps.viewer !== this.state.viewer) && (this.scr() === 'review' || this.scr() === 'live')) setTimeout(() => { this.scrollIn('fp-canvas', 'fp-row-' + this.state.sel); this.scrollIn('fp-list', 'fp-item-' + this.state.sel); }, 30);
+  }
+
+  renderVals() {
+    const s = this.state, p = this.props, screen = this.scr(), SRC = this.src(), grp = f => this.grp(f);
+    const C = { need: ['#c01048', '#fff0f3'], decl: ['#6941c6', '#f4f0ff'], warn: ['#b54708', '#fff6e5'], ok: ['#12805c', '#e8f6f0'], man: ['#475467', '#f2f4f7'], faint: ['#98a2b3', '#f2f4f7'] };
+    const TYPE = { PDF: '#d92d20', DOC: '#1570ef' };
+    const t = s.tick, matched = Math.max(0, Math.min(s.fields.length, t - 10));
+    const isLiveScr = screen === 'live', live = isLiveScr && t < 41, foundN = isLiveScr ? matched : s.fields.length;
+    const pending = f => isLiveScr && f.id > foundN;
+    const fields = s.fields, total = fields.length, resolved = fields.filter(f => f.resolved && !pending(f)).length, remaining = fields.filter(f => !f.resolved && !pending(f)).length;
+    const open = k => fields.filter(f => grp(f) === k && !f.resolved && !pending(f)).length;
+    const sel = fields.find(f => f.id === s.sel) || fields[0];
+    const srcOf = f => { if (f.kind === 'conflict') { const o = f.options[f.choice]; return o ? { ...SRC[o.src], page: o.page, q: o.q } : null; } return f.src ? { ...SRC[f.src], page: f.page, q: f.q } : null; };
+
+    const mk = f => {
+      const isSel = f.id === s.sel, sv = srcOf(f);
+      let icon, ic, tag, tc, val, muted = false;
+      if (f.resolved && f.by === 'ai') { icon = '✓'; ic = ['#3b5bdb', '#eef2ff']; tag = sv ? sv.short : 'Pre-filled'; tc = ['#98a2b3', 'transparent']; val = f.kind === 'decl' ? 'Ticked ' + f.value : f.value; }
+      else if (f.resolved) { icon = '✓'; ic = C.ok; tag = f.by === 'you' ? 'Edited by you' : 'Kept'; tc = C.ok; val = f.kind === 'decl' ? 'Ticked ' + f.value : f.value; }
+      else if (f.kind === 'conflict') { icon = '⇄'; ic = C.need; tag = 'Conflict · 2 sources'; tc = C.warn; val = f.choice < 0 ? (f.draft || 'Your own value') : f.options[f.choice].value; muted = f.choice < 0 && !f.draft; }
+      else if (f.kind === 'missing') { icon = '?'; ic = C.need; tag = 'Not found'; tc = C.need; val = f.draft || 'Not found in your documents'; muted = !f.draft; }
+      else if (f.kind === 'manual') { icon = '✎'; ic = C.man; tag = 'Manual'; tc = C.man; val = f.draft || 'Only you can fill this'; muted = !f.draft; }
+      else if (f.kind === 'decl') { icon = '§'; ic = C.decl; if (f.suggest) { tag = 'Suggests ' + f.suggest; tc = C.decl; val = 'AI suggests ' + f.suggest + ' · ' + SRC[f.src].short; } else { tag = 'No evidence'; tc = C.need; val = 'Nothing in your documents'; muted = true; } }
+      else if (f.kind === 'warn') { icon = '!'; ic = C.warn; tag = 'Outdated'; tc = C.warn; val = f.value + ' · expired source'; }
+      else { icon = '✓'; ic = C.faint; tag = sv.short; tc = ['#98a2b3', 'transparent']; val = f.value; }
+      const canConfirm = f.kind === 'decl' ? !!f.answer : (f.kind === 'missing' || f.kind === 'manual' || f.editing || (f.kind === 'conflict' && f.choice < 0)) ? !!(f.draft || '').trim() : true;
+      const labels = { conflict: 'Use this one', missing: 'Save', manual: 'Save', decl: 'Save', warn: 'Keep this value', ok: 'Save' };
+      const sec = f.editing ? 'Cancel' : f.kind === 'warn' ? 'Enter new value' : '';
+      let note = f.note || '', nfg = '#475467', nbg = '#f2f4f7';
+      if (f.kind === 'conflict' || f.kind === 'warn') { nfg = C.warn[0]; nbg = C.warn[1]; }
+      if (f.kind === 'decl' && !f.suggest) { nfg = C.need[0]; nbg = C.need[1]; }
+      const showSrc = !!sv && !f.editing && !(f.kind === 'conflict' && !f.resolved);
+      return {
+        domId: 'fp-item-' + f.id, label: f.label, selected: isSel, notSel: !isSel,
+        onSelect: () => this.setState({ sel: f.id }),
+        icon, icFg: ic[0], icBg: ic[1], tag, tagFg: tc[0], tagBg: tc[1],
+        val, valColor: muted ? '#98a2b3' : '#101828', valStyle: muted ? 'italic' : 'normal', valWeight: muted ? 400 : 500, valFont: f.mono && !muted ? "'Geist Mono', ui-monospace, monospace" : 'inherit',
+        hasQuick: !isSel && !f.resolved && f.kind === 'decl' && !!f.suggest, quickLabel: 'Confirm ' + f.suggest,
+        onQuick: e => { e.stopPropagation(); this.patch(f.id, { answer: f.suggest }, 'keep'); },
+        hasNote: !f.resolved && !!note, note, noteFg: nfg, noteBg: nbg,
+        isRes: !!f.resolved, resValue: f.kind === 'decl' ? 'Ticked: ' + f.value : f.value, byText: f.by === 'ai' ? 'Filled automatically' : (f.by === 'you' ? 'Edited by you' : 'Kept by you') + ' · ' + (f.at || ''), byColor: f.by === 'ai' ? '#3b5bdb' : '#12805c', undoLabel: f.by === 'ai' ? 'Change' : 'Undo', onUndo: () => this.patch(f.id, f.kind === 'decl' ? { resolved: false } : { resolved: false, editing: true, draft: f.value }),
+        showConflict: !f.resolved && f.kind === 'conflict',
+        options: f.kind === 'conflict' ? f.options.map((o, i) => { const on = i === f.choice, os = SRC[o.src]; return { value: o.value, srcName: os.name, srcType: os.type, srcTypeBg: TYPE[os.type], page: o.page, meta: o.meta, recent: o.recent, on, q: { b: o.q[0], m: o.q[1], a: o.q[2] }, border: on ? '#3b5bdb' : '#e4e7ec', bg: on ? '#f5f7ff' : '#fff', radio: on ? '4px solid #3b5bdb' : '1.5px solid #d0d5dd', onPick: () => this.patch(f.id, { choice: i }), onSrc: e => { e.stopPropagation(); this.patch(f.id, { choice: i }); this.setState({ viewer: 'source' }); } }; }) : [],
+        customOn: f.choice < 0, customBorder: f.choice < 0 ? '#3b5bdb' : '#e4e7ec', customBg: f.choice < 0 ? '#f5f7ff' : '#fff', customRadio: f.choice < 0 ? '4px solid #3b5bdb' : '1.5px solid #d0d5dd', onCustom: () => { if (f.choice >= 0) this.patch(f.id, { choice: -1, draft: f.draft || '' }); },
+        showInput: !f.resolved && (f.kind === 'missing' || f.kind === 'manual' || !!f.editing), draft: f.draft || '', onDraft: e => this.patch(f.id, { draft: e.target.value }), placeholder: f.kind === 'manual' ? 'e.g. Zurich, 3 Nov 2026' : 'Type the answer',
+        chips: (f.chips || []).map(c => ({ label: 'Use “' + c + '”', onClick: () => this.patch(f.id, { draft: c }, true) })), hasChips: !!(f.chips && f.chips.length),
+        showDecl: !f.resolved && f.kind === 'decl', declLead: f.suggest ? 'Your documents indicate “' + f.suggest + '”. Tick the answer you declare:' : 'Tick the answer you declare:',
+        yn: f.kind === 'decl' ? ['Yes', 'No'].map(v => { const on = f.answer === v, sug = f.suggest === v; return { label: v, sub: 'AI suggestion', hasSub: sug && !on, box: on ? '☒' : '☐', onClick: () => this.patch(f.id, { answer: v }), bg: on ? '#6941c6' : (sug ? '#f4f0ff' : '#fff'), color: on ? '#fff' : (sug ? '#6941c6' : '#101828'), border: on ? '1px solid #6941c6' : (sug ? '1px dashed #6941c6' : '1px solid #d0d5dd') }; }) : [],
+        showValue: !f.resolved && !f.editing && (f.kind === 'ok' || f.kind === 'warn'), value: f.value,
+        hasSrc: showSrc, hasQuote: showSrc && !!sv.q, srcName: sv ? sv.name : '', srcType: sv ? sv.type : '', srcTypeBg: sv ? TYPE[sv.type] : '#999', page: sv ? sv.page : '', srcDate: sv ? sv.date : '', srcDateColor: sv && sv.status === 'warn' ? C.warn[0] : '#667085',
+        q: sv && sv.q ? { b: sv.q[0], m: sv.q[1], a: sv.q[2] } : { b: '', m: '', a: '' },
+        onSrc: () => this.setState({ viewer: 'source' }),
+        showActions: !f.resolved, confirmLabel: f.editing ? 'Save' : labels[f.kind], confirmOpacity: canConfirm ? 1 : .45, onConfirm: () => this.confirm(f.id),
+        hasSec: !!sec, secLabel: sec, onSec: () => f.editing ? this.patch(f.id, { editing: false, resolved: f.kind !== 'warn' }) : this.patch(f.id, { editing: true, draft: f.value }),
+        hasSec2: f.kind === 'warn' && !f.editing, onSec2: () => this.go('knowledge')
+      };
+    };
+
+    const G = [{ key: 'need', label: 'No value' }, { key: 'warn', label: 'Doubt' }, { key: 'auto', label: 'Filled automatically' }];
+    C.auto = ['#3b5bdb', '#eef2ff'];
+    const selAuto = grp(sel) === 'auto';
+    const ord = this.ordered(fields);
+    const groups = G.filter(g => s.filter === 'all' || s.filter === g.key).map(g => {
+      const all = ord.filter(f => grp(f) === g.key && !pending(f)), n = open(g.key), isAuto = g.key === 'auto';
+      const expanded = !isAuto || s.autoOpen || selAuto || s.filter === 'auto';
+      return { label: g.label + ' · ' + all.length, right: isAuto ? (expanded ? 'Hide' : 'No action needed') : (n ? n + ' open' : '✓ Done'), rightColor: isAuto ? '#3b5bdb' : (n ? '#98a2b3' : C.ok[0]), cursor: isAuto ? 'pointer' : 'default', onToggle: () => { if (isAuto) this.setState(st => ({ autoOpen: !(st.autoOpen || selAuto), sel: selAuto && (st.autoOpen || selAuto) ? this.nextOpen(st.fields, -1) : st.sel })); }, items: expanded ? all.map(mk) : [], collapsed: !expanded, collapsedText: all.length + ' answers sourced from your documents, already in the form', showBulk: false, bulkText: '', count: all.length };
+    }).filter(g => !live || g.count > 0);
+    const chips = G.map(g => { const on = s.filter === g.key, c = C[g.key]; return { num: g.key === 'auto' ? fields.filter(f => grp(f) === 'auto' && !pending(f)).length : open(g.key), label: g.label === 'Filled automatically' ? 'Automatic' : g.label, color: c[0], bg: on ? c[1] : '#fff', border: on ? c[0] : '#e4e7ec', onClick: () => this.setState(st => ({ filter: st.filter === g.key ? 'all' : g.key })) }; });
+
+    const hl = p.docHighlights !== false;
+    const SECS = { A: 'A. Information on the bidder', B: 'B. Staff', C: 'C. Insurance and social security', D: 'D. Declarations', E: 'E. Signature' };
+    const docRow = f => {
+      if (pending(f)) { const cur = live && f.id === foundN + 1 && t >= 10; return { domId: 'fp-row-' + f.id, label: f.label, onClick: () => {}, isText: true, isYN: false, txt: cur ? 'Searching…' : '', bg: cur ? 'rgba(59,91,219,.10)' : '#f2f4f7', sh: cur ? 'inset 0 -1.5px 0 #3b5bdb' : 'none', minW: cur ? '120px' : (60 + (f.id * 37) % 90) + 'px', outline: '2px solid transparent', rowBg: cur ? '#f7f9ff' : 'transparent', yes: '', no: '', awaiting: false }; }
+      const isSel = f.id === s.sel; let txt = f.value, bg, sh, minW = '0px';
+      if (!f.resolved && f.kind === 'conflict') txt = f.choice < 0 ? (f.draft || '') : f.options[f.choice].value;
+      if (!f.resolved && (f.kind === 'missing' || f.kind === 'manual' || f.editing)) txt = f.draft || '';
+      const empty = !txt;
+      if (empty) { minW = '140px'; bg = 'repeating-linear-gradient(45deg,rgba(192,16,72,.09) 0 4px,transparent 4px 8px)'; sh = 'inset 0 -1.5px 0 rgba(192,16,72,.5)'; }
+      else if (f.resolved && f.by === 'ai') { bg = 'rgba(59,91,219,.08)'; sh = 'inset 0 -1.5px 0 rgba(59,91,219,.45)'; }
+      else if (f.resolved) { bg = 'rgba(18,128,92,.07)'; sh = 'inset 0 -1.5px 0 rgba(18,128,92,.45)'; }
+      else if (f.kind === 'warn' || f.kind === 'conflict') { bg = 'rgba(181,71,8,.08)'; sh = 'inset 0 -1.5px 0 rgba(181,71,8,.5)'; }
+      else if (f.kind === 'missing' || f.kind === 'manual') { bg = 'rgba(16,24,40,.05)'; sh = 'inset 0 -1.5px 0 rgba(16,24,40,.3)'; }
+      else { bg = 'rgba(59,91,219,.08)'; sh = 'inset 0 -1.5px 0 rgba(59,91,219,.45)'; }
+      if (f.kind === 'decl') { bg = 'transparent'; sh = 'none'; }
+      if (!hl) { bg = 'transparent'; sh = empty ? 'inset 0 -1px 0 #888' : 'none'; }
+      if (isSel && !empty) bg = 'rgba(59,91,219,.12)';
+      const a = f.resolved ? f.value : f.answer;
+      return { domId: 'fp-row-' + f.id, label: f.label, onClick: () => this.setState({ sel: f.id }), isText: f.kind !== 'decl', isYN: f.kind === 'decl', txt, bg, sh, minW, outline: isSel ? '2px solid #3b5bdb' : '2px solid transparent', rowBg: isSel ? '#f7f9ff' : 'transparent', yes: a === 'Yes' ? '☒' : '☐', no: a === 'No' ? '☒' : '☐', awaiting: f.kind === 'decl' && !f.resolved };
+    };
+    const docSecs = Object.keys(SECS).map(k => ({ title: SECS[k], rows: fields.filter(f => f.sec === k).map(docRow) }));
+    const svr = srcOf(sel);
+    const sv = svr ? { name: svr.name, type: svr.type, typeBg: TYPE[svr.type], date: svr.date, page: svr.page, b: svr.q ? svr.q[0] : '', m: svr.q ? svr.q[1] : '', a: svr.q ? svr.q[2] : '' } : { name: '', type: '', typeBg: '#999', date: '', page: '', b: '', m: '', a: '' };
+    const isDoc = s.viewer === 'doc';
+
+    const ph = [[0, 'Reading the form', 'DOCX · 3 pages · 5 sections'], [5, 'Detecting fields to fill', '23 fields · 5 Yes/No declarations · 1 signature'], [10, 'Searching company knowledge', 'Matched ' + matched + ' of 23 fields across 11 documents'], [34, 'Cross-checking sources', '1 conflicting address · 1 expired certificate'], [38, 'Preparing your review', 'Sorted so what needs you comes first']];
+    const phases = ph.map((x, i) => { const end = i < ph.length - 1 ? ph[i + 1][0] : 41, st = t >= end ? 'done' : t >= x[0] ? 'active' : 'todo'; return { label: x[1], detail: x[2], hasDetail: st !== 'todo', mark: st === 'done' ? '✓' : '', dotBg: st === 'done' ? '#12805c' : '#fff', dotBorder: st === 'done' ? '#12805c' : st === 'active' ? '#3b5bdb' : '#d0d5dd', dotRing: st === 'active' ? '0 0 0 4px #eef2ff' : 'none', color: st === 'todo' ? '#98a2b3' : '#101828' }; });
+    const feed = this.initFields().slice(0, matched).map(f => {
+      const miss = f.kind === 'missing' || f.kind === 'manual' || (f.kind === 'decl' && !f.suggest);
+      const v = f.kind === 'conflict' ? f.options[0].value : (f.kind === 'decl' && f.suggest) ? 'Suggests ' + f.suggest : miss ? (f.kind === 'manual' ? 'Left for you' : 'Not found') : f.value;
+      const so = f.kind === 'conflict' ? SRC.soc : f.src ? SRC[f.src] : null, flag = f.kind === 'conflict' ? 'Conflict' : f.kind === 'warn' ? 'Outdated' : '';
+      return { label: f.label, val: v, color: miss ? '#c01048' : '#101828', weight: miss ? 400 : 500, src: so ? so.short : '—', hasFlag: !!flag, flag };
+    }).reverse();
+    const runDone = t >= 41;
+
+    const started = s.started || screen === 'review' || screen === 'export';
+    const pctResolved = Math.round(resolved / total * 100);
+    const newAnswers = fields.filter(f => f.kind === 'missing' && f.resolved).map(f => ({ label: f.label, value: f.value }));
+    const audit = fields.filter(f => f.kind === 'decl' && f.resolved).map(f => ({ label: f.label, answer: f.value, who: f.by === 'ai' ? 'auto-ticked from ' + (f.src ? this.src()[f.src].short : 'documents') : 'Marc Keller · ' + f.at }));
+    const emptyN = fields.filter(f => !f.resolved && !pending(f) && grp(f) === 'need').length, doubtN = fields.filter(f => !f.resolved && !pending(f) && grp(f) === 'warn').length;
+    const filled = foundN - emptyN;
+    const keptOutdated = fields.filter(f => f.kind === 'warn' && f.resolved).length;
+    const sourced = fields.filter(f => f.src || f.options).length;
+
+    const kbRows = Object.values(SRC).map(d => { const st = { ok: ['✓ Indexed', C.ok], warn: ['Outdated', C.warn], conflict: ['Conflict', C.warn], processing: ['Processing', ['#3b5bdb', '#eef2ff']] }[d.status]; return { type: d.type, typeBg: TYPE[d.type], name: d.name, facts: d.facts.map(x => ({ k: x[0], v: x[1] })), hasMore: d.more > 0, more: '+' + d.more, processing: d.status === 'processing', date: d.status === 'processing' ? 'Reading… 3/5 pages' : d.date, dateColor: d.status === 'warn' ? C.warn[0] : '#667085', status: st[0], sFg: st[1][0], sBg: st[1][1] }; });
+
+    const navKey = screen === 'knowledge' ? 'knowledge' : 'tender';
+    const nav = [['Tenders', '3', 'tender'], ['Company knowledge', '11', 'knowledge'], ['Forms library', '24', null], ['Settings', '', null]].map(n => ({ label: n[0], badge: n[1], bg: navKey === n[2] ? '#eef0f3' : 'transparent', color: navKey === n[2] ? '#101828' : '#475467', weight: navKey === n[2] ? 500 : 400, onClick: () => n[2] && this.go(n[2]) }));
+    const flow = [['1 Tender', 'tender'], ['2 Setup', 'setup'], ['3 AI filling', 'running'], ['4 Review', 'review'], ['5 Export', 'export'], ['Knowledge', 'knowledge'], ['Live fill (test)', 'live']].map(x => ({ label: x[0], bg: screen === x[1] ? 'rgba(255,255,255,.16)' : 'transparent', color: screen === x[1] ? '#fff' : '#d0d5dd', onClick: () => this.go(x[1]) }));
+    const setupSrc = [
+      { key: 'srcKb', label: 'Company knowledge', sub: '11 documents · 64 facts', warn: '1 expired certificate and 1 conflict will be flagged for you', hasWarn: true },
+      { key: 'srcPrev', label: 'Previous submissions', sub: '3 forms you filled and signed in 2025–2026', hasWarn: false }
+    ].map(o => ({ ...o, boxBg: s[o.key] ? '#3b5bdb' : '#fff', boxBorder: s[o.key] ? '#3b5bdb' : '#d0d5dd', mark: s[o.key] ? '✓' : '', onToggle: () => this.setState(st => ({ [o.key]: !st[o.key] })) }));
+    const miniRows = fields.slice(0, 14).map((f, i) => ({ l: (55 + (i * 37) % 40) + '%', r: f.resolved ? (40 + (i * 23) % 50) + '%' : '30%', c: f.resolved ? 'rgba(18,128,92,.35)' : '#eaecf0' }));
+
+    return {
+      showSidebar: screen === 'tender' || screen === 'setup' || screen === 'knowledge',
+      isTender: screen === 'tender' || screen === 'setup', isSetup: screen === 'setup', isKnowledge: screen === 'knowledge', isRunning: screen === 'running', isReview: screen === 'review' || isLiveScr, isLive: live, liveDone: isLiveScr && !live, livePhase: (phases.find(x => x.dotBorder === '#3b5bdb') || { label: 'Done' }).label, isExport: screen === 'export',
+      showFlowNav: p.showFlowNav !== false, nav, flow, kbRows, setupSrc,
+      goTender: () => this.go('tender'), goSetup: () => this.go('setup'), goReview: () => this.go('review'), goKnowledge: () => this.go('knowledge'), startRun: () => this.startRun(),
+      a4NotStarted: !started, a4Started: started, a4Meta: started ? (resolved + ' of ' + total + ' fields resolved · ' + remaining + ' left') : '23 fields detected · 5 Yes/No declarations · 1 signature',
+      a4Status: !started ? 'Not started' : remaining ? 'In review · ' + resolved + '/' + total : '✓ Ready', a4StatusBg: !started ? '#f2f4f7' : remaining ? '#eef2ff' : '#e8f6f0', a4StatusFg: !started ? '#475467' : remaining ? '#3b5bdb' : '#12805c', a4RowBg: started ? '#fff' : '#fbfcff',
+      runTag: runDone ? 'Done in 14 seconds' : 'AI fill in progress', runHead: runDone ? '20 of 23 fields filled' : 'Filling Annex 4 — Bidder questionnaire', runSub: runDone ? 'Confident answers are already in the form. Only 3 doubts and 3 empty fields need a look.' : 'You can leave this page — we’ll notify you when it’s ready for review.',
+      runPct: Math.round(Math.min(1, t / 41) * 100), phases, feed, feedEmpty: matched === 0, matched, runDone,
+      total, resolved, remaining, pctResolved, allDone: remaining === 0 && !isLiveScr, groups, chips,
+      approveAll: () => this.approveAll(),
+      exportLabel: live ? 'Filling…' : '⤓ Export DOCX', exportBg: live ? '#f2f4f7' : '#3b5bdb', exportFg: live ? '#98a2b3' : '#fff', exportBorder: live ? '#e4e7ec' : '#3b5bdb',
+      onExport: () => { if (!live) this.go('export'); },
+      filled, pctFilled: Math.round(filled / total * 100), liveCount: foundN, hasAttention: remaining > 0, attentionLabel: (emptyN ? emptyN + ' empty' : '') + (emptyN && doubtN ? ' · ' : '') + (doubtN ? doubtN + ' doubt' + (doubtN > 1 ? 's' : '') : ''),
+      panelHead: live ? 'AI is filling the form…' : remaining ? remaining + ' field' + (remaining > 1 ? 's' : '') + ' need a look' : 'All fields filled', noEmpty: emptyN === 0,
+      exportBannerHead: emptyN ? emptyN + ' field' + (emptyN > 1 ? 's' : '') + ' still empty' : doubtN + ' doubt' + (doubtN > 1 ? 's' : '') + ' not reviewed', exportBannerSub: emptyN ? '— they will be exported blank.' : '— the AI’s best answer will be used.',
+      docSecs, sv, selLabel: sel.label, isDocView: isDoc, hasSrcView: !isDoc && !!svr, noSrcView: !isDoc && !svr,
+      viewerLabel: isDoc ? 'Annex_4_Bidder_questionnaire.docx · 3 pages' : (svr ? 'Opened at the cited page' : ''),
+      showDoc: () => this.setState({ viewer: 'doc' }), showSrc: () => this.setState({ viewer: 'source' }),
+      segDocBg: isDoc ? '#fff' : 'transparent', segDocFg: isDoc ? '#101828' : '#667085', segDocSh: isDoc ? '0 1px 2px rgba(16,24,40,.1)' : 'none',
+      segSrcBg: !isDoc ? '#fff' : 'transparent', segSrcFg: !isDoc ? '#101828' : '#667085', segSrcSh: !isDoc ? '0 1px 2px rgba(16,24,40,.1)' : 'none',
+      exportOpen: remaining > 0, exportTitle: emptyN ? 'Annex 4 — ' + emptyN + ' field' + (emptyN > 1 ? 's' : '') + ' still empty' : 'Annex 4 is ready to submit', exportSummary: filled + ' of ' + total + ' fields filled · ' + fields.filter(f => f.by === 'ai').length + ' automatically from your documents · ' + fields.filter(f => f.by === 'you' || f.by === 'kept').length + ' reviewed by you.',
+      hasKept: keptOutdated > 0, keptOutdated, newAnswers, hasNewAnswers: newAnswers.length > 0, noNewAnswers: newAnswers.length === 0,
+      audit, hasAudit: audit.length > 0, noAudit: audit.length === 0,
+      kbTrack: s.saveKb ? '#3b5bdb' : '#d0d5dd', kbKnob: s.saveKb ? '16px' : '2px', toggleKb: () => this.setState(st => ({ saveKb: !st.saveKb })),
+      miniRows
+    };
+  }
+}
+</script>
+</body>
+</html>

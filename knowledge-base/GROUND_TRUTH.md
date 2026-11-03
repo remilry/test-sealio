@@ -3,7 +3,7 @@
 Reference for tests and AI evaluation. "Today" for freshness checks: **2026-11-02**.
 Documents are in `documents/` (regenerate with `generator/generate.py`). Everything is fictitious.
 
-Expected statuses: `answer` (found, sourced) · `not_found` · `conflict` (sources disagree) · `stale` (found but out of date) · `human` (answer may be proposed but a person must decide).
+Expected statuses: `answer` (found, sourced) · `not_found` · `conflict` (sources disagree) · `stale` (found but out of date) · `human` (engaging declaration: auto-ticked when the AI finds evidence, shown with its proof and changeable by the user; left empty without evidence — see `docs/USER_FLOW.md` §4).
 
 ## Annex 4 — factual fields
 
@@ -37,7 +37,7 @@ Expected statuses: `answer` (found, sourced) · `not_found` · `conflict` (sourc
 | BVG pension fund | Sammelstiftung Limmat BVG, Seestrasse 200, 8002 Zurich | 08 | answer |
 | Foreign bidders: pension scheme details (two fields) | Not applicable (Swiss bidder) | — | not_found / not applicable |
 
-## Annex 4 — Yes/No declarations (always `human` review; the AI may only propose)
+## Annex 4 — Yes/No declarations (`human`: auto-ticked with evidence, empty otherwise)
 
 | Question (short) | Proposed answer | Evidence | Status |
 |---|---|---|---|
@@ -80,7 +80,7 @@ Expected statuses: `answer` (found, sourced) · `not_found` · `conflict` (sourc
 2. **Conflict**: headcount (28 vs 31) and AHV office address (Hardturmstrasse 120 vs Röntgenstrasse 17).
 3. **Not found**: auxiliary staff, apprentices, VAT, UVG, all "services abroad" questions, foreign-scheme fields.
 4. **Fresh**: register extracts (01, 02) are under 3 months old (20 and 22 October 2026).
-5. **Engaging**: every Yes/No and the Art. 29c declaration require human validation.
+5. **Engaging**: every Yes/No and the Art. 29c declaration are ticked only with verified evidence, the proof is always shown, and those without evidence stay empty for the user.
 
 ## Noise and distractors (added so extraction is realistic)
 

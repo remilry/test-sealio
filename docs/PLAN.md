@@ -2,7 +2,7 @@
 
 > Document vivant. Chaque étape y est cochée et détaillée au fur et à mesure.
 > Contexte produit et priorités : voir `CLAUDE.md`. Échéance : jeudi 5 novembre.
-> Statut : étape 0 validée. Les choix techniques marqués _proposition_ restent à confirmer à l'étape 3.
+> Statut : étapes 0 à 2 validées. Parcours détaillé : `docs/USER_FLOW.md`. Les choix techniques marqués _proposition_ restent à confirmer à l'étape 3.
 
 ## 1. Ce qu'on a appris des deux formulaires
 
@@ -15,14 +15,14 @@
 
 Conséquences :
 - Il n'y a **pas de schéma de champs prêt à l'emploi** : la première brique est un _parseur_ qui produit une représentation commune (liste de champs : id, libellé, type, position dans le fichier source).
-- Les questions Oui/Non et les signatures/dates sont des **déclarations engageantes** : toujours validées par un humain, jamais auto-remplies sans confirmation.
+- Les questions Oui/Non sont des **déclarations engageantes** : cochées par l'IA seulement avec une preuve vérifiée et toujours visible, modifiables ; sans preuve, elles restent vides pour l'humain. Signature et cachet ne sont jamais remplis (décision 2026-11-03).
 - Certains champs ne se trouvent dans aucun document (nom du projet, autorité adjudicatrice, lieu/date, signature) : ce sont des champs « saisie utilisateur ».
 
 ## 2. Principes directeurs (déduits de `CLAUDE.md`)
 
 1. **Parcours utilisateur d'abord**, puis fiabilité IA, puis fidélité de l'export.
 2. **Aucune réponse inventée** : chaque réponse = valeur + source (document, passage) + niveau de confiance, ou bien « non trouvé ».
-3. **Humain dans la boucle** là où ça compte : relecture obligatoire des réponses sans source solide et de toutes les déclarations Oui/Non.
+3. **Humain dans la boucle** là où ça compte : l'IA remplit tout ce qu'elle peut prouver ; l'humain ne traite que les doutes (conflits, sources périmées) et les champs sans valeur, et peut tout modifier. Aucune règle propre à un formulaire : critères génériques uniquement (voir `docs/USER_FLOW.md` §4).
 4. **Format d'origine** : DOCX ressorti en DOCX, PDF ressorti en PDF.
 5. **Tests sur le critique** : parsing, validation des réponses, export.
 6. Petits pas, un commit par pas, pas de fonctionnalité secondaire avant que le flux de bout en bout marche.
@@ -41,10 +41,9 @@ Légende : ⬜ à faire · 🟦 en cours · ✅ fait. Chaque étape produit un l
 - Y mettre volontairement des **pièges** pour tester la fiabilité : une info absente (→ « non trouvé »), deux documents contradictoires ou une donnée périmée (→ conflit signalé), une réponse Oui/Non non documentée (→ question à l'humain).
 - Livrable : `knowledge-base/documents/` (11 documents PDF/DOCX, générés par `knowledge-base/generator/generate.py`) + `knowledge-base/GROUND_TRUTH.md` (valeurs attendues, statuts, pièges) servant de référence aux tests. Entreprise : **Alpenlogic AG**.
 
-### Étape 2 — Parcours utilisateur ⬜
-- Définir le flux de bout en bout et les écrans (esquisses simples), voir section 4.
-- Décider du niveau d'interaction : combien de clics pour un formulaire de 45 champs ? Comment relire vite ?
-- Livrable : `docs/USER_FLOW.md` (flux + maquettes basse fidélité).
+### Étape 2 — Parcours utilisateur ✅ (validée)
+- Flux : Company knowledge → Tender (offre fictive avec les 2 formulaires) → Setup → **Live fill** (l'IA remplit sous les yeux de l'utilisateur, qui corrige en parallèle) → Export. *AI filling* + *Review* en repli technique.
+- Livrable : `docs/USER_FLOW.md` + maquettes Claude Design `docs/design/Formpilot.dc.html`.
 
 ### Étape 3 — Architecture ⬜
 - Choix de la stack, découpage en modules, modèle de données, contrats entre modules, stratégie de test. Pistes en section 6.
@@ -69,7 +68,7 @@ Chaque étape à partir de la 4 livre une **fonctionnalité utilisable de bout e
 
 ### Étape 6 — Relecture et humain dans la boucle ⬜ _(testé)_
 - UI : relecture champ par champ avec source visible/cliquable, édition, validation individuelle ou en lot, tri par priorité (introuvables, conflits, déclarations engageantes).
-- Règles : tout ce qui est faible, conflictuel ou engageant est bloquant tant qu'il n'est pas validé ; export impossible avec des champs non résolus (ou explicitement laissés vides).
+- Règles (voir `docs/USER_FLOW.md` §4) : export autorisé avec bandeau listant champs vides et doutes ; seule une déclaration Oui/Non sans réponse bloque l'export.
 - Tests : règles de blocage, e2e « corriger une réponse puis exporter ».
 
 ### Étape 7 — Annex 4 (DOCX) de bout en bout ⬜ _(critique, testé)_
@@ -88,14 +87,9 @@ Chaque étape à partir de la 4 livre une **fonctionnalité utilisable de bout e
 ### Si le temps le permet
 - Réutilisation inter-formulaires (mémoriser les corrections), support d'autres formats, historique/versions, métriques de qualité.
 
-## 4. Parcours utilisateur — première ébauche (à détailler à l'étape 2)
+## 4. Parcours utilisateur
 
-1. **Accueil / sélection** : l'utilisateur dépose un formulaire (DOCX ou PDF) ou en choisit un d'exemple.
-2. **Analyse** : le système détecte les champs ; l'utilisateur voit « 42 champs détectés, dont 3 à saisir vous-même ».
-3. **Remplissage IA** : progression visible, puis résumé : _x répondus avec source, y à vérifier, z introuvables_.
-4. **Relecture** : vue côte à côte (formulaire / réponse + source cliquable). Tri par priorité : introuvables, conflits, déclarations Oui/Non, puis le reste. Édition possible, validation champ par champ ou en lot pour les réponses à haute confiance.
-5. **Champs à compléter à la main** : projet, autorité, lieu/date, signataire.
-6. **Export** : aperçu, puis téléchargement dans le format d'origine. La signature reste à apposer par le client (non automatisée, signalé clairement).
+Détaillé dans `docs/USER_FLOW.md` (validé le 2026-11-03).
 
 ## 5. Décisions prises et questions ouvertes
 
@@ -138,3 +132,8 @@ UI (relecture)  ──►  API locale
 | 2026-11-02 | Entreprise fictive Alpenlogic AG validée ; assureur fictif « Limmat Versicherungen AG » (pas de vraie marque) ; 11 documents générés | validé |
 | 2026-11-02 | Documents de la base rendus réalistes (papier à en-tête, références, pagination, tableaux, historiques, contenus hors sujet) ; distracteurs consignés dans GROUND_TRUTH.md | validé |
 | 2026-11-02 | Étape 1 validée par l'utilisateur | validé |
+| 2026-11-03 | Parcours basé sur les maquettes Claude Design ; écran principal *Live fill*, *AI filling* + *Review* en repli technique ; une offre fictive contenant les 2 formulaires | validé |
+| 2026-11-03 | Déclarations Oui/Non cochées automatiquement quand une preuve est trouvée (preuve visible, modifiable) ; vides sinon | validé |
+| 2026-11-03 | Export autorisé avec avertissement (champs vides, doutes) ; bloqué seulement par une déclaration sans réponse ; format d'origine uniquement | validé |
+| 2026-11-03 | Aucune règle propre à un formulaire ou un champ : l'IA juge avec des critères génériques (preuve, conflit, péremption, champ réservé à l'utilisateur) | validé |
+| 2026-11-03 | Remember answers, audit trail, résolution de conflit dans la base, sources « previous submissions » → Remaining features | validé |
