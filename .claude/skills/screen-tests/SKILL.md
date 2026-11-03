@@ -21,7 +21,8 @@ event reducer, PDF → CSS coordinate conversion).
 - `vitest` + `jsdom`
 - `@testing-library/react` + `@testing-library/user-event` (always `userEvent.setup()`, never `fireEvent`)
 - `@testing-library/jest-dom` matchers
-- `msw` (v2) for **all** network: REST handlers and SSE (`sse()` from `msw`)
+- `msw` (v3) for **all** network: REST handlers and SSE (`sse()` from `msw`). The server
+  listens with `onUnhandledFrame: "error"` (v3 name of `onUnhandledRequest`): a request with no handler fails the test
 - Helpers in `src/shared/test/`: `renderScreen()`, MSW `server`, `handlers/`, `fixtures/`, `fillStream()`
 
 Scope: these Vitest screen tests cover **every detail of each screen**. The only
