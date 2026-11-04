@@ -2,7 +2,7 @@
 
 > Document vivant. Chaque étape y est cochée et détaillée au fur et à mesure.
 > Contexte produit et priorités : voir `CLAUDE.md`. Échéance : jeudi 5 novembre.
-> Statut : étapes 0 à 4.5 faites ; étape 5 découpée en 5a–5d, 5a faite (à valider) ; prochaine : 5b (upload de documents). Parcours détaillé : `docs/USER_FLOW.md`. Les choix techniques marqués _proposition_ restent à confirmer à l'étape 3.
+> Statut : étapes 0 à 4.5 faites ; étape 5 découpée en 5a–5d, 5a faite et mergée ; prochaine : 5b (upload de documents). Parcours détaillé : `docs/USER_FLOW.md`. Les choix techniques marqués _proposition_ restent à confirmer à l'étape 3.
 
 ## 1. Ce qu'on a appris des deux formulaires
 
@@ -78,7 +78,7 @@ Chaque étape à partir de la 4 livre une **fonctionnalité utilisable de bout e
 - Tests : validateur sans appel LLM, jeu de questions avec réponses attendues dont des « doit répondre introuvable », e2e du parcours.
 - Découpée en 4 sous-étapes, chacune sur sa branche et validée avant la suivante (décision 2026-11-04).
 
-#### 5a — Base de connaissances et recherche hybride ✅ (à valider, branche `step-5a-knowledge`)
+#### 5a — Base de connaissances et recherche hybride ✅ (mergée le 2026-11-04)
 - Back : module `knowledge`, tables `document` (tenant, nom, format, pages, statut `processing`/`indexed`/`error`, message d'erreur, `indexed_at`) et `chunk` (page, rectangle, texte, contexte, `embedding vector(384)` HNSW, `tsv` généré GIN).
 - Extraction pure : PDF → blocs PyMuPDF avec page et rectangle ; DOCX → paragraphes (titres repérés) et lignes de tableau. Fichier illisible ou sans texte → statut `error` avec un message pour l'utilisateur.
 - Découpage pur en passages : une page et une section par passage, ~800 caractères max, sans couper un bloc ; contexte = titre du document + titre de section (cherché, jamais cité).
@@ -188,6 +188,7 @@ UI (relecture)  ──►  API locale
 | 2026-11-04 | Étape 4.5 validée et mergée dans `main` | validé |
 | 2026-11-04 | Étape 5 découpée en 5a (base de connaissances + recherche), 5b (upload), 5c (moteur IA back), 5d (UI de remplissage IA), une branche et une validation par sous-étape ; LLM Claude Sonnet 5.5, réponses réelles enregistrées pour le `FakeLLM` ; règles génériques pures dès 5c, cartes Conflit / Périmé plus tard | validé |
 | 2026-11-04 | i18n front avec next-intl (sans routage par langue : locale fixe `en`, compatible Cache Components) ; tous les textes dans `shared/i18n/messages/en.json`, clés typées, pluriels ICU ; ESLint `react/jsx-no-literals` ; anglais seulement pour l'instant | validé |
-| 2026-11-04 | 5a : passages d'une page et d'une section (~800 car.) avec contexte titre + section ; plein texte en « n'importe quel mot » ; rappel mesuré par section du formulaire ; cache du modèle dans `~/.cache/fastembed` | à valider |
+| 2026-11-04 | 5a : passages d'une page et d'une section (~800 car.) avec contexte titre + section ; plein texte en « n'importe quel mot » ; rappel mesuré par section du formulaire ; cache du modèle dans `~/.cache/fastembed` | validé |
 | 2026-11-04 | Documents de la base gardés tels quels, défauts compris (`&amp;` dans la plaquette, noms tirés des fichiers) : un cas réel en aura aussi | validé |
 | 2026-11-04 | *Company knowledge* : clic sur un document = aperçu en modale (PDF), téléchargement toujours possible ; aperçu DOCX à l'étape 7 | validé |
+| 2026-11-04 | Étape 5a validée et mergée dans `main` | validé |
