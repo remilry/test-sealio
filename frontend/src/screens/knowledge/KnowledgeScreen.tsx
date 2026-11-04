@@ -11,6 +11,7 @@ import {
   useKnowledgeBase,
   type KnowledgeBase,
 } from "@/features/knowledge-base";
+import { FileDropArea } from "@/shared/components/FileDropArea";
 import { EmptyState, LoadError } from "@/shared/components/LoadStates";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { formatDay, formatTime } from "@/shared/utils/date";
@@ -40,10 +41,14 @@ export function KnowledgeScreen() {
     );
   }
   return (
-    <KnowledgeFrame actions={<AddDocumentsButton add={add} />}>
+    <KnowledgeFrame
+      actions={<AddDocumentsButton add={add} />}
+      onDropFiles={add.isPending ? undefined : (files) => add.mutate(files)}
+    >
       <header className="flex flex-col gap-1">
         <h1 className="text-[22px] font-semibold tracking-tight">{knowledge.company_name}</h1>
         <Summary knowledge={knowledge} />
+        <p className="text-xs text-muted-foreground">{t("dropHint")}</p>
       </header>
       <AddDocumentsError add={add} />
       <Documents knowledge={knowledge} />
@@ -90,9 +95,23 @@ function Documents({ knowledge }: { knowledge: KnowledgeBase }) {
   );
 }
 
-/** The top bar and the page column, whatever the state of the knowledge base. */
-function KnowledgeFrame({ actions, children }: { actions?: ReactNode; children: ReactNode }) {
+/**
+ * The top bar and the page column, whatever the state of the knowledge base. With `onDropFiles`,
+ * files can be dropped anywhere under the top bar.
+ */
+function KnowledgeFrame({
+  actions,
+  onDropFiles,
+  children,
+}: {
+  actions?: ReactNode;
+  onDropFiles?: (files: File[]) => void;
+  children: ReactNode;
+}) {
   const t = useTranslations("knowledge");
+  const column = (
+    <div className="mx-auto flex w-full max-w-275 flex-col gap-5 px-8 pt-7 pb-24">{children}</div>
+  );
   return (
     <div className="flex flex-1 flex-col">
       <div className="sticky top-0 z-10 flex h-13 items-center gap-2 border-b bg-card px-6">
@@ -100,7 +119,14 @@ function KnowledgeFrame({ actions, children }: { actions?: ReactNode; children: 
         <div className="flex-1" />
         {actions}
       </div>
-      <div className="mx-auto flex w-full max-w-275 flex-col gap-5 px-8 pt-7 pb-24">{children}</div>
+      <FileDropArea
+        onFiles={(files) => onDropFiles?.(files)}
+        overlay={t("dropOverlay")}
+        disabled={!onDropFiles}
+        className="flex flex-1 flex-col"
+      >
+        {column}
+      </FileDropArea>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { handlers, renderScreen, server } from "@/shared/test";
 import { knowledgeBase, knowledgeDocument } from "@/shared/test/fixtures";
@@ -333,6 +333,64 @@ describe("Company knowledge", () => {
         within(alert).getByText("Something went wrong on our side. Please try again in a moment."),
       ).toBeInTheDocument();
       expect(within(alert).queryByText("Internal Server Error")).not.toBeInTheDocument();
+    });
+
+    // user-event cannot drag files from outside the page: drag events are fired directly (the one
+    // allowed use of fireEvent, see the screen-tests skill).
+    const dragFiles = (files: File[]) => ({ dataTransfer: { types: ["Files"], files } });
+
+    it("adds the files I drop anywhere on the page", async () => {
+      // Given a back that indexes what I add
+      const added = backIndexing({ ...uvg, status: "indexed", pages: 1 });
+      renderScreen(<KnowledgeScreen />);
+      const page = await screen.findByRole("heading", { level: 1, name: "Alpenlogic AG" });
+
+      // When I drag a PDF over the page, the page tells me what dropping does
+      const files = [pdf("UVG certificate.pdf")];
+      fireEvent.dragEnter(page, dragFiles(files));
+      expect(screen.getByRole("status")).toHaveTextContent(
+        "Drop PDF or Word documents to add them",
+      );
+
+      // And when I drop it, it is added like with the button
+      fireEvent.drop(page, dragFiles(files));
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+      const row = within(await screen.findByRole("row", { name: "UVG certificate" }));
+      expect(row.getByText("Processing")).toBeInTheDocument();
+      expect(added.requests).toHaveLength(1);
+      expect(await row.findByText("Indexed", {}, POLLED)).toBeInTheDocument();
+    });
+
+    it("hides the drop hint when the files leave the page without being dropped", async () => {
+      // Given the seeded knowledge base
+      server.use(handlers.knowledge(knowledgeBase()));
+      renderScreen(<KnowledgeScreen />);
+      const page = await screen.findByRole("heading", { level: 1, name: "Alpenlogic AG" });
+      const table = screen.getByRole("table", { name: "Documents" });
+
+      // When files are dragged across the page (entering a child element too), then leave it
+      const files = [pdf("UVG certificate.pdf")];
+      fireEvent.dragEnter(page, dragFiles(files));
+      fireEvent.dragEnter(table, dragFiles(files));
+      fireEvent.dragLeave(page, dragFiles(files));
+      expect(screen.getByRole("status")).toBeInTheDocument();
+      fireEvent.dragLeave(table, dragFiles(files));
+
+      // Then the hint is gone and nothing was sent
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    });
+
+    it("ignores text or links dragged inside the page", async () => {
+      // Given the seeded knowledge base
+      server.use(handlers.knowledge(knowledgeBase()));
+      renderScreen(<KnowledgeScreen />);
+      const page = await screen.findByRole("heading", { level: 1, name: "Alpenlogic AG" });
+
+      // When I drag some text over the page
+      fireEvent.dragEnter(page, { dataTransfer: { types: ["text/plain"], files: [] } });
+
+      // Then nothing happens
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
     });
 
     it("only offers PDF and Word documents in the file picker", async () => {
