@@ -32,13 +32,26 @@ logger = logging.getLogger(__name__)
 UNEXPECTED_ERROR = "Something went wrong while filling this form."
 
 
+class _Discarded(Exception):
+    """The user discarded the fill while it was running: stop, silently."""
+
+
 def run_fill(fill_id: int, llm: LLM, today: date | None = None) -> None:
-    """Fill the form with the AI. Never raises: a failure ends the run with an "error" event."""
+    """Fill the form with the AI. Never raises: a failure ends the run with an "error" event.
+    A fill discarded meanwhile ends the run silently (nothing is written into it, or into a new
+    fill started since: the ids differ)."""
     with SessionLocal() as session:
         try:
             _run(session, fill_id, llm, today or date.today())
+        except _Discarded:
+            session.rollback()
+            logger.info("AI fill %s was discarded, stopped", fill_id)
         except Exception as error:
             session.rollback()
+            if not service.fill_exists(session, fill_id):
+                # Gone while writing (a foreign key fails): same as discarded.
+                logger.info("AI fill %s was discarded, stopped", fill_id)
+                return
             if isinstance(error, LLMError):
                 logger.warning("AI fill %s failed: %s", fill_id, error)
                 message = str(error)
@@ -74,7 +87,12 @@ def _run(session: Session, fill_id: int, llm: LLM, today: date) -> None:
     tenant_id, form = fill.tenant_id, forms_service.get_form(session, fill.form_id)
     sections = [section for section, _ in groupby(form.fields, key=lambda f: f.section)]
 
+    def check_not_discarded() -> None:
+        if not service.fill_exists(session, fill_id):
+            raise _Discarded
+
     def phase(name: str, **data: object) -> None:
+        check_not_discarded()
         service.add_event(session, fill_id, FillEventType.PHASE, {"phase": name, **data})
 
     phase(
@@ -117,6 +135,7 @@ def _run(session: Session, fill_id: int, llm: LLM, today: date) -> None:
         def on_field(
             field_id: int, validated: ValidatedField, by_id: dict[int, FieldToAnswer] = by_id
         ) -> None:
+            check_not_discarded()
             field = by_id[field_id]
             for reason in validated.rejected:
                 logger.info("Field %s (%s): %s", field.key, field.id, reason)

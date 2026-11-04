@@ -138,6 +138,22 @@ def start_ai_fill(session: Session, tenant_id: int, form_id: int) -> int:
     return fill.id
 
 
+def discard_fill(session: Session, tenant_id: int, form_id: int) -> None:
+    """Delete the tenant's fill of the form: every answer (the user's included), the run and its
+    events go with it (cascade), and the form is "not started" again. Also while it is running:
+    the job notices and stops. Does nothing when nothing was started."""
+    forms_service.get_form(session, form_id)
+    session.execute(
+        delete(FormFill).where(FormFill.tenant_id == tenant_id, FormFill.form_id == form_id)
+    )
+    session.commit()
+
+
+def fill_exists(session: Session, fill_id: int) -> bool:
+    """False once the fill was discarded. A plain read: it holds no row lock."""
+    return session.scalar(select(FormFill.id).where(FormFill.id == fill_id)) is not None
+
+
 def get_ai_run(session: Session, tenant_id: int, form_id: int) -> AiRun | None:
     forms_service.get_form(session, form_id)
     return _ai_run(_get_fill(session, tenant_id, form_id))

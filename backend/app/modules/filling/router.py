@@ -88,6 +88,17 @@ def start_fill(
     return run
 
 
+@router.delete(
+    "/fill",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses={404: {"description": "Unknown form"}},
+)
+def discard_fill(form_id: int, session: SessionDep, tenant_id: CurrentTenantId) -> None:
+    """Discard the fill: every answer (the user's too) and the run are deleted, the form is back
+    to "not started". Allowed while it is being filled: that run stops."""
+    service.discard_fill(session, tenant_id, form_id)
+
+
 @router.get(
     "/fill/events",
     response_class=EventSourceResponse,
