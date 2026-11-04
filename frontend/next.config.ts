@@ -8,6 +8,8 @@ const withNextIntl = createNextIntlPlugin("./src/shared/i18n/request.ts");
 const root = path.join(__dirname);
 
 const nextConfig: NextConfig = {
+  // The e2e build goes to its own folder (playwright.config.ts) so it never touches the dev server's.
+  distDir: process.env.NEXT_DIST_DIR ?? ".next",
   cacheComponents: true,
   partialPrefetching: true,
   outputFileTracingRoot: root,

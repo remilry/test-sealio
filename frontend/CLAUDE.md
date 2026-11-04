@@ -7,14 +7,14 @@ Architecture and module rules: `../docs/ARCHITECTURE.md` §2. Tests: skill `scre
 
 Node 26 (see `../.nvmrc`, run `fnm use`), pnpm 12 via corepack.
 
-| Command                                        | What it does                                                                                 |
-| ---------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `pnpm dev`                                     | dev server on :3000 (also exposes `/_next/mcp`)                                              |
-| `pnpm test` / `pnpm test:watch`                | Vitest screen tests                                                                          |
-| `pnpm e2e`                                     | Playwright (builds and starts the app)                                                       |
-| `pnpm lint` · `pnpm typecheck` · `pnpm format` | ESLint (incl. module boundaries) · tsc · Prettier                                            |
-| `pnpm gen:api`                                 | regenerate `src/shared/api/schema.gen.ts` from the back's OpenAPI (`API_URL`, default :8000) |
-| `pnpm dlx shadcn@latest add <component>`       | add a shadcn component into `src/shared/ui`                                                  |
+| Command                                        | What it does                                                                                                               |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm dev`                                     | dev server on :3000 (also exposes `/_next/mcp`)                                                                            |
+| `pnpm test` / `pnpm test:watch`                | Vitest screen tests                                                                                                        |
+| `pnpm e2e`                                     | Playwright main scenario in a clean, dedicated environment (own DB `formpilot_e2e`, ports 8100/3100, build in `.next-e2e`) |
+| `pnpm lint` · `pnpm typecheck` · `pnpm format` | ESLint (incl. module boundaries) · tsc · Prettier                                                                          |
+| `pnpm gen:api`                                 | regenerate `src/shared/api/schema.gen.ts` from the back's OpenAPI (`API_URL`, default :8000)                               |
+| `pnpm dlx shadcn@latest add <component>`       | add a shadcn component into `src/shared/ui`                                                                                |
 
 Conventions:
 
