@@ -2,7 +2,7 @@
 
 > Document vivant. Chaque étape y est cochée et détaillée au fur et à mesure.
 > Contexte produit et priorités : voir `CLAUDE.md`. Échéance : jeudi 5 novembre.
-> Statut : étapes 0 à 4.5 faites (4.5 à valider) ; prochaine : 5 (base de connaissances + IA sur l'Annex 7). Parcours détaillé : `docs/USER_FLOW.md`. Les choix techniques marqués _proposition_ restent à confirmer à l'étape 3.
+> Statut : étapes 0 à 4.5 faites ; prochaine : 5 (base de connaissances + IA sur l'Annex 7). Parcours détaillé : `docs/USER_FLOW.md`. Les choix techniques marqués _proposition_ restent à confirmer à l'étape 3.
 
 ## 1. Ce qu'on a appris des deux formulaires
 
@@ -63,7 +63,7 @@ Chaque étape à partir de la 4 livre une **fonctionnalité utilisable de bout e
 - Tests : API (pytest), écrans *Tender* / accueil / coquille (Vitest + MSW), scénario Playwright contre le vrai back.
 - Mergé dans `main` le 2026-11-03.
 
-### Étape 4.5 — Annex 7 de bout en bout, sans IA ✅ (à valider)
+### Étape 4.5 — Annex 7 de bout en bout, sans IA ✅
 - Parcours : *Tender* → « Fill with AI » (ouvre l'écran de remplissage ; *Setup* viendra devant à l'étape 5) → champs détectés affichés sur l'aperçu → saisie à la main → *Export* (modale) → téléchargement du PDF rempli.
 - **Parseur PDF générique** (`forms/parsing/pdf_parser.py`, pur) : pointillés `…`/`.` (libellé avant, à gauche sur la même ligne de base, ou au-dessus) et cases de tableau vides tracées par des filets (valeur à droite du libellé). Libellé « signature/stamp » → `signature`. Annex 7 : 10 champs dont 1 signature. Parsé à l'import (seed) : table `field` (localisateur JSONB : page, rectangle, ligne de base, taille de police, pointillés à effacer), `form.parsed_at` et `form.pages`. L'Annex 4 (DOCX) n'a pas encore de parseur : carte sans compteurs, « Fill with AI » désactivé.
 - **Saisie** : table `answer` minimale (valeur, `resolved_by`, `resolved_at` ; colonnes IA à l'étape 5). `PATCH /forms/{id}/fields/{fieldId}` renvoie l'état complet (réponses + compteurs) ; 422 sur une signature ; le formulaire passe *In review* à la première valeur.
@@ -160,7 +160,8 @@ UI (relecture)  ──►  API locale
 | 2026-11-03 | Pas de dépôt des formulaires par l'utilisateur : l'offre et ses annexes viennent d'une source externe (seed au démarrage depuis `forms/`, copie dans `data/`) ; première page = *Tender* | validé |
 | 2026-11-03 | Étape 4 recentrée sur le socle + premier écran *Tender* (front + back), mergée dans `main` ; parsing, saisie manuelle et export de l’Annex 7 déplacés en étape 4.5 | validé |
 | 2026-11-03 | Étape 4.5 : « Fill with AI » ouvre directement l'écran de remplissage (Setup ajouté à l'étape 5) ; écran *Export* minimal dès cette étape ; dans les cases de tableau, la valeur s'écrit à droite du libellé | validé |
-| 2026-11-03 | Étape 4.5 : parseur PDF générique (pointillés + cases vides), formulaires parsés à l'import, table `answer` minimale (étendue à l'étape 5), export par suppression des pointillés + texte sur la ligne de base | à valider |
+| 2026-11-03 | Étape 4.5 : parseur PDF générique (pointillés + cases vides), formulaires parsés à l'import, table `answer` minimale (étendue à l'étape 5), export par suppression des pointillés + texte sur la ligne de base | validé |
 | 2026-11-04 | *Export* en modale au-dessus de *Live fill* au lieu d'une page (flux plus léger ; une page pourra revenir si nécessaire) | validé |
 | 2026-11-04 | Multi-tenant anticipé : table `tenant` ; formulaires et champs partagés ; un `form_fill` par (tenant, formulaire) porte le statut et les réponses (les collègues d'un tenant partagent le même) ; tenant courant via la dépendance `CurrentTenantId` (tenant seedé tant qu'il n'y a pas d'authentification) ; données existantes migrées vers le tenant de démo | validé |
-| 2026-11-04 | Schéma de la base généré depuis les modèles SQLAlchemy dans `docs/DB_SCHEMA.md` (Mermaid, `make db-schema`), un test vérifie qu'il est à jour | à valider |
+| 2026-11-04 | Schéma de la base généré depuis les modèles SQLAlchemy dans `docs/DB_SCHEMA.md` (Mermaid, `make db-schema`), un test vérifie qu'il est à jour | validé |
+| 2026-11-04 | Étape 4.5 validée et mergée dans `main` | validé |
