@@ -10,6 +10,7 @@ export {
   useStartFill,
 } from "./fill-session.queries";
 export { initialRun, reduceRun } from "./fill-events";
+export { fillProgress } from "./progress";
 export type { FillEvent, FillPhase, FillRun } from "./fill-events";
 export type { SaveStatus } from "./fill-session.queries";
 export { SaveIndicator } from "./SaveIndicator";
