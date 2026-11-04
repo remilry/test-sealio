@@ -10,6 +10,8 @@ produces (`form_fill`, `answer`) carries its `tenant_id`, directly or through it
 erDiagram
     field ||--o{ answer : field_id
     form_fill ||--o{ answer : form_fill_id
+    document ||--o{ chunk : document_id
+    tenant ||--o{ document : tenant_id
     form ||--o{ field : form_id
     tender ||--o{ form : tender_id
     form ||--o{ form_fill : form_id
@@ -21,6 +23,29 @@ erDiagram
         text value "nullable"
         text resolved_by "ai | user"
         timestamptz resolved_at
+    }
+    chunk {
+        bigint id PK
+        bigint document_id FK
+        integer position
+        integer page "nullable"
+        jsonb box "nullable"
+        text text
+        text context
+        vector(384) embedding
+        tsvector tsv
+    }
+    document {
+        bigint id PK
+        bigint tenant_id FK
+        text name
+        text file_name
+        text file_format "pdf | docx"
+        text file_path
+        integer pages "nullable"
+        text status "processing | indexed | error"
+        text error "nullable"
+        timestamptz indexed_at "nullable"
     }
     field {
         bigint id PK
@@ -73,6 +98,18 @@ erDiagram
 - FK `form_fill_id` → `form_fill.id`, on delete cascade
 - unique `(form_fill_id, field_id)`
 - index `(field_id)`
+
+### `chunk`
+
+- FK `document_id` → `document.id`, on delete cascade
+- unique `(document_id, position)`
+- index `(embedding)`
+- index `(tsv)`
+
+### `document`
+
+- FK `tenant_id` → `tenant.id`, on delete cascade
+- unique `(tenant_id, file_name)`
 
 ### `field`
 

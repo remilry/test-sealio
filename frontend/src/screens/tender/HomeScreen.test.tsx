@@ -1,6 +1,6 @@
 import { screen } from "@testing-library/react";
 import { freezeToday, handlers, renderScreen, server } from "@/shared/test";
-import { tender, tenderSummary } from "@/shared/test/fixtures";
+import { knowledgeBase, tender, tenderSummary } from "@/shared/test/fixtures";
 import { HomeScreen } from "./HomeScreen";
 
 describe("Home", () => {
@@ -8,7 +8,11 @@ describe("Home", () => {
 
   it("opens the first open tender directly", async () => {
     // Given one open tender
-    server.use(handlers.tenders([tenderSummary()]), handlers.tender(tender()));
+    server.use(
+      handlers.tenders([tenderSummary()]),
+      handlers.tender(tender()),
+      handlers.knowledge(knowledgeBase()),
+    );
 
     // When I land on the app
     renderScreen(<HomeScreen />);

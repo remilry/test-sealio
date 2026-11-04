@@ -13,6 +13,7 @@ from app.core.migrations import upgrade_to_head
 from app.modules.export.router import router as export_router
 from app.modules.filling.router import router as filling_router
 from app.modules.forms.router import router as forms_router
+from app.modules.knowledge.router import router as knowledge_router
 from app.modules.tenders.router import router as tenders_router
 from app.seed import seed
 
@@ -39,6 +40,7 @@ app.include_router(tenders_router)
 app.include_router(forms_router)
 app.include_router(filling_router)
 app.include_router(export_router)
+app.include_router(knowledge_router)
 
 
 class Health(BaseModel):

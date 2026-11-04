@@ -1,13 +1,16 @@
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { freezeToday, handlers, renderScreen, server } from "@/shared/test";
-import { form, tender } from "@/shared/test/fixtures";
+import { form, knowledgeBase, tender } from "@/shared/test/fixtures";
 import { TenderScreen } from "./TenderScreen";
 
 const forms = () => within(screen.getByRole("list", { name: "Forms to complete" }));
 
 describe("Tender", () => {
-  beforeEach(() => freezeToday("2026-11-03"));
+  beforeEach(() => {
+    freezeToday("2026-11-03");
+    server.use(handlers.knowledge(knowledgeBase()));
+  });
 
   it("shows what the tender is, who runs it and when it is due", async () => {
     // Given the seeded tender
@@ -169,6 +172,20 @@ describe("Tender", () => {
     // Then the deadline wording follows
     const due = await screen.findByRole("group", { name: "Submission due" });
     expect(within(due).getByText(expected)).toBeInTheDocument();
+  });
+
+  it("shows what the AI answers from, with a way to manage it", async () => {
+    // Given the seeded tender and knowledge base
+    server.use(handlers.tender(tender()));
+
+    // When I open the tender
+    renderScreen(<TenderScreen tenderId={1} />);
+
+    // Then the Company knowledge card counts the documents and links to them
+    const card = within(await screen.findByRole("region", { name: "Company knowledge" }));
+    expect(await card.findByText("2")).toBeInTheDocument();
+    expect(card.getByText("documents")).toBeInTheDocument();
+    expect(card.getByRole("link", { name: "Manage" })).toHaveAttribute("href", "/knowledge");
   });
 
   it("tells me when the tender does not exist", async () => {

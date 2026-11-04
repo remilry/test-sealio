@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import Settings
 from app.modules.forms import service as forms_service
+from app.modules.knowledge import service as knowledge_service
 from app.modules.tenants import service as tenants_service
 from app.modules.tenders import service as tenders_service
 
@@ -39,7 +40,7 @@ FORMS = [
 
 
 def seed(session: Session, settings: Settings) -> None:
-    tenants_service.ensure_tenant(session, **TENANT)
+    tenant = tenants_service.ensure_tenant(session, **TENANT)
     tender = tenders_service.upsert_tender(session, **TENDER)
     for position, (title, file_name) in enumerate(FORMS):
         forms_service.import_form(
@@ -50,4 +51,8 @@ def seed(session: Session, settings: Settings) -> None:
             source=settings.seed_forms_dir / file_name,
             data_dir=settings.data_dir,
         )
+    # The demo company's documents (knowledge-base/, see GROUND_TRUTH.md), indexed once.
+    for source in sorted(settings.seed_knowledge_dir.glob("*")):
+        if source.suffix.lower() in {".pdf", ".docx"}:
+            knowledge_service.import_document(session, tenant.id, source, settings.data_dir)
     session.commit()

@@ -2,8 +2,10 @@
 
 import { Suspense, type ReactNode } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { ActiveTenders } from "@/features/tender";
+import { routes } from "@/shared/lib/routes";
 import {
   Sidebar,
   SidebarContent,
@@ -33,10 +35,8 @@ function initials(name: string, single = false) {
 
 /**
  * Sidebar + content for the Tender and Company knowledge screens (Live fill is full screen).
- * Company knowledge appears in the nav once that screen exists (no dead links).
  */
 export function AppShell({ children }: { children: ReactNode }) {
-  const t = useTranslations("shell");
   const tCommon = useTranslations("common");
   const appName = tCommon("appName");
   return (
@@ -58,15 +58,11 @@ export function AppShell({ children }: { children: ReactNode }) {
         </SidebarHeader>
         <SidebarContent>
           <SidebarGroup>
-            <SidebarMenu aria-label={t("mainNav")}>
-              <SidebarMenuItem>
-                <SidebarMenuButton isActive render={<Link href="/" />}>
-                  {t("tenders")}
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
+            {/* usePathname suspends on dynamic routes with Cache Components: keep it in a boundary. */}
+            <Suspense fallback={<MainNav pathname={null} />}>
+              <CurrentMainNav />
+            </Suspense>
           </SidebarGroup>
-          {/* usePathname suspends on dynamic routes with Cache Components: keep it in a boundary. */}
           <Suspense fallback={<SidebarMenuSkeleton />}>
             <ActiveTenders />
           </Suspense>
@@ -85,5 +81,29 @@ export function AppShell({ children }: { children: ReactNode }) {
       </Sidebar>
       <SidebarInset>{children}</SidebarInset>
     </SidebarProvider>
+  );
+}
+
+function CurrentMainNav() {
+  return <MainNav pathname={usePathname()} />;
+}
+
+/** Tenders and Company knowledge; the current section is highlighted once the path is known. */
+function MainNav({ pathname }: { pathname: string | null }) {
+  const t = useTranslations("shell");
+  const inKnowledge = pathname?.startsWith(routes.knowledge) ?? false;
+  return (
+    <SidebarMenu aria-label={t("mainNav")}>
+      <SidebarMenuItem>
+        <SidebarMenuButton isActive={pathname !== null && !inKnowledge} render={<Link href="/" />}>
+          {t("tenders")}
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+      <SidebarMenuItem>
+        <SidebarMenuButton isActive={inKnowledge} render={<Link href={routes.knowledge} />}>
+          {t("knowledge")}
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+    </SidebarMenu>
   );
 }

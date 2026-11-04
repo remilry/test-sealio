@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     data_dir: Path = REPO_ROOT / "data"
     # Stand-in for the external source the tender forms come from in the real product.
     seed_forms_dir: Path = REPO_ROOT / "forms"
+    # The demo tenant's company documents, ingested at startup (knowledge base).
+    seed_knowledge_dir: Path = REPO_ROOT / "knowledge-base" / "documents"
+    # "hash": deterministic test embedder, never loads the model (tests/conftest.py).
+    embedder: Literal["fastembed", "hash"] = "fastembed"
     cors_origins: list[str] = ["http://localhost:3000"]
     # Slug of the tenant every request acts for, until real authentication (tenants/service.py).
     current_tenant: str = "alpenlogic"

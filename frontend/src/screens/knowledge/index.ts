@@ -1,0 +1,1 @@
+export { KnowledgeScreen } from "./KnowledgeScreen";

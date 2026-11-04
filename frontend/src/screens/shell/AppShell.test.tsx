@@ -25,4 +25,27 @@ describe("App shell", () => {
     expect(screen.getByText("Page content")).toBeInTheDocument();
     expect(screen.getByText("Marc Keller")).toBeInTheDocument();
   });
+
+  it("links to the tenders and to the company knowledge", async () => {
+    // Given one open tender
+    server.use(handlers.tenders([tenderSummary()]));
+
+    // When any page renders inside the shell
+    renderScreen(
+      <AppShell>
+        <p>Page content</p>
+      </AppShell>,
+    );
+
+    // Then the main navigation leads to both sections
+    const nav = within(screen.getByRole("list", { name: "Main" }));
+    expect(nav.getByRole("link", { name: "Tenders" })).toHaveAttribute("href", "/");
+    expect(nav.getByRole("link", { name: "Company knowledge" })).toHaveAttribute(
+      "href",
+      "/knowledge",
+    );
+    expect(
+      await screen.findByRole("link", { name: /Cloud Platform Services/ }),
+    ).toBeInTheDocument();
+  });
 });
