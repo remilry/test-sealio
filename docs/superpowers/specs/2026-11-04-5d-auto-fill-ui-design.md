@@ -106,7 +106,7 @@ Selon `answer.type` et `resolved_by` :
 - La logique de correspondance clé/libellé reste celle de 5c ; un champ dont la clé partielle n'est pas encore complète n'est pas publié.
 
 ### 4.3 Enregistrements avec minutage
-- `RecordingLLM` enregistre en plus, dans le même JSON, un bloc `timing` : `first_field_seconds` (du lancement à la fin du premier champ) et `field_seconds` (délai cumulé à la fin de chaque champ), plus `total_seconds`. Les fichiers sans `timing` restent rejouables (sans latence).
+- `RecordingLLM` enregistre en plus, dans le même JSON, un bloc `timing` : `{first_output_seconds, total_seconds}` (du lancement à la première sortie partielle du modèle, et à la fin de la réponse) ; `FakeLLM` attend `first_output_seconds` avant la première sortie, puis répartit le reste régulièrement. Les fichiers sans `timing` restent rejouables (sans latence).
 - Réenregistrer l'Annex 7 avec le vrai modèle en streaming (`scripts/record_llm.py`, ~0,5 centime, clé de l'utilisateur dans `backend/.env`, lue par les réglages de l'app, jamais par Claude). _Choix de Claude_ : Claude lance le script pendant l'étape ; la nouvelle réponse est relue contre `GROUND_TRUTH.md` (le test de rejeu existant porte sur le nouvel enregistrement). Si l'appel échoue, un bloc `timing` écrit à la main (~23 s, réparti sur les champs) sert de repli, signalé à l'utilisateur.
 
 ### 4.4 Durée estimée et progression

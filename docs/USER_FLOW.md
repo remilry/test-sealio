@@ -61,8 +61,8 @@ But : voir ce qui est demandé et lancer le remplissage.
 But : un dernier coup d'œil, un clic pour lancer.
 
 - Fichier détecté : nom, `N fields detected · N Yes/No declarations · 1 signature`.
-- Source utilisée : *Company knowledge* (`11 documents`) + *Tender details*. Pas d'avertissement préalable en V1 (doutes détectés pendant le remplissage).
-- Durée estimée (« Takes about 15 seconds », calculée d'après le nombre de sections), boutons `Cancel` / `Auto-fill`.
+- Source utilisée : *Company knowledge* (`11 documents`) + *Tender details*. Base de connaissances vide : avertissement « Your company knowledge is empty: only the tender details can be used. » + lien *Add documents* (le lancement reste possible) ; tant que le nombre de documents est inconnu (chargement, échec), ni le nombre ni l'avertissement ne sont affichés. Les doutes (conflits, sources périmées) sont détectés pendant le remplissage.
+- Durée estimée (« Takes about 15 seconds », calculée d'après le nombre de sections), boutons `Cancel` / `Start`.
 - Un formulaire déjà commencé ne peut pas être relancé : il faut d'abord `Discard answers` (confirmation « Discard all answers to … ? », supprime **toutes** les réponses, celles de l'utilisateur aussi, même pendant un remplissage en cours), puis `Auto-fill` à nouveau. Un nouveau remplissage qui garde les valeurs de l'utilisateur viendra en V2.
 
 ### 3.4 Live fill (écran principal)
@@ -98,17 +98,17 @@ But : un dernier coup d'œil, un clic pour lancer.
 **Colonne droite — le document**
 
 - Onglets `Form` / `Source`.
-- **Form** : aperçu fidèle du formulaire d'origine, mis à jour en direct. Légende : *Filled automatically* (bleu) · *To check* (ambre) · *Missing* (hachuré rose) · *Reviewed by you* (vert). Les Oui/Non montrent ☐/☒ et « awaiting you » si non tranchés. Zones signature / cachet visibles, jamais remplies.
+- **Form** : aperçu fidèle du formulaire d'origine, mis à jour en direct. Légende : *Filled automatically* (bleu) · *To check* (ambre) · *Empty* (hachuré rose) · *Entered by you* (vert) · *Sign by hand*. Les Oui/Non montrent ☐/☒ et « awaiting you » si non tranchés. Zones signature / cachet visibles, jamais remplies.
 - **Source** : le passage du document cité, ouvert à la page, citation surlignée, « Used for: <champ> ». Si aucune source : « No source for this field — nothing relevant found in the passages searched ».
 - **Synchronisation** : cliquer un champ à gauche cadre et surligne sa zone à droite (défilement automatique), et inversement.
 
 **Déroulé du remplissage en direct** (phases affichées) :
 
 1. *Reading the form* — format, pages, sections.
-2. *Detecting fields to fill* — nombre de champs, déclarations, signature.
-3. *Searching company knowledge* — les champs se remplissent **un par un, au fil de l'écriture du modèle** (chaque champ est validé puis publié dès qu'il est complet) dans le document (« Searching… » sur le champ en cours) et apparaissent dans la file à gauche.
-4. *Cross-checking sources* — conflits (valeurs candidates divergentes) et sources périmées (date de validité renvoyée par le LLM avec citation vérifiée, comparée à la date du jour) détectés.
-5. *Preparing your review* — tri ; fin : « Done. 20 of 23 fields filled in 14 seconds », sélection automatique du premier champ ouvert.
+2. *Detecting fields* — nombre de champs, déclarations, signature.
+3. *Searching your documents* — les champs se remplissent **un par un, au fil de l'écriture du modèle** (chaque champ est validé puis publié dès qu'il est complet) dans le document (« Searching your documents… » sur le champ en cours) et apparaissent dans la file à gauche.
+4. *Checking sources* — conflits (valeurs candidates divergentes) et sources périmées (date de validité renvoyée par le LLM avec citation vérifiée, comparée à la date du jour) détectés.
+5. *Preparing your review* — tri ; fin : « 20 of 23 fields filled in 14 seconds », sélection automatique du premier champ ouvert.
 
 L'utilisateur peut corriger un champ signalé **pendant** le remplissage.
 
