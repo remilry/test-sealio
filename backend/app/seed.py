@@ -10,7 +10,11 @@ from sqlalchemy.orm import Session
 
 from app.core.config import Settings
 from app.modules.forms import service as forms_service
+from app.modules.tenants import service as tenants_service
 from app.modules.tenders import service as tenders_service
+
+# The bidder company of the demo (docs/USER_FLOW.md), the tenant every request acts for.
+TENANT = {"slug": "alpenlogic", "name": "Alpenlogic AG"}
 
 TENDER = {
     "reference": "ZH-2026-0412",
@@ -35,6 +39,7 @@ FORMS = [
 
 
 def seed(session: Session, settings: Settings) -> None:
+    tenants_service.ensure_tenant(session, **TENANT)
     tender = tenders_service.upsert_tender(session, **TENDER)
     for position, (title, file_name) in enumerate(FORMS):
         forms_service.import_form(

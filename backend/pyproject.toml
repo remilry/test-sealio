@@ -57,7 +57,7 @@ select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "FAST", "PT"]
 allowed-confusables = ["–", "—"]
 
 [tool.pyright]
-include = ["app", "tests", "migrations"]
+include = ["app", "tests", "migrations", "scripts"]
 pythonVersion = "3.14"
 typeCheckingMode = "standard"
 venvPath = "."

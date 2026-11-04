@@ -54,16 +54,76 @@ describe("Tender", () => {
     expect(annex7.getByText("PDF")).toBeInTheDocument();
   });
 
-  it("offers to fill a form that has not been started", async () => {
-    // Given a form not started yet
-    server.use(handlers.tender(tender({ forms: [form({ status: "not_started" })] })));
+  it("shows what was detected in each form", async () => {
+    // Given the seeded tender: Annex 7 parsed, Annex 4 (Word) not parsed yet
+    server.use(handlers.tender(tender()));
+
+    // When I open it
+    renderScreen(<TenderScreen tenderId={1} />);
+
+    // Then the parsed form shows its counts, the other its file name
+    const annex7 = within(await screen.findByRole("listitem", { name: /Annex 7/ }));
+    expect(annex7.getByText("10 fields detected · 1 signature")).toBeInTheDocument();
+    const annex4 = within(forms().getByRole("listitem", { name: /Annex 4/ }));
+    expect(
+      annex4.getByText("Annex_4_Conditions of Participation and Company Self-Declaration.docx"),
+    ).toBeInTheDocument();
+  });
+
+  it("opens a parsed form to fill it", async () => {
+    // Given a parsed form not started yet
+    server.use(handlers.tender(tender()));
 
     // When I open the tender
     renderScreen(<TenderScreen tenderId={1} />);
 
-    // Then I can see the AI fill action (wired to the Setup step later)
-    const card = within(await screen.findByRole("listitem", { name: /Annex 4/ }));
-    expect(card.getByRole("button", { name: "Fill with AI" })).toBeInTheDocument();
+    // Then "Fill with AI" leads to the form
+    const annex7 = within(await screen.findByRole("listitem", { name: /Annex 7/ }));
+    expect(annex7.getByRole("link", { name: "Fill with AI" })).toHaveAttribute(
+      "href",
+      "/forms/2/fill",
+    );
+  });
+
+  it("cannot fill a form whose format is not supported yet", async () => {
+    // Given the Word form, not parsed yet
+    server.use(handlers.tender(tender()));
+
+    // When I open the tender
+    renderScreen(<TenderScreen tenderId={1} />);
+
+    // Then its fill action is disabled
+    const annex4 = within(await screen.findByRole("listitem", { name: /Annex 4/ }));
+    expect(annex4.getByRole("button", { name: "Fill with AI" })).toBeDisabled();
+  });
+
+  it("lets me continue a form in review", async () => {
+    // Given Annex 7 in review
+    server.use(
+      handlers.tender(
+        tender({
+          forms: [
+            form({
+              id: 2,
+              title: "Annex 7 — Sanctions self-declaration (Art. 29c)",
+              file_format: "pdf",
+              status: "in_review",
+              field_counts: { fields: 10, yes_no: 0, signatures: 1 },
+            }),
+          ],
+        }),
+      ),
+    );
+
+    // When I open the tender
+    renderScreen(<TenderScreen tenderId={1} />);
+
+    // Then I can continue where I left off
+    const annex7 = within(await screen.findByRole("listitem", { name: /Annex 7/ }));
+    expect(annex7.getByRole("link", { name: "Continue review" })).toHaveAttribute(
+      "href",
+      "/forms/2/fill",
+    );
   });
 
   it("shows where each form stands: in review or ready", async () => {

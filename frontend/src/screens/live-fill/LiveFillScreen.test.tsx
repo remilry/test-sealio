@@ -1,0 +1,435 @@
+import { screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { handlers, renderScreen, server } from "@/shared/test";
+import {
+  annex7,
+  answer,
+  exportSummary,
+  fillState,
+  form as formSummary,
+  tender,
+  type FillState,
+} from "@/shared/test/fixtures";
+import { LiveFillScreen } from "./LiveFillScreen";
+
+const fieldList = () => within(screen.getByRole("list", { name: "Fields" }));
+const preview = () => screen.getByRole("region", { name: "Form preview" });
+/** The zone drawn on the document for a field (the only place where data-field-id is used). */
+const zone = (fieldId: number) =>
+  preview().querySelector<HTMLButtonElement>(`[data-field-id="${fieldId}"]`)!;
+
+/** The back keeps the answers it receives and returns the new fill state. */
+function backWithAnswers(initial: FillState = fillState()) {
+  let state = initial;
+  const saved = handlers.saveField(2, (fieldId, { value }) => {
+    const others = state.answers.filter((a) => a.field_id !== fieldId);
+    state = fillState([...others, answer(fieldId, value?.trim() || null, "2026-11-03T13:45:00Z")]);
+    return state;
+  });
+  server.use(handlers.answers(2, state), saved.handler);
+  return saved;
+}
+
+function given(form = annex7(), answers: FillState = fillState()) {
+  server.use(handlers.form(form), handlers.tender(tender()));
+  const saved = backWithAnswers(answers);
+  const user = userEvent.setup();
+  renderScreen(<LiveFillScreen formId={2} />);
+  return { saved, user };
+}
+
+describe("Live fill (manual)", () => {
+  it("lists every detected field in reading order, the signature included", async () => {
+    // Given the parsed Annex 7
+    given();
+
+    // When the form opens, then its 10 fields are listed in order
+    const items = await screen.findAllByRole("listitem", { name: /./ });
+    const fields = items.filter(
+      (item) => item.closest("ol")?.getAttribute("aria-label") === "Fields",
+    );
+    expect(fields.map((item) => item.getAttribute("aria-label"))).toEqual([
+      "Project number/project title/project name",
+      "Name of the contracting authority",
+      "Name and legal form",
+      "Business address",
+      "Contact person",
+      "Telephone",
+      "E-mail",
+      "Place and date",
+      "First name(s) and surname(s)",
+      "Signature(s)",
+    ]);
+    // And the signature cannot be typed in: it is signed by hand
+    const signature = within(fieldList().getByRole("listitem", { name: "Signature(s)" }));
+    expect(signature.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(signature.getByText(/Sign by hand after export/)).toBeInTheDocument();
+  });
+
+  it("shows the original form with each field highlighted where its answer goes", async () => {
+    // Given the parsed Annex 7
+    given();
+
+    // When the form opens
+    await screen.findByRole("heading", { name: "9 fields to fill" });
+
+    // Then the original PDF is rendered with one zone per field, placed from the parser's box
+    expect(preview().querySelector("[data-pdf-file]")).toHaveAttribute(
+      "data-pdf-file",
+      "http://localhost:8000/forms/2/file",
+    );
+    expect(preview().querySelectorAll("[data-field-id]")).toHaveLength(10);
+    expect(zone(6)).toHaveAccessibleName("Telephone");
+    expect(zone(6).style.left).toBe(`${((143.9 - 2) / 595.3) * 100}%`);
+    expect(within(preview()).getByText("Sign by hand")).toBeInTheDocument();
+  });
+
+  it("shows where I am: tender, form, how many fields are filled", async () => {
+    // Given a form with two fields already filled
+    given(annex7(), fillState([answer(3, "Alpenlogic AG"), answer(6, "+41 44 512 38 00")]));
+
+    // When it opens
+    expect(
+      await screen.findByRole("heading", {
+        level: 1,
+        name: "Annex 7 — Sanctions self-declaration (Art. 29c)",
+      }),
+    ).toBeInTheDocument();
+
+    // Then the breadcrumb, the counter and the values are shown
+    const breadcrumb = within(screen.getByRole("navigation", { name: "Breadcrumb" }));
+    expect(
+      await breadcrumb.findByText("Cloud Platform Services – Canton of Zurich"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("2 / 9 filled · 7 empty")).toBeInTheDocument();
+    expect(fieldList().getByRole("textbox", { name: "Name and legal form" })).toHaveValue(
+      "Alpenlogic AG",
+    );
+    expect(within(zone(3)).getByText("Alpenlogic AG")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Back to the tender" })).toHaveAttribute(
+      "href",
+      "/tenders/1",
+    );
+  });
+
+  it("saves what I type when I leave the field, and shows it on the form", async () => {
+    // Given an empty form
+    const { saved, user } = given();
+    const telephone = await screen.findByRole("textbox", { name: "Telephone" });
+
+    // When I type a phone number and leave the field
+    await user.type(telephone, "  +41 44 512 38 00 ");
+    await user.tab();
+
+    // Then the back receives it and the value appears on the document
+    await waitFor(() =>
+      expect(saved.requests).toEqual([{ fieldId: 6, value: "+41 44 512 38 00" }]),
+    );
+    expect(await within(zone(6)).findByText("+41 44 512 38 00")).toBeInTheDocument();
+    expect(await screen.findByText("1 / 9 filled · 8 empty")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Saved");
+    const card = within(fieldList().getByRole("listitem", { name: "Telephone" }));
+    expect(card.getByText("Entered by you · 14:45")).toBeInTheDocument();
+  });
+
+  it("shows what I type on the form at every keystroke, before it is saved", async () => {
+    // Given an empty form
+    const { saved, user } = given();
+    const telephone = await screen.findByRole("textbox", { name: "Telephone" });
+
+    // When I type the first characters
+    await user.type(telephone, "+4");
+
+    // Then the document shows them already, though nothing is saved yet
+    expect(within(zone(6)).getByText("+4")).toBeInTheDocument();
+    await user.type(telephone, "1");
+    expect(within(zone(6)).getByText("+41")).toBeInTheDocument();
+    expect(saved.requests).toEqual([]);
+
+    // And erasing everything shows the field empty again
+    await user.clear(telephone);
+    expect(within(zone(6)).queryByText(/\+4/)).not.toBeInTheDocument();
+  });
+
+  it("shows the dot leaders of a field only while it is empty", async () => {
+    // Given the project field, printed with dot leaders, and empty
+    const { user } = given();
+    const project = await screen.findByRole("textbox", {
+      name: "Project number/project title/project name",
+    });
+    const masks = () => preview().querySelectorAll<HTMLElement>('[data-placeholder-of="1"]');
+    expect(masks()).toHaveLength(0);
+
+    // When I type in it, then its dots are covered, exactly where the parser found them
+    await user.type(project, "ZH");
+    expect(masks()).toHaveLength(1);
+    expect(masks()[0].style.left).toBe(`${(270.2 / 595.3) * 100}%`);
+    expect(masks()[0].style.width).toBe(`${((395.7 - 270.2) / 595.3) * 100}%`);
+
+    // And when I erase it, the dots show again
+    await user.clear(project);
+    expect(masks()).toHaveLength(0);
+  });
+
+  it("does not save a field I only passed through", async () => {
+    // Given a form with a saved telephone number
+    const { saved, user } = given(annex7(), fillState([answer(6, "+41 44 512 38 00")]));
+
+    // When I go through the field without changing it
+    await user.click(await screen.findByRole("textbox", { name: "Telephone" }));
+    await user.tab();
+
+    // Then nothing is sent
+    expect(saved.requests).toEqual([]);
+  });
+
+  it("Enter saves the value once and moves on to the next field", async () => {
+    // Given an empty form
+    const { saved, user } = given();
+
+    // When I type a value in "Contact person" and press Enter
+    await user.type(
+      await screen.findByRole("textbox", { name: "Contact person" }),
+      "Marc Keller{Enter}",
+    );
+
+    // Then it is saved once and the cursor is in "Telephone"
+    await waitFor(() => expect(saved.requests).toEqual([{ fieldId: 5, value: "Marc Keller" }]));
+    expect(screen.getByRole("textbox", { name: "Telephone" })).toHaveFocus();
+    expect(fieldList().getByRole("listitem", { name: "Telephone" })).toHaveAttribute(
+      "aria-current",
+      "true",
+    );
+  });
+
+  it("clearing a value leaves the field empty", async () => {
+    // Given a saved e-mail
+    const { saved, user } = given(annex7(), fillState([answer(7, "info@alpenlogic.ch")]));
+
+    // When I clear it and leave the field
+    await user.clear(await screen.findByRole("textbox", { name: "E-mail" }));
+    await user.tab();
+
+    // Then the back is told the field is empty, and the document shows it empty again
+    await waitFor(() => expect(saved.requests).toEqual([{ fieldId: 7, value: null }]));
+    await waitFor(() => expect(within(zone(7)).queryByText("info@alpenlogic.ch")).toBeNull());
+    expect(await screen.findByText("0 / 9 filled · 9 empty")).toBeInTheDocument();
+  });
+
+  it("clicking a field on the document puts me in its input", async () => {
+    // Given the form is open
+    const { user } = given();
+    await screen.findByRole("textbox", { name: "E-mail" });
+
+    // When I click the e-mail zone on the document
+    await user.click(zone(7));
+
+    // Then the e-mail input has the focus, and the zone shows as selected
+    expect(screen.getByRole("textbox", { name: "E-mail" })).toHaveFocus();
+    expect(zone(7)).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("selects the first empty field when the form opens", async () => {
+    // Given the first two fields are filled
+    given(annex7(), fillState([answer(1, "ZH-2026-0412"), answer(2, "Canton of Zurich")]));
+
+    // When it opens, the first empty field is selected in the list and on the document
+    const item = await screen.findByRole("listitem", { name: "Name and legal form" });
+    expect(item).toHaveAttribute("aria-current", "true");
+    expect(zone(3)).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("moves through the fields with the keyboard: ↓ ↑ j k, Enter to type", async () => {
+    // Given the form is open, the first field selected
+    const { user } = given();
+    const items = () => fieldList().getAllByRole("listitem");
+    await screen.findByRole("textbox", { name: "Telephone" });
+
+    // When I press ↓ ↓ k j j
+    await user.keyboard("{ArrowDown}{ArrowDown}kjj");
+
+    // Then the fourth field is selected
+    expect(items()[3]).toHaveAttribute("aria-current", "true");
+
+    // And ↑ then Enter puts me in the third field's input
+    await user.keyboard("{ArrowUp}{Enter}");
+    expect(screen.getByRole("textbox", { name: "Name and legal form" })).toHaveFocus();
+  });
+
+  it("keeps what I typed when it could not be saved, so I can try again", async () => {
+    // Given the back refuses the save
+    const { saved } = given();
+    server.use(handlers.error("/forms/2/fields/6", 500, "Boom", "patch"));
+    const user = userEvent.setup();
+
+    // When I type a value and leave the field
+    const telephone = await screen.findByRole("textbox", { name: "Telephone" });
+    await user.type(telephone, "044");
+    await user.tab();
+
+    // Then I am told it is not saved, without technical details, and the form does not pretend it is
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Couldn't save — press Enter in the field to try again",
+    );
+    expect(screen.getByText("0 / 9 filled · 9 empty")).toBeInTheDocument();
+    // But what I typed is still there, on the form too
+    const card = within(fieldList().getByRole("listitem", { name: "Telephone" }));
+    expect(card.getByRole("textbox")).toHaveValue("044");
+    expect(card.getByText("Not saved — press Enter to try again")).toBeInTheDocument();
+    expect(within(zone(6)).getByText("044")).toBeInTheDocument();
+
+    // And when the back is reachable again, Enter saves it
+    server.use(saved.handler);
+    await user.type(card.getByRole("textbox"), "{Enter}");
+    await waitFor(() => expect(saved.requests).toEqual([{ fieldId: 6, value: "044" }]));
+    expect(await screen.findByText("1 / 9 filled · 8 empty")).toBeInTheDocument();
+    expect(card.queryByText(/Not saved/)).not.toBeInTheDocument();
+  });
+
+  it("tells me when a form cannot be filled yet (format not supported)", async () => {
+    // Given the Word form, not parsed yet
+    const docx = formSummary();
+    given(annex7({ ...docx, id: 2, field_counts: null, pages: [], fields: [] }), fillState([], []));
+
+    // Then I am told so
+    expect(
+      await screen.findByRole("heading", { name: "This form can't be filled yet" }),
+    ).toBeInTheDocument();
+  });
+
+  it("tells me when the form does not exist", async () => {
+    // Given an unknown form
+    server.use(
+      handlers.error("/forms/2", 404, "Form 2 not found"),
+      handlers.error("/forms/2/answers", 404, "Form 2 not found"),
+    );
+
+    // When I open it
+    renderScreen(<LiveFillScreen formId={2} />);
+
+    // Then I am told so
+    expect(await screen.findByRole("heading", { name: "Form not found" })).toBeInTheDocument();
+  });
+
+  it("lets me retry when the form could not be loaded", async () => {
+    // Given the back fails once
+    server.use(handlers.error("/forms/2", 500), handlers.answers(2, fillState()));
+    const user = userEvent.setup();
+    renderScreen(<LiveFillScreen formId={2} />);
+    const alert = await screen.findByRole("alert");
+    // (told in plain words, nothing technical)
+    expect(alert).toHaveTextContent(
+      "We couldn't load this form.Something went wrong on our side. Please try again in a moment.",
+    );
+
+    // When it is back and I retry
+    server.use(handlers.form(annex7()), handlers.tender(tender()));
+    await user.click(within(alert).getByRole("button", { name: "Try again" }));
+
+    // Then the form shows
+    expect(await screen.findByRole("textbox", { name: "Telephone" })).toBeInTheDocument();
+  });
+});
+
+const ALL_FILLED = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+
+/** Opens the export over the form, the back answering with the given summary. */
+async function openExport(summary = exportSummary(ALL_FILLED), answers = fillState()) {
+  server.use(handlers.exportSummary(2, summary));
+  const { saved, user } = given(annex7(), answers);
+  await user.click(await screen.findByRole("button", { name: "Export PDF" }));
+  return { dialog: await screen.findByRole("dialog"), saved, user };
+}
+
+describe("Export (dialog over the form)", () => {
+  it("says the form is ready when every field is filled", async () => {
+    // Given every fillable field has a value, when I open the export
+    const { dialog } = await openExport();
+
+    // Then it is ready, with no warning
+    const panel = within(dialog);
+    expect(await panel.findByRole("heading", { name: "Ready to submit" })).toBeInTheDocument();
+    expect(
+      panel.getByText("Annex 7 — Sanctions self-declaration (Art. 29c) · 9 of 9 fields filled"),
+    ).toBeInTheDocument();
+    expect(panel.queryByRole("list", { name: "Empty fields" })).not.toBeInTheDocument();
+  });
+
+  it("warns that empty fields will be exported blank, and lets me go back to them", async () => {
+    // Given two fields are filled, when I open the export
+    const { dialog, user } = await openExport(exportSummary([3, 6]));
+
+    // Then I see which fields will be blank, and can still download
+    const panel = within(dialog);
+    expect(await panel.findByRole("heading", { name: "7 fields still empty" })).toBeInTheDocument();
+    expect(panel.getByText("7 fields still empty — they will be exported blank")).toBeVisible();
+    const empty = within(panel.getByRole("list", { name: "Empty fields" }));
+    expect(empty.getAllByRole("listitem").map((item) => item.textContent)).toEqual([
+      "Project number/project title/project name",
+      "Name of the contracting authority",
+      "Business address",
+      "Contact person",
+      "E-mail",
+      "Place and date",
+      "First name(s) and surname(s)",
+    ]);
+    expect(panel.getByRole("link", { name: "Download PDF" })).toBeInTheDocument();
+
+    // And going back closes it, the form still there
+    await user.click(panel.getByRole("button", { name: "Back to review" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(screen.getByRole("textbox", { name: "Telephone" })).toBeInTheDocument();
+  });
+
+  it("downloads the filled form in its original format, and reminds me to sign by hand", async () => {
+    // Given the form, when I open the export
+    const { dialog } = await openExport();
+
+    // Then the download is the filled PDF from the back
+    const panel = within(dialog);
+    const download = await panel.findByRole("link", { name: "Download PDF" });
+    expect(download).toHaveAttribute("href", "http://localhost:8000/forms/2/export/file");
+    expect(
+      panel.getByText(
+        "Buyer's original layout preserved · answers written into the existing fields",
+      ),
+    ).toBeInTheDocument();
+    // And the signature is listed before submitting
+    const section = panel.getByRole("region", { name: "Before you submit" });
+    expect(within(section).getByText("Sign by hand: Signature(s)")).toBeInTheDocument();
+  });
+
+  it("counts the value I was typing when I opened it", async () => {
+    // Given the back's summary counts the values it has received
+    const { user, saved } = given();
+    server.use(
+      handlers.exportSummary(2, () =>
+        exportSummary(saved.requests.filter((r) => r.value).map((r) => r.fieldId)),
+      ),
+    );
+
+    // When I type a value and open the export straight away
+    await user.type(await screen.findByRole("textbox", { name: "Telephone" }), "044");
+    await user.click(screen.getByRole("button", { name: "Export PDF" }));
+
+    // Then the value is saved first, and the export counts it
+    const panel = within(await screen.findByRole("dialog"));
+    expect(await panel.findByText(/1 of 9 fields filled/)).toBeInTheDocument();
+    expect(saved.requests).toEqual([{ fieldId: 6, value: "044" }]);
+  });
+
+  it("lets me retry when the export could not be prepared", async () => {
+    // Given the back fails once
+    server.use(handlers.error("/forms/2/export", 500));
+    const { user } = given();
+    await user.click(await screen.findByRole("button", { name: "Export PDF" }));
+    const alert = await within(await screen.findByRole("dialog")).findByRole("alert");
+
+    // When it is back and I retry
+    server.use(handlers.exportSummary(2, exportSummary(ALL_FILLED)));
+    await user.click(within(alert).getByRole("button", { name: "Try again" }));
+
+    // Then the export shows
+    expect(await screen.findByRole("heading", { name: "Ready to submit" })).toBeInTheDocument();
+  });
+});

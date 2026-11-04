@@ -64,6 +64,46 @@ const eslintConfig = defineConfig([
       ],
     },
   },
+  // Readability: a chain of ternaries becomes a sub-component or a function with early returns.
+  { files: ["src/**/*.{ts,tsx}"], rules: { "no-nested-ternary": "error" } },
+  // Data layer (skill `frontend-data-layer`): HTTP calls only in `[feature].api.ts`, TanStack
+  // Query hooks only in `[feature].queries.ts`; components use the hooks those files export.
+  {
+    files: ["src/**/*.{ts,tsx}"],
+    ignores: ["src/**/*.queries.ts", "src/**/*.test.{ts,tsx}", "src/shared/test/**"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "@tanstack/react-query",
+              importNames: [
+                "useQuery",
+                "useQueries",
+                "useSuspenseQuery",
+                "useInfiniteQuery",
+                "useMutation",
+                "useMutationState",
+                "useQueryClient",
+                "queryOptions",
+              ],
+              message: "Query hooks live in [feature].queries.ts: export a useXxx hook from there.",
+            },
+            {
+              name: "@/shared/api",
+              importNames: ["api", "unwrap"],
+              message: "HTTP calls live in [feature].api.ts, used through [feature].queries.ts.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ["src/**/*.api.ts"],
+    rules: { "no-restricted-imports": "off" },
+  },
   // Dates are only handled through src/shared/utils/date.ts (one place to swap for a date library).
   {
     files: ["src/**/*.{ts,tsx}"],

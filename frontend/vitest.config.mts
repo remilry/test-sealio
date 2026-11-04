@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 
@@ -6,7 +7,13 @@ process.env.TZ = "Europe/Zurich";
 
 export default defineConfig({
   plugins: [react()],
-  resolve: { tsconfigPaths: true },
+  resolve: {
+    tsconfigPaths: true,
+    // PDF.js cannot render in jsdom: pages are stubbed, the field overlay stays real.
+    alias: {
+      "react-pdf": fileURLToPath(new URL("./src/shared/test/mocks/react-pdf.tsx", import.meta.url)),
+    },
+  },
   test: {
     environment: "jsdom",
     globals: true,

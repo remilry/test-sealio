@@ -1,63 +1,58 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import { FileQuestionIcon } from "lucide-react";
-import { FormList, TenderHeader, tenderQueries } from "@/features/tender";
+import type { ReactNode } from "react";
+import { FormList, TenderHeader, useTender } from "@/features/tender";
 import { isNotFound } from "@/shared/api";
-import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/shared/ui/alert";
-import { Button } from "@/shared/ui/button";
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/shared/ui/empty";
+import { LoadError, EmptyState } from "@/shared/components/LoadStates";
 import { Skeleton } from "@/shared/ui/skeleton";
 
 /** Tender detail: what is asked, when, and the forms to fill (docs/USER_FLOW.md §3.2). */
 export function TenderScreen({ tenderId }: { tenderId: number }) {
-  const { data: tender, error, isPending, refetch } = useQuery(tenderQueries.detail(tenderId));
+  const { data: tender, error, isPending, refetch } = useTender(tenderId);
 
+  if (isPending) {
+    return (
+      <TenderFrame>
+        <TenderSkeleton />
+      </TenderFrame>
+    );
+  }
+  if (isNotFound(error)) {
+    return (
+      <TenderFrame>
+        <EmptyState title="Tender not found">It may have been withdrawn by the buyer.</EmptyState>
+      </TenderFrame>
+    );
+  }
+  if (error) {
+    return (
+      <TenderFrame>
+        <LoadError title="We couldn't load this tender." onRetry={() => void refetch()} />
+      </TenderFrame>
+    );
+  }
+  return (
+    <TenderFrame title={tender.title}>
+      <TenderHeader tender={tender} />
+      <FormList forms={tender.forms} />
+    </TenderFrame>
+  );
+}
+
+/** The breadcrumb bar and the page column, whatever the state of the tender. */
+function TenderFrame({ title, children }: { title?: string; children: ReactNode }) {
   return (
     <div className="flex flex-1 flex-col">
       <div className="sticky top-0 z-10 flex h-13 items-center gap-2 border-b bg-card px-6">
         <span className="text-muted-foreground">Tenders</span>
-        {tender && (
+        {title && (
           <>
             <span className="text-border">/</span>
-            <span className="truncate font-medium">{tender.title}</span>
+            <span className="truncate font-medium">{title}</span>
           </>
         )}
       </div>
-      <div className="mx-auto flex w-full max-w-290 flex-col gap-6 px-8 pt-7 pb-24">
-        {isPending ? (
-          <TenderSkeleton />
-        ) : error ? (
-          isNotFound(error) ? (
-            <Empty>
-              <EmptyHeader>
-                <EmptyMedia variant="icon">
-                  <FileQuestionIcon />
-                </EmptyMedia>
-                <EmptyTitle role="heading" aria-level={1}>
-                  Tender not found
-                </EmptyTitle>
-                <EmptyDescription>It may have been withdrawn by the buyer.</EmptyDescription>
-              </EmptyHeader>
-            </Empty>
-          ) : (
-            <Alert variant="destructive">
-              <AlertTitle>We couldn&apos;t load this tender.</AlertTitle>
-              <AlertDescription>Check that the API is running, then try again.</AlertDescription>
-              <AlertAction>
-                <Button variant="outline" size="sm" onClick={() => refetch()}>
-                  Try again
-                </Button>
-              </AlertAction>
-            </Alert>
-          )
-        ) : (
-          <>
-            <TenderHeader tender={tender} />
-            <FormList forms={tender.forms} />
-          </>
-        )}
-      </div>
+      <div className="mx-auto flex w-full max-w-290 flex-col gap-6 px-8 pt-7 pb-24">{children}</div>
     </div>
   );
 }

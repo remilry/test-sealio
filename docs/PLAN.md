@@ -2,7 +2,7 @@
 
 > Document vivant. Chaque étape y est cochée et détaillée au fur et à mesure.
 > Contexte produit et priorités : voir `CLAUDE.md`. Échéance : jeudi 5 novembre.
-> Statut : étapes 0 à 4 faites ; prochaine : 4.5 (Annex 7 sans IA). Parcours détaillé : `docs/USER_FLOW.md`. Les choix techniques marqués _proposition_ restent à confirmer à l'étape 3.
+> Statut : étapes 0 à 4.5 faites ; prochaine : 5 (base de connaissances + IA sur l'Annex 7). Parcours détaillé : `docs/USER_FLOW.md`. Les choix techniques marqués _proposition_ restent à confirmer à l'étape 3.
 
 ## 1. Ce qu'on a appris des deux formulaires
 
@@ -63,10 +63,14 @@ Chaque étape à partir de la 4 livre une **fonctionnalité utilisable de bout e
 - Tests : API (pytest), écrans *Tender* / accueil / coquille (Vitest + MSW), scénario Playwright contre le vrai back.
 - Mergé dans `main` le 2026-11-03.
 
-### Étape 4.5 — Annex 7 de bout en bout, sans IA ⬜
-- Parcours : *Tender* → Annex 7 (PDF) → champs détectés affichés sur l'aperçu → l'utilisateur les saisit à la main → export du PDF rempli → téléchargement.
-- C'est volontairement la partie la plus risquée (parsing PDF à plat + superposition de texte) : on la valide avant l'IA, avec l'UI en place.
-- Tests : parseur PDF (schéma attendu), export (texte au bon endroit, reste inchangé), e2e du parcours.
+### Étape 4.5 — Annex 7 de bout en bout, sans IA ✅
+- Parcours : *Tender* → « Fill with AI » (ouvre l'écran de remplissage ; *Setup* viendra devant à l'étape 5) → champs détectés affichés sur l'aperçu → saisie à la main → *Export* (modale) → téléchargement du PDF rempli.
+- **Parseur PDF générique** (`forms/parsing/pdf_parser.py`, pur) : pointillés `…`/`.` (libellé avant, à gauche sur la même ligne de base, ou au-dessus) et cases de tableau vides tracées par des filets (valeur à droite du libellé). Libellé « signature/stamp » → `signature`. Annex 7 : 10 champs dont 1 signature. Parsé à l'import (seed) : table `field` (localisateur JSONB : page, rectangle, ligne de base, taille de police, pointillés à effacer), `form.parsed_at` et `form.pages`. L'Annex 4 (DOCX) n'a pas encore de parseur : carte sans compteurs, « Fill with AI » désactivé.
+- **Saisie** : table `answer` minimale (valeur, `resolved_by`, `resolved_at` ; colonnes IA à l'étape 5). `PATCH /forms/{id}/fields/{fieldId}` renvoie l'état complet (réponses + compteurs) ; 422 sur une signature ; le formulaire passe *In review* à la première valeur.
+- **Export** (`export/pdf_exporter.py`, pur) : pointillés des champs remplis supprimés (redaction du texte seulement), valeur écrite sur la ligne de base du libellé, police réduite si elle déborde (plancher 5 pt). `GET /forms/{id}/export` (résumé : champs vides, à signer à la main) et `/export/file` (nom de fichier d'origine).
+- **Front** : écran *Live fill* manuel (liste des champs, sauvegarde auto en quittant le champ ou sur Entrée, « ✓ Saved », compteur, aperçu `react-pdf` avec zones synchronisées, clavier ↑↓/j/k/Entrée) et *Export* en modale au-dessus du formulaire (bandeau champs vides, rappel signature, téléchargement PDF ; le résumé attend la sauvegarde en cours).
+- Tests : parseur (schéma attendu de l'Annex 7 + PDF synthétiques), exporteur (valeurs dans leur rectangle, pointillés effacés seulement pour les champs remplis, reste de la page identique), API (pytest) ; écrans *Live fill* (export inclus) / *Tender* (Vitest, `react-pdf` remplacé par un stub) ; scénario Playwright jusqu'au téléchargement (vérifié aussi sur build de production).
+- Limites connues : une valeur trop longue même à 5 pt déborde de sa zone ; le statut *Ready* n'est pas encore posé (étape 6).
 
 ### Étape 5 — Base de connaissances + réponse IA sur l'Annex 7 ⬜ _(critique, testé)_
 - UI : écran « base de connaissances » (documents de l'entreprise fictive, état d'ingestion) ; bouton « Remplir avec l'IA » ; chaque champ pré-rempli affiche sa **source** (document + passage) et un état (répondu / introuvable).
@@ -155,3 +159,9 @@ UI (relecture)  ──►  API locale
 | 2026-11-03 | Étape 4, setup back : Python 3.14 (3.15 bloqué par onnxruntime/fastembed), uv, FastAPI 0.162 avec SSE natif (pas de `sse-starlette`), SQLAlchemy 2.1, PostgreSQL 18 + pgvector 0.8.7 (`docker-compose.yml`), migrations Alembic au démarrage, base `formpilot_test` pour pytest ; SQLAlchemy et pyright conservés malgré le skill FastAPI (SQLModel, ty en bêta) ; skills `fastapi`, `uv`, `pydantic`, `supabase-postgres-best-practices` ; `make dev` lance db + back + front | à valider |
 | 2026-11-03 | Pas de dépôt des formulaires par l'utilisateur : l'offre et ses annexes viennent d'une source externe (seed au démarrage depuis `forms/`, copie dans `data/`) ; première page = *Tender* | validé |
 | 2026-11-03 | Étape 4 recentrée sur le socle + premier écran *Tender* (front + back), mergée dans `main` ; parsing, saisie manuelle et export de l’Annex 7 déplacés en étape 4.5 | validé |
+| 2026-11-03 | Étape 4.5 : « Fill with AI » ouvre directement l'écran de remplissage (Setup ajouté à l'étape 5) ; écran *Export* minimal dès cette étape ; dans les cases de tableau, la valeur s'écrit à droite du libellé | validé |
+| 2026-11-03 | Étape 4.5 : parseur PDF générique (pointillés + cases vides), formulaires parsés à l'import, table `answer` minimale (étendue à l'étape 5), export par suppression des pointillés + texte sur la ligne de base | validé |
+| 2026-11-04 | *Export* en modale au-dessus de *Live fill* au lieu d'une page (flux plus léger ; une page pourra revenir si nécessaire) | validé |
+| 2026-11-04 | Multi-tenant anticipé : table `tenant` ; formulaires et champs partagés ; un `form_fill` par (tenant, formulaire) porte le statut et les réponses (les collègues d'un tenant partagent le même) ; tenant courant via la dépendance `CurrentTenantId` (tenant seedé tant qu'il n'y a pas d'authentification) ; données existantes migrées vers le tenant de démo | validé |
+| 2026-11-04 | Schéma de la base généré depuis les modèles SQLAlchemy dans `docs/DB_SCHEMA.md` (Mermaid, `make db-schema`), un test vérifie qu'il est à jour | validé |
+| 2026-11-04 | Étape 4.5 validée et mergée dans `main` | validé |

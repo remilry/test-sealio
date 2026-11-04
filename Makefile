@@ -1,4 +1,4 @@
-.PHONY: install db db-stop dev dev-back dev-front test test-slow test-all test-back test-front e2e lint typecheck format gen-api
+.PHONY: install db db-stop dev dev-back dev-front test test-slow test-all test-back test-front e2e lint typecheck format gen-api db-schema
 
 BACK = cd backend &&
 FRONT = cd frontend &&
@@ -53,3 +53,6 @@ format:
 
 gen-api:            ## Regenerate frontend types from the running API's OpenAPI
 	$(FRONT) pnpm gen:api
+
+db-schema:          ## Regenerate docs/DB_SCHEMA.md (Mermaid diagram) from the SQLAlchemy models
+	$(BACK) uv run python -m scripts.db_schema

@@ -53,27 +53,27 @@ frontend/src/
 │  ├─ layout.tsx                 # providers (QueryClient) + shell
 │  ├─ knowledge/page.tsx
 │  ├─ tenders/[tenderId]/page.tsx
-│  └─ forms/[formId]/{fill,export}/page.tsx
+│  └─ forms/[formId]/fill/page.tsx
 │
 ├─ screens/                      # composition des features ; unité des tests d'intégration
 │  ├─ knowledge/   KnowledgeScreen.tsx · KnowledgeScreen.test.tsx
 │  ├─ tender/      TenderScreen.tsx    · TenderScreen.test.tsx
-│  ├─ live-fill/   LiveFillScreen.tsx  · LiveFillProvider.tsx · LiveFillScreen.test.tsx
-│  └─ export/      ExportScreen.tsx    · ExportScreen.test.tsx
+│  └─ live-fill/   LiveFillScreen.tsx  · LiveFillProvider.tsx · LiveFillScreen.test.tsx (export en modale inclus)
 │
 ├─ features/                     # modules autonomes ; API publique = index.ts
-│  ├─ knowledge-base/    api.ts · DocumentTable · UploadDocuments · useDocuments
-│  ├─ tender/            api.ts · TenderHeader · FormCard · SetupDialog · useTender
-│  ├─ fill-session/      api.ts (SSE + PATCH) · useFillSession · fillEventsReducer · useUpdateField
+│  ├─ knowledge-base/    knowledge-base.{api,queries}.ts · DocumentTable · UploadDocuments · useDocuments
+│  ├─ tender/            tender.{api,queries}.ts (useTenders, useTender) · TenderHeader · FormList · SetupDialog
+│  ├─ fill-session/      fill-session.{api,queries}.ts (useFormDetail, useFillState, useSaveAnswer ; SSE à l'étape 5) · SaveIndicator
 │  ├─ review-queue/      ReviewQueue · FilterChips · FieldCard/{Auto,NotFound,Manual,
 │  │                     Outdated,Conflict,Declaration} · useReviewKeyboard
 │  ├─ document-preview/  DocumentPreview · renderers/{pdf,docx} · FieldOverlay · locator.ts
-│  ├─ source-viewer/     api.ts · SourceView
-│  └─ form-export/       api.ts · ExportSummary · ExportWarnings · DownloadButton
+│  ├─ source-viewer/     source-viewer.{api,queries}.ts · SourceView
+│  └─ form-export/       form-export.{api,queries}.ts · ExportDialog (résumé, champs vides, téléchargement)
 │
 ├─ shared/
 │  ├─ api/               client.ts (initialisation du client HTTP typé) · schema.gen.ts (généré)
 │  ├─ ui/                composants shadcn, StatusBadge, tokens de couleur
+│  ├─ components/        composants partagés hors shadcn (LoadStates : EmptyState, LoadError)
 │  ├─ lib/               utilitaires sans dépendance métier
 │  ├─ utils/date.ts      seul point de manipulation des dates (règle ESLint), remplaçable par une lib
 │  └─ test/              setup, serveur MSW, handlers, fixtures typées, renderScreen, fillStream
@@ -85,8 +85,9 @@ frontend/e2e/            # un test Playwright : le scénario principal
 1. Dépendances à sens unique : `app → screens → features → shared`.
 2. Une feature n'importe pas une autre feature ; elles se composent dans les écrans. _Règle par défaut, révisable au cas par cas._
 3. Une feature s'importe uniquement par son `index.ts`.
-4. Chaque feature possède son `api.ts` (appels, query keys, hooks TanStack Query de son domaine). `shared/api` ne contient que l'initialisation du client et les types générés.
+4. Couche de données (skill `frontend-data-layer`) : chaque feature a son `[feature].api.ts` (types et appels HTTP) et son `[feature].queries.ts` (query keys et hooks `useXxx`, seuls à appeler TanStack Query) ; les composants n'utilisent que ces hooks (règle ESLint `no-restricted-imports`). `shared/api` ne contient que l'initialisation du client et les types générés.
 5. `document-preview` est générique : il reçoit `{id, locator, value, tone}` et émet `onSelect(id)`.
+6. Style (skill `frontend-code-style`) : early return dans les fonctions et composants, pas de ternaires imbriqués (`no-nested-ternary`) : sous-composant ou fonction nommée à la place.
 
 ### État
 - **Données serveur** : cache TanStack Query (seule source côté front). Le flux SSE met à jour ce cache (`setQueryData`) ; les éditions partent en `PATCH` optimiste (« ✓ Saved »).
@@ -132,6 +133,7 @@ backend/
 │     │  ├─ extraction/       pdf.py (PyMuPDF : texte + rectangles) · docx.py
 │     │  ├─ chunking.py       passages = doc + page + rectangle + texte
 │     │  └─ index.py          vecteurs (pgvector) + plein texte (tsvector), fusion RRF → retrieve()
+│     ├─ tenants/             service (dépendance `CurrentTenantId`) · models
 │     ├─ tenders/             router · service · models
 │     ├─ forms/               router · service · models
 │     │  └─ parsing/          pdf_parser.py · docx_parser.py → FormSchema (pur)
@@ -152,17 +154,23 @@ backend/
 
 ### Modèle de données (PostgreSQL)
 
+Schéma actuel, généré depuis les modèles : [`DB_SCHEMA.md`](DB_SCHEMA.md) (`make db-schema` ; un test échoue s'il n'est pas à jour). Le tableau ci-dessous décrit aussi les tables à venir.
+
+**Multi-tenant.** Les données de référence (offre, formulaires, champs détectés) viennent d'une source externe et sont partagées par tous les tenants (entreprises soumissionnaires). Ce qu'un tenant produit porte son `tenant_id`, directement ou via son remplissage : base de connaissances, `form_fill` et ses réponses. Plusieurs tenants remplissent le même formulaire ; dans un tenant, les collègues partagent le même remplissage. Sans connexion pour l'instant, chaque requête agit pour le tenant configuré (`FORMPILOT_CURRENT_TENANT`, seedé au démarrage) : la dépendance `CurrentTenantId` est le seul endroit à changer avec une vraie authentification.
+
 Toutes les tables héritent d'un `TimestampMixin` : `created_at` (`timestamptz`, `server_default now()`) et `updated_at` (`timestamptz`, mis à jour à chaque modification par l'ORM).
 
 | Table | Champs principaux |
 |---|---|
+| `tenant` | slug (unique), nom. L'entreprise soumissionnaire |
 | `tender` | titre, référence, autorité, échéance. Sert aussi de source « Tender details » |
-| `document` | nom, format, pages, statut (`processing`/`indexed`/`error`), message d'erreur |
+| `document` | tenant, nom, format, pages, statut (`processing`/`indexed`/`error`), message d'erreur |
 | `chunk` | document, page, rectangle, texte, `embedding vector(384)` (index HNSW), `tsv tsvector` (colonne générée, index GIN) |
-| `form` | offre, fichier d'origine, format, statut (`not_started`/`in_review`/`ready`) |
+| `form` | offre, fichier d'origine, format, pages. Partagé par tous les tenants |
 | `field` | formulaire, section, ordre, libellé, nature (`text`/`number`/`date`/`yes_no`/`signature`), localisateur (JSONB) |
-| `answer` | champ, valeur, candidats JSONB `[{value, quote, chunk_id, valid_until, valid_until_quote}]`, type (`auto`/`missing`/`manual`/`outdated`/`conflict`/`declaration`), `user_only` + raison, état, `resolved_by`, `resolved_at` |
-| `fill_event` | formulaire, numéro de séquence, type (`phase`/`field`/`done`/`error`), données JSONB |
+| `form_fill` | tenant, formulaire (unique ensemble), statut (`not_started`/`in_review`/`ready`). Créé à la première réponse |
+| `answer` | remplissage, champ (unique ensemble), valeur, candidats JSONB `[{value, quote, chunk_id, valid_until, valid_until_quote}]`, type (`auto`/`missing`/`manual`/`outdated`/`conflict`/`declaration`), `user_only` + raison, état, `resolved_by`, `resolved_at` |
+| `fill_event` | remplissage, numéro de séquence, type (`phase`/`field`/`done`/`error`), données JSONB |
 
 ### Recherche hybride
 - **Vecteurs** : `fastembed` (`BAAI/bge-small-en-v1.5`, 384 dimensions, local) → pgvector, distance cosinus.

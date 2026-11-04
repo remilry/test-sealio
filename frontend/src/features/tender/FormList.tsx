@@ -1,9 +1,11 @@
+import Link from "next/link";
 import { CheckIcon, SparklesIcon } from "lucide-react";
+import { routes } from "@/shared/lib/routes";
 import { cn } from "@/shared/lib/utils";
 import { Badge } from "@/shared/ui/badge";
-import { Button } from "@/shared/ui/button";
+import { Button, buttonVariants } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
-import type { FormSummary } from "./api";
+import type { FormSummary } from "./tender.api";
 
 const STATUS = {
   not_started: { label: "Not started", variant: "secondary" },
@@ -44,23 +46,56 @@ function FormRow({ form }: { form: FormSummary }) {
       <FormatTile format={form.file_format} />
       <div className="min-w-0">
         <div className="truncate text-sm font-semibold">{form.title}</div>
-        <div className="mt-0.5 truncate text-xs text-muted-foreground">{form.file_name}</div>
+        <div className="mt-0.5 truncate text-xs text-muted-foreground">
+          {form.field_counts ? describeFields(form.field_counts) : form.file_name}
+        </div>
       </div>
       <Badge variant={status.variant}>
         {form.status === "ready" && <CheckIcon data-icon="inline-start" />}
         {status.label}
       </Badge>
       <div className="flex justify-end">
-        {form.status === "not_started" && (
-          // Opens the Setup step once it exists (next slice).
-          <Button disabled title="Available in the next step">
-            <SparklesIcon data-icon="inline-start" />
-            Fill with AI
-          </Button>
-        )}
+        <FormAction form={form} />
       </div>
     </li>
   );
+}
+
+function FormAction({ form }: { form: FormSummary }) {
+  if (!form.field_counts) {
+    // This file format cannot be parsed yet: nothing to fill.
+    return (
+      <Button disabled title="This form format is not supported yet">
+        <SparklesIcon data-icon="inline-start" />
+        Fill with AI
+      </Button>
+    );
+  }
+  const href = routes.fillForm(form.id);
+  // Opens the form to fill; the Setup step (AI) comes in front of it with the next slice.
+  return form.status === "not_started" ? (
+    <Link href={href} className={buttonVariants()}>
+      <SparklesIcon data-icon="inline-start" />
+      Fill with AI
+    </Link>
+  ) : (
+    <Link href={href} className={buttonVariants({ variant: "outline" })}>
+      Continue review
+    </Link>
+  );
+}
+
+const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`;
+
+/** "10 fields detected · 2 Yes/No declarations · 1 signature" */
+function describeFields(counts: NonNullable<FormSummary["field_counts"]>) {
+  return [
+    `${plural(counts.fields, "field")} detected`,
+    counts.yes_no > 0 && plural(counts.yes_no, "Yes/No declaration"),
+    counts.signatures > 0 && plural(counts.signatures, "signature"),
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 function FormatTile({ format }: { format: FormSummary["file_format"] }) {
