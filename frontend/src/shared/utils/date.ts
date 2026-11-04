@@ -58,6 +58,11 @@ export function formatDate(date: Date | IsoDate): string {
 
 const timeFormat = new Intl.DateTimeFormat("en-CH", { hour: "2-digit", minute: "2-digit" });
 
+/** A timestamp as sent by the back (ISO 8601 with offset) → its local calendar day: "04.11.2026". */
+export function formatDay(isoDateTime: string): string {
+  return displayFormat.format(new Date(isoDateTime));
+}
+
 /** A timestamp as sent by the back (ISO 8601 with offset) → "14:32", in local time. */
 export function formatTime(isoDateTime: string): string {
   return timeFormat.format(new Date(isoDateTime));

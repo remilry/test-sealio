@@ -3,6 +3,7 @@ import {
   daysBetween,
   daysUntil,
   formatDate,
+  formatDay,
   formatTime,
   parseIsoDate,
   startOfToday,
@@ -42,6 +43,12 @@ describe("date helpers", () => {
     expect(daysBetween(startOfToday(), parseIsoDate("2026-11-03"))).toBe(0);
     expect(daysUntil("2026-11-19")).toBe(16);
     expect(daysUntil("2026-11-02")).toBe(-1);
+  });
+
+  it("formats a timestamp from the back as its local day: dd.mm.yyyy", () => {
+    // 23:30 UTC is already the next day in Zurich (UTC+1 in November).
+    expect(formatDay("2026-11-03T23:30:00Z")).toBe("04.11.2026");
+    expect(formatDay("2026-11-03T09:05:00+01:00")).toBe("03.11.2026");
   });
 
   it("formats a timestamp from the back as a local time: hh:mm", () => {

@@ -2,7 +2,7 @@
 
 > Document vivant. Chaque étape y est cochée et détaillée au fur et à mesure.
 > Contexte produit et priorités : voir `CLAUDE.md`. Échéance : jeudi 5 novembre.
-> Statut : étapes 0 à 4.5 faites ; prochaine : 5 (base de connaissances + IA sur l'Annex 7). Parcours détaillé : `docs/USER_FLOW.md`. Les choix techniques marqués _proposition_ restent à confirmer à l'étape 3.
+> Statut : étapes 0 à 4.5 faites ; étape 5 découpée en 5a–5d, 5a faite (à valider) ; prochaine : 5b (upload de documents). Parcours détaillé : `docs/USER_FLOW.md`. Les choix techniques marqués _proposition_ restent à confirmer à l'étape 3.
 
 ## 1. Ce qu'on a appris des deux formulaires
 
@@ -72,10 +72,30 @@ Chaque étape à partir de la 4 livre une **fonctionnalité utilisable de bout e
 - Tests : parseur (schéma attendu de l'Annex 7 + PDF synthétiques), exporteur (valeurs dans leur rectangle, pointillés effacés seulement pour les champs remplis, reste de la page identique), API (pytest) ; écrans *Live fill* (export inclus) / *Tender* (Vitest, `react-pdf` remplacé par un stub) ; scénario Playwright jusqu'au téléchargement (vérifié aussi sur build de production).
 - Limites connues : une valeur trop longue même à 5 pt déborde de sa zone ; le statut *Ready* n'est pas encore posé (étape 6).
 
-### Étape 5 — Base de connaissances + réponse IA sur l'Annex 7 ⬜ _(critique, testé)_
+### Étape 5 — Base de connaissances + réponse IA sur l'Annex 7 🟦 _(critique, testé)_
 - UI : écran « base de connaissances » (documents de l'entreprise fictive, état d'ingestion) ; bouton « Remplir avec l'IA » ; chaque champ pré-rempli affiche sa **source** (document + passage) et un état (répondu / introuvable).
 - Back : ingestion et recherche, réponse en sortie structurée, **validation stricte** (citation vérifiée mécaniquement, format du champ), `not_found` valide.
 - Tests : validateur sans appel LLM, jeu de questions avec réponses attendues dont des « doit répondre introuvable », e2e du parcours.
+- Découpée en 4 sous-étapes, chacune sur sa branche et validée avant la suivante (décision 2026-11-04).
+
+#### 5a — Base de connaissances et recherche hybride ✅ (à valider, branche `step-5a-knowledge`)
+- Back : module `knowledge`, tables `document` (tenant, nom, format, pages, statut `processing`/`indexed`/`error`, message d'erreur, `indexed_at`) et `chunk` (page, rectangle, texte, contexte, `embedding vector(384)` HNSW, `tsv` généré GIN).
+- Extraction pure : PDF → blocs PyMuPDF avec page et rectangle ; DOCX → paragraphes (titres repérés) et lignes de tableau. Fichier illisible ou sans texte → statut `error` avec un message pour l'utilisateur.
+- Découpage pur en passages : une page et une section par passage, ~800 caractères max, sans couper un bloc ; contexte = titre du document + titre de section (cherché, jamais cité).
+- Embeddings : `fastembed` (`bge-small-en-v1.5`, cache `~/.cache/fastembed`) ; embedder factice déterministe (`FORMPILOT_EMBEDDER=hash`) pour les tests rapides.
+- `search()` : vecteurs (cosinus) + plein texte (n'importe quel mot de la requête, `ts_rank_cd`), fusion RRF, filtrée par tenant et documents indexés.
+- Seed : les 11 documents de `knowledge-base/documents/` indexés au démarrage (idempotent). API `GET /knowledge`, `GET /knowledge/documents/{id}/file`.
+- Front : écran *Company knowledge* (entreprise, nombre de documents, dernière indexation, tableau type / nom / pages / date d'ajout / statut, erreur affichée, lien vers l'original), entrée dans la barre latérale, carte *Company knowledge* sur l'écran *Tender* (nombre de documents, *Manage*).
+- Tests : extraction et découpage (vrais documents + cas synthétiques), API, recherche (identifiant, tri, isolation des tenants), écran *Knowledge* et carte (Vitest), scénario Playwright étendu. Test `slow` de rappel avec le vrai modèle : pour chaque section des formulaires, les passages trouvés pour ses champs contiennent chaque valeur attendue de `GROUND_TRUTH.md` (mesure par section car l'IA répond section par section ; deux libellés seuls, « Legal form since » et « Main activity », ne trouvent pas leur passage en top 8).
+
+#### 5b — Ajout de documents ⬜
+- *Add documents* (PDF/DOCX) : ligne en `Processing` puis statut final, retour par document sans rechargement, `Error` pour un fichier illisible.
+
+#### 5c — Moteur de réponse IA (back) ⬜
+- Façade LLM (Claude Sonnet 5.5 + `FakeLLM` rejouant des réponses réelles enregistrées), un appel par section, sortie structurée, validateur (citation vérifiée, format), toutes les règles génériques (auto, missing, manual, conflict, outdated, declaration) testées, job + événements persistés + SSE.
+
+#### 5d — Remplissage IA dans l'UI ⬜
+- *Setup* (modale), *Live fill* en flux, source par champ (document, page, citation), état répondu / introuvable, e2e du parcours. Cartes Conflit / Périmé dans l'UI aux étapes 6–7.
 
 ### Étape 6 — Relecture et humain dans la boucle ⬜ _(testé)_
 - UI : relecture champ par champ avec source visible/cliquable, édition, validation individuelle ou en lot, tri par priorité (introuvables, conflits, déclarations engageantes).
@@ -165,4 +185,6 @@ UI (relecture)  ──►  API locale
 | 2026-11-04 | Multi-tenant anticipé : table `tenant` ; formulaires et champs partagés ; un `form_fill` par (tenant, formulaire) porte le statut et les réponses (les collègues d'un tenant partagent le même) ; tenant courant via la dépendance `CurrentTenantId` (tenant seedé tant qu'il n'y a pas d'authentification) ; données existantes migrées vers le tenant de démo | validé |
 | 2026-11-04 | Schéma de la base généré depuis les modèles SQLAlchemy dans `docs/DB_SCHEMA.md` (Mermaid, `make db-schema`), un test vérifie qu'il est à jour | validé |
 | 2026-11-04 | Étape 4.5 validée et mergée dans `main` | validé |
+| 2026-11-04 | Étape 5 découpée en 5a (base de connaissances + recherche), 5b (upload), 5c (moteur IA back), 5d (UI de remplissage IA), une branche et une validation par sous-étape ; LLM Claude Sonnet 5.5, réponses réelles enregistrées pour le `FakeLLM` ; règles génériques pures dès 5c, cartes Conflit / Périmé plus tard | validé |
 | 2026-11-04 | i18n front avec next-intl (sans routage par langue : locale fixe `en`, compatible Cache Components) ; tous les textes dans `shared/i18n/messages/en.json`, clés typées, pluriels ICU ; ESLint `react/jsx-no-literals` ; anglais seulement pour l'instant | validé |
+| 2026-11-04 | 5a : passages d'une page et d'une section (~800 car.) avec contexte titre + section ; plein texte en « n'importe quel mot » ; rappel mesuré par section du formulaire ; cache du modèle dans `~/.cache/fastembed` | à valider |

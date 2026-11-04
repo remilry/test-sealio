@@ -1,6 +1,13 @@
 import { http, HttpResponse } from "msw";
 import { API_URL } from "@/shared/api";
-import type { ExportSummary, FillState, FormDetail, TenderDetail, TenderSummary } from "./fixtures";
+import type {
+  ExportSummary,
+  FillState,
+  FormDetail,
+  KnowledgeBase,
+  TenderDetail,
+  TenderSummary,
+} from "./fixtures";
 
 const url = (path: string) => `${API_URL}${path}`;
 
@@ -13,6 +20,9 @@ export const handlers = {
 
   tender: (tender: TenderDetail) =>
     http.get(url(`/tenders/${tender.id}`), () => HttpResponse.json(tender)),
+
+  knowledge: (knowledge: KnowledgeBase) =>
+    http.get(url("/knowledge"), () => HttpResponse.json(knowledge)),
 
   form: (form: FormDetail) => http.get(url(`/forms/${form.id}`), () => HttpResponse.json(form)),
 

@@ -166,8 +166,8 @@ Toutes les tables héritent d'un `TimestampMixin` : `created_at` (`timestamptz`,
 |---|---|
 | `tenant` | slug (unique), nom. L'entreprise soumissionnaire |
 | `tender` | titre, référence, autorité, échéance. Sert aussi de source « Tender details » |
-| `document` | tenant, nom, format, pages, statut (`processing`/`indexed`/`error`), message d'erreur |
-| `chunk` | document, page, rectangle, texte, `embedding vector(384)` (index HNSW), `tsv tsvector` (colonne générée, index GIN) |
+| `document` | tenant, nom, fichier, format, pages (nul pour un DOCX), statut (`processing`/`indexed`/`error`), message d'erreur, `indexed_at` |
+| `chunk` | document, position, page, rectangle, texte (cité tel quel), contexte (titre du document + section, cherché mais jamais cité), `embedding vector(384)` (index HNSW), `tsv tsvector` (colonne générée sur contexte + texte, index GIN) |
 | `form` | offre, fichier d'origine, format, pages. Partagé par tous les tenants |
 | `field` | formulaire, section, ordre, libellé, nature (`text`/`number`/`date`/`yes_no`/`signature`), localisateur (JSONB) |
 | `form_fill` | tenant, formulaire (unique ensemble), statut (`not_started`/`in_review`/`ready`). Créé à la première réponse |

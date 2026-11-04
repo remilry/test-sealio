@@ -2,4 +2,5 @@
 export const routes = {
   tender: (tenderId: number) => `/tenders/${tenderId}`,
   fillForm: (formId: number) => `/forms/${formId}/fill`,
+  knowledge: "/knowledge",
 };

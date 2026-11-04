@@ -149,6 +149,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/knowledge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Knowledge Base
+         * @description The current tenant's company documents and their indexing status.
+         */
+        get: operations["get_knowledge_base_knowledge_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/knowledge/documents/{document_id}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download Document */
+        get: operations["download_document_knowledge_documents__document_id__file_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -205,6 +242,38 @@ export interface components {
             /** Y1 */
             y1: number;
         };
+        /**
+         * DocumentFormat
+         * @enum {string}
+         */
+        DocumentFormat: "pdf" | "docx";
+        /** DocumentOut */
+        DocumentOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** File Name */
+            file_name: string;
+            file_format: components["schemas"]["DocumentFormat"];
+            /** Pages */
+            pages: number | null;
+            status: components["schemas"]["DocumentStatus"];
+            /** Error */
+            error: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Indexed At */
+            indexed_at: string | null;
+        };
+        /**
+         * DocumentStatus
+         * @enum {string}
+         */
+        DocumentStatus: "processing" | "indexed" | "error";
         /**
          * ExportSummary
          * @description What the export will contain, and what the user should know before downloading.
@@ -331,6 +400,18 @@ export interface components {
             status: string;
             /** Database */
             database: string;
+        };
+        /**
+         * KnowledgeBase
+         * @description What the AI answers from, for the current tenant.
+         */
+        KnowledgeBase: {
+            /** Company Name */
+            company_name: string;
+            /** Documents */
+            documents: components["schemas"]["DocumentOut"][];
+            /** Last Indexed At */
+            last_indexed_at: string | null;
         };
         /** PageSize */
         PageSize: {
@@ -699,6 +780,62 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    get_knowledge_base_knowledge_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeBase"];
+                };
+            };
+        };
+    };
+    download_document_knowledge_documents__document_id__file_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The original company document (PDF or DOCX). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown document */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
         };
     };

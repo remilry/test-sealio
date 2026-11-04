@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { useTranslations } from "next-intl";
+import { KnowledgeCard } from "@/features/knowledge-base";
 import { FormList, TenderHeader, useTender } from "@/features/tender";
 import { isNotFound } from "@/shared/api";
 import { EmptyState, LoadError } from "@/shared/components/LoadStates";
@@ -37,7 +38,12 @@ export function TenderScreen({ tenderId }: { tenderId: number }) {
   return (
     <TenderFrame title={tender.title}>
       <TenderHeader tender={tender} />
-      <FormList forms={tender.forms} />
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
+        <FormList forms={tender.forms} />
+        <aside className="lg:pt-8.5">
+          <KnowledgeCard />
+        </aside>
+      </div>
     </TenderFrame>
   );
 }
