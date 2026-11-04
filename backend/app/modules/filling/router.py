@@ -65,7 +65,9 @@ def update_field(
     status_code=status.HTTP_202_ACCEPTED,
     responses={
         404: {"description": "Unknown form"},
-        409: {"description": "This form is already being filled"},
+        409: {
+            "description": "This form is already being filled, or already filled (discard first)"
+        },
         422: {"description": "The form cannot be filled automatically (format not read)"},
         503: {"description": "Automatic filling is not available (no API key)"},
     },
@@ -79,7 +81,8 @@ def start_fill(
 ) -> AiRun:
     """Start the automatic fill of the form, in the background: follow it on `GET …/fill/events`.
 
-    Every field the user has not set is answered again; the user's values are kept.
+    Only a form nobody has started can be filled: once it has answers (or a run), they must be
+    discarded first (`DELETE …/fill`). A value the user saves during the run is never replaced.
     """
     fill_id = service.start_ai_fill(session, tenant_id, form_id)
     background_tasks.add_task(job.run_fill, fill_id, llm)

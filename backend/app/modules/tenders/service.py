@@ -51,7 +51,11 @@ def tender_details(session: Session, tender_id: int) -> str:
 def _forms_with_status(session: Session, tenant_id: int, tender_id: int) -> list[FormSummary]:
     forms = forms_service.list_forms(session, tender_id)
     statuses = filling_service.fill_statuses(session, tenant_id, [form.id for form in forms])
-    return [FormSummary(**form.model_dump(), status=statuses[form.id]) for form in forms]
+    running = filling_service.running_forms(session, tenant_id, [form.id for form in forms])
+    return [
+        FormSummary(**form.model_dump(), status=statuses[form.id], filling=form.id in running)
+        for form in forms
+    ]
 
 
 def upsert_tender(

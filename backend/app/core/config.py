@@ -38,6 +38,8 @@ class Settings(BaseSettings):
     llm_price_input: float = 0.25
     llm_price_cached_input: float = 0.025
     llm_price_output: float = 2.0
+    # Average time of one model call (one per form section), for the estimate shown before a fill.
+    fill_seconds_per_section: int = 25
     openai_api_key: SecretStr | None = Field(
         default=None,
         validation_alias=AliasChoices("OPENAI_API_KEY", "FORMPILOT_OPENAI_API_KEY"),

@@ -277,18 +277,31 @@ def test_no_events_when_the_ai_never_ran(client: TestClient, annex_7: int) -> No
     assert client.get("/forms/999999/fill/events").status_code == 404
 
 
-def test_a_value_the_user_saved_is_kept_when_the_ai_fills_again(
-    client: TestClient, annex_7: int, llm: ScriptedLLM
+def test_a_started_form_cannot_be_filled_again_until_its_answers_are_discarded(
+    client: TestClient, annex_7: int
 ) -> None:
     contact = fields_by_key(client, annex_7)["contact_person"]
     client.patch(f"/forms/{annex_7}/fields/{contact['id']}", json={"value": "Sofia Brunner"})
 
-    client.post(f"/forms/{annex_7}/fill")
+    refused = client.post(f"/forms/{annex_7}/fill")
 
-    answer = answers_by_key(client, annex_7)["contact_person"]
-    assert (answer["value"], answer["resolved_by"]) == ("Sofia Brunner", "user")
-    # Not even asked again.
-    assert "contact_person" not in llm.requests[0].prompt
+    assert refused.status_code == 409
+    assert refused.json()["detail"] == (
+        "This form has already been filled. Discard its answers to auto-fill it again."
+    )
+    assert client.delete(f"/forms/{annex_7}/fill").status_code == 204
+    assert client.post(f"/forms/{annex_7}/fill").status_code == 202
+
+
+def test_a_form_in_review_after_a_run_cannot_be_filled_again(
+    client: TestClient, annex_7: int
+) -> None:
+    assert client.post(f"/forms/{annex_7}/fill").status_code == 202
+
+    response = client.post(f"/forms/{annex_7}/fill")
+
+    assert response.status_code == 409
+    assert "already been filled" in response.json()["detail"]
 
 
 def test_a_value_the_user_saves_while_the_ai_is_filling_wins(

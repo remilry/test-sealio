@@ -19,6 +19,8 @@ class FormSummary(FormInfo):
     """A form as listed on its tender page, with where the current tenant is in filling it."""
 
     status: FillStatus
+    # The tenant's auto-fill is running right now.
+    filling: bool
 
 
 class TenderDetail(TenderSummary):

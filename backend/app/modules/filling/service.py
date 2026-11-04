@@ -44,6 +44,19 @@ def fill_statuses(
     return {form_id: found.get(form_id, FillStatus.NOT_STARTED) for form_id in form_ids}
 
 
+def running_forms(session: Session, tenant_id: int, form_ids: Sequence[int]) -> set[int]:
+    """The forms among `form_ids` that the tenant's auto-fill is running on."""
+    return set(
+        session.scalars(
+            select(FormFill.form_id).where(
+                FormFill.tenant_id == tenant_id,
+                FormFill.form_id.in_(form_ids),
+                FormFill.ai_status == AiStatus.RUNNING,
+            )
+        )
+    )
+
+
 def get_fill_state(session: Session, tenant_id: int, form_id: int) -> FillState:
     fields = forms_service.list_fields(session, form_id)
     fill = _get_fill(session, tenant_id, form_id)
@@ -113,7 +126,8 @@ def start_ai_fill(session: Session, tenant_id: int, form_id: int) -> int:
     """Mark the tenant's fill of the form as being filled by the AI; returns the fill id.
 
     The previous run's events are cleared (the screen replays the new run). Raises when the form
-    cannot be parsed yet or when the AI is already filling it.
+    cannot be parsed yet, when the AI is already filling it or when the form was already started
+    (any answer or a previous run): its answers must be discarded first.
     """
     form = forms_service.get_form(session, form_id)
     if form.field_counts is None:
@@ -129,6 +143,10 @@ def start_ai_fill(session: Session, tenant_id: int, form_id: int) -> int:
     ).one()
     if fill.ai_status == AiStatus.RUNNING:
         raise ConflictError("This form is already being filled.")
+    if fill.status != FillStatus.NOT_STARTED:
+        raise ConflictError(
+            "This form has already been filled. Discard its answers to auto-fill it again."
+        )
     session.execute(delete(FillEvent).where(FillEvent.form_fill_id == fill.id))
     fill.status = FillStatus.IN_REVIEW
     fill.ai_status = AiStatus.RUNNING

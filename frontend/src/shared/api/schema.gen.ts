@@ -111,7 +111,7 @@ export interface paths {
         /**
          * Update Field
          * @description Save the value the user entered. Returns the whole fill state (counts change).
-         *     Allowed while the AI is filling: the user's value is never replaced by the AI.
+         *     Allowed while the form is being filled: the user's value is never replaced.
          */
         patch: operations["update_field_forms__form_id__fields__field_id__patch"];
         trace?: never;
@@ -127,12 +127,18 @@ export interface paths {
         put?: never;
         /**
          * Start Fill
-         * @description Start the AI fill of the form, in the background: follow it on `GET …/fill/events`.
+         * @description Start the automatic fill of the form, in the background: follow it on `GET …/fill/events`.
          *
-         *     Every field the user has not set is answered again; the user's values are kept.
+         *     Only a form nobody has started can be filled: once it has answers (or a run), they must be
+         *     discarded first (`DELETE …/fill`). A value the user saves during the run is never replaced.
          */
         post: operations["start_fill_forms__form_id__fill_post"];
-        delete?: never;
+        /**
+         * Discard Fill
+         * @description Discard the fill: every answer (the user's too) and the run are deleted, the form is back
+         *     to "not started". Allowed while it is being filled: that run stops.
+         */
+        delete: operations["discard_fill_forms__form_id__fill_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -147,8 +153,8 @@ export interface paths {
         };
         /**
          * Fill Events
-         * @description The events of the last AI fill, from the start or after `Last-Event-ID`, then the new
-         *     ones as they happen. Ends with the run ("done" or "error"); empty when the AI never ran.
+         * @description The events of the last automatic fill, from the start or after `Last-Event-ID`, then the new
+         *     ones as they happen. Ends with the run ("done" or "error"); empty when no fill ever ran.
          *
          *     Event types: `phase` ({phase, …}), `field` ({field_id, state: "searching" | "answered",
          *     answer, counts}), `done` ({filled, fillable, doubts, seconds}), `error` ({message}).
@@ -534,6 +540,8 @@ export interface components {
             file_name: string;
             file_format: components["schemas"]["FileFormat"];
             field_counts: components["schemas"]["FieldCounts"] | null;
+            /** Estimated Fill Seconds */
+            estimated_fill_seconds: number | null;
             /** Tender Id */
             tender_id: number;
             /** Pages */
@@ -554,7 +562,11 @@ export interface components {
             file_name: string;
             file_format: components["schemas"]["FileFormat"];
             field_counts: components["schemas"]["FieldCounts"] | null;
+            /** Estimated Fill Seconds */
+            estimated_fill_seconds: number | null;
             status: components["schemas"]["FillStatus"];
+            /** Filling */
+            filling: boolean;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -905,26 +917,62 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description The AI is already filling this form */
+            /** @description This form is already being filled, or already filled (discard first) */
             409: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content?: never;
             };
-            /** @description The form cannot be filled with AI (format not read) */
+            /** @description The form cannot be filled automatically (format not read) */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content?: never;
             };
-            /** @description The AI is not available (no API key) */
+            /** @description Automatic filling is not available (no API key) */
             503: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    discard_fill_forms__form_id__fill_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                form_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown form */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
         };
     };

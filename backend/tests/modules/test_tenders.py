@@ -2,7 +2,10 @@ from fastapi.testclient import TestClient
 
 from app.core.config import get_settings
 from app.core.db import SessionLocal
+from app.modules.filling import service as filling_service
+from app.modules.tenants import service as tenants_service
 from app.seed import seed
+from tests.modules.helpers import seeded_forms
 
 ANNEX_4 = "Annex_4_Conditions of Participation and Company Self-Declaration.docx"
 ANNEX_7 = "Annex_7_Self-Declaration_Art29c_Ukraine_Ordinance.pdf"
@@ -68,3 +71,24 @@ def test_downloads_each_original_form_unchanged(client: TestClient) -> None:
 
 def test_unknown_form_file_is_a_404(client: TestClient) -> None:
     assert client.get("/forms/999999/file").status_code == 404
+
+
+def test_cards_estimate_the_fill_duration_from_the_sections(client: TestClient) -> None:
+    annex_4, annex_7 = seeded_forms(client)
+
+    # One section, 25 seconds each; a form that is not parsed has no estimate.
+    assert annex_7["estimated_fill_seconds"] == 25
+    assert annex_4["estimated_fill_seconds"] is None
+    assert client.get(f"/forms/{annex_7['id']}").json()["estimated_fill_seconds"] == 25
+
+
+def test_a_card_says_when_the_form_is_being_filled(client: TestClient) -> None:
+    annex_7 = seeded_forms(client)[1]
+    assert annex_7["filling"] is False
+
+    with SessionLocal() as session:
+        filling_service.start_ai_fill(
+            session, tenants_service.get_current_tenant_id(session), annex_7["id"]
+        )
+
+    assert seeded_forms(client)[1]["filling"] is True

@@ -23,6 +23,8 @@ class FormInfo(BaseModel):
     file_format: FileFormat
     # Null while the form's format cannot be parsed yet (it cannot be filled either).
     field_counts: FieldCounts | None
+    # Distinct sections x the seconds one section takes to fill; null with field_counts.
+    estimated_fill_seconds: int | None
 
 
 class FieldOut(BaseModel):

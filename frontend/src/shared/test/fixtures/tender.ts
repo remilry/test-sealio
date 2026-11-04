@@ -13,6 +13,8 @@ export function form(overrides: Partial<FormSummary> = {}): FormSummary {
     status: "not_started",
     // Word forms are not parsed yet.
     field_counts: null,
+    estimated_fill_seconds: null,
+    filling: false,
     ...overrides,
   };
 }
@@ -35,6 +37,7 @@ export function tender(overrides: Partial<TenderDetail> = {}): TenderDetail {
         file_name: "Annex_7_Self-Declaration_Art29c_Ukraine_Ordinance.pdf",
         file_format: "pdf",
         field_counts: { fields: 10, yes_no: 0, signatures: 1 },
+        estimated_fill_seconds: 25,
       }),
     ],
     ...overrides,

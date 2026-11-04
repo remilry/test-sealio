@@ -9,6 +9,7 @@ from pathlib import Path
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.errors import NotFoundError
 from app.modules.forms.models import Field, FileFormat, Form
 from app.modules.forms.parsing.pdf_parser import parse_pdf
@@ -36,14 +37,17 @@ def list_forms(session: Session, tender_id: int) -> list[FormInfo]:
     forms = session.scalars(
         select(Form).where(Form.tender_id == tender_id).order_by(Form.position)
     ).all()
-    counts = _field_counts(session, [form.id for form in forms])
-    return [_summary(form, counts) for form in forms]
+    form_ids = [form.id for form in forms]
+    counts, sections = _field_counts(session, form_ids), _section_counts(session, form_ids)
+    return [_summary(form, counts, sections) for form in forms]
 
 
 def get_form(session: Session, form_id: int) -> FormDetail:
     form = _get(session, form_id)
     return FormDetail(
-        **_summary(form, _field_counts(session, [form.id])).model_dump(),
+        **_summary(
+            form, _field_counts(session, [form.id]), _section_counts(session, [form.id])
+        ).model_dump(),
         tender_id=form.tender_id,
         pages=[PageSize.model_validate(page) for page in form.pages],
         fields=list_fields(session, form_id),
@@ -152,7 +156,18 @@ def _field_counts(session: Session, form_ids: list[int]) -> dict[int, dict[Field
     return counts
 
 
-def _summary(form: Form, counts: dict[int, dict[FieldKind, int]]) -> FormInfo:
+def _section_counts(session: Session, form_ids: list[int]) -> dict[int, int]:
+    rows = session.execute(
+        select(Field.form_id, func.count(func.distinct(Field.section)))
+        .where(Field.form_id.in_(form_ids))
+        .group_by(Field.form_id)
+    ).all()
+    return dict(rows)
+
+
+def _summary(
+    form: Form, counts: dict[int, dict[FieldKind, int]], sections: dict[int, int]
+) -> FormInfo:
     by_kind = counts.get(form.id, {})
     return FormInfo(
         id=form.id,
@@ -166,4 +181,7 @@ def _summary(form: Form, counts: dict[int, dict[FieldKind, int]]) -> FormInfo:
             yes_no=by_kind.get(FieldKind.YES_NO, 0),
             signatures=by_kind.get(FieldKind.SIGNATURE, 0),
         ),
+        estimated_fill_seconds=None
+        if form.parsed_at is None
+        else sections.get(form.id, 0) * get_settings().fill_seconds_per_section,
     )

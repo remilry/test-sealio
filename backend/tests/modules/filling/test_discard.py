@@ -91,9 +91,17 @@ def _start(form_id: int) -> int:
         )
 
 
-def test_discard_deletes_every_answer_the_users_included(client: TestClient, annex_7: int) -> None:
+def test_discard_deletes_every_answer_the_users_included(
+    client: TestClient, annex_7: int, llm: HookedLLM
+) -> None:
     telephone = fields_by_key(client, annex_7)["telephone"]
-    client.patch(f"/forms/{annex_7}/fields/{telephone['id']}", json={"value": "044"})
+
+    def user_saves() -> None:
+        with SessionLocal() as session:
+            tenant_id = tenants_service.get_current_tenant_id(session)
+            service.set_answer(session, tenant_id, annex_7, telephone["id"], "044")
+
+    llm.hook = user_saves
     client.post(f"/forms/{annex_7}/fill")
     assert len(client.get(f"/forms/{annex_7}/answers").json()["answers"]) > 1
 
