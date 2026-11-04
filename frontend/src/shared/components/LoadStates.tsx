@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { FileQuestionIcon } from "lucide-react";
-import { messages } from "@/shared/lib/messages";
+import { useTranslations } from "next-intl";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Button } from "@/shared/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/shared/ui/empty";
@@ -33,13 +33,14 @@ export function EmptyState({
 
 /** Loading failed: said in plain words (nothing technical), with a way to try again. */
 export function LoadError({ title, onRetry }: { title: string; onRetry: () => void }) {
+  const t = useTranslations("common");
   return (
     <Alert variant="destructive">
       <AlertTitle>{title}</AlertTitle>
-      <AlertDescription>{messages.retryLater}</AlertDescription>
+      <AlertDescription>{t("retryLater")}</AlertDescription>
       <AlertAction>
         <Button variant="outline" size="sm" onClick={onRetry}>
-          Try again
+          {t("tryAgain")}
         </Button>
       </AlertAction>
     </Alert>

@@ -64,6 +64,18 @@ const eslintConfig = defineConfig([
       ],
     },
   },
+  // i18n (skill `frontend-i18n`): no text written in JSX, every user-facing string comes from
+  // src/shared/i18n/messages (useTranslations). Only separators are allowed as literals.
+  {
+    files: ["src/**/*.tsx"],
+    ignores: ["src/**/*.test.tsx", "src/shared/test/**"],
+    rules: {
+      "react/jsx-no-literals": [
+        "error",
+        { noStrings: true, ignoreProps: true, allowedStrings: ["/", "·", "—", "…"] },
+      ],
+    },
+  },
   // Readability: a chain of ternaries becomes a sub-component or a function with early returns.
   { files: ["src/**/*.{ts,tsx}"], rules: { "no-nested-ternary": "error" } },
   // Data layer (skill `frontend-data-layer`): HTTP calls only in `[feature].api.ts`, TanStack

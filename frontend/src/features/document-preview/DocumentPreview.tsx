@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
+import { useTranslations } from "next-intl";
 import { cn } from "@/shared/lib/utils";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { boxToCss, fontSizeToCss, type PageSize, type PdfBox } from "./locator";
@@ -27,19 +28,16 @@ export type PreviewZone = {
   tone: ZoneTone;
 };
 
-const TONES: Record<ZoneTone, { label: string; zone: string; swatch: string }> = {
+const TONES: Record<ZoneTone, { zone: string; swatch: string }> = {
   entered: {
-    label: "Entered by you",
     zone: "bg-success/12 ring-success/50",
     swatch: "bg-success/30",
   },
   empty: {
-    label: "Empty",
     zone: "bg-[repeating-linear-gradient(135deg,color-mix(in_oklch,var(--destructive)_18%,transparent)_0_3px,transparent_3px_6px)] ring-destructive/40",
     swatch: "bg-destructive/25",
   },
   signature: {
-    label: "Sign by hand",
     zone: "border border-dashed border-muted-foreground/60 bg-muted/40 ring-transparent",
     swatch: "bg-muted-foreground/25",
   },
@@ -59,13 +57,14 @@ export function DocumentPreview({
   selectedId: number | null;
   onSelect: (id: number) => void;
 }) {
+  const t = useTranslations("preview");
   return (
-    <section aria-label="Form preview" className="flex flex-col gap-3">
-      <ul aria-label="Legend" className="flex flex-wrap gap-4 text-xs text-muted-foreground">
-        {Object.values(TONES).map((tone) => (
-          <li key={tone.label} className="flex items-center gap-1.5">
-            <span aria-hidden className={cn("h-2 w-3.5 rounded-xs", tone.swatch)} />
-            {tone.label}
+    <section aria-label={t("label")} className="flex flex-col gap-3">
+      <ul aria-label={t("legend")} className="flex flex-wrap gap-4 text-xs text-muted-foreground">
+        {(Object.keys(TONES) as ZoneTone[]).map((tone) => (
+          <li key={tone} className="flex items-center gap-1.5">
+            <span aria-hidden className={cn("h-2 w-3.5 rounded-xs", TONES[tone].swatch)} />
+            {t(`tone.${tone}`)}
           </li>
         ))}
       </ul>

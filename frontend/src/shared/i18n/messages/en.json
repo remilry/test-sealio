@@ -1,0 +1,105 @@
+{
+  "metadata": {
+    "title": "Formpilot",
+    "description": "Fill tender forms with AI, grounded in your company documents."
+  },
+  "common": {
+    "appName": "Formpilot",
+    "tryAgain": "Try again",
+    "retryLater": "Something went wrong on our side. Please try again in a moment.",
+    "withdrawnByBuyer": "It may have been withdrawn by the buyer."
+  },
+  "ui": {
+    "close": "Close",
+    "sidebarTitle": "Sidebar",
+    "sidebarDescription": "Displays the mobile sidebar.",
+    "toggleSidebar": "Toggle Sidebar"
+  },
+  "shell": {
+    "mainNav": "Main",
+    "tenders": "Tenders",
+    "activeTenders": "Active tenders",
+    "tendersUnavailable": "Tenders unavailable"
+  },
+  "tender": {
+    "breadcrumbRoot": "Tenders",
+    "loading": "Loading tender",
+    "notFound": "Tender not found",
+    "loadError": "We couldn't load this tender.",
+    "listLoadError": "We couldn't load your tenders.",
+    "noneTitle": "No open tenders",
+    "noneDescription": "New calls for tenders appear here as soon as they are published.",
+    "reference": "Ref. {reference}",
+    "submissionDue": "Submission due",
+    "deadline": "{date} · {timeLeft}",
+    "timeLeft": "{days, plural, =0 {due today} one {# day} other {# days}}",
+    "closed": "closed"
+  },
+  "forms": {
+    "title": "Forms to complete",
+    "hint": "Buyer templates · filled in place, layout preserved",
+    "status": {
+      "not_started": "Not started",
+      "in_review": "In review",
+      "ready": "Ready"
+    },
+    "fillWithAi": "Fill with AI",
+    "continueReview": "Continue review",
+    "formatNotSupported": "This form format is not supported yet",
+    "fieldsDetected": "{count, plural, one {# field} other {# fields}} detected",
+    "yesNoDeclarations": "{count, plural, one {# Yes/No declaration} other {# Yes/No declarations}}",
+    "signatures": "{count, plural, one {# signature} other {# signatures}}"
+  },
+  "liveFill": {
+    "backToTender": "Back to the tender",
+    "breadcrumb": "Breadcrumb",
+    "loading": "Loading form",
+    "notFound": "Form not found",
+    "loadError": "We couldn't load this form.",
+    "cannotFillTitle": "This form can't be filled yet",
+    "cannotFillDescription": "Only PDF forms can be filled for now. You can still download the original from the tender.",
+    "progress": "{filled} / {fillable} filled · {empty} empty",
+    "fieldsToFill": "{count, plural, one {# field} other {# fields}} to fill",
+    "allFilled": "All fields are filled",
+    "instructions": "Type each answer: it is saved as you go and shown on the form. Press Enter to move to the next field."
+  },
+  "fieldList": {
+    "label": "Fields",
+    "signByHand": "Sign by hand after export — never filled.",
+    "notSaved": "Not saved — press Enter to try again",
+    "enteredByYou": "Entered by you · {time}",
+    "empty": "Empty — exported blank"
+  },
+  "saveStatus": {
+    "idle": "All changes saved",
+    "saving": "Saving…",
+    "saved": "Saved",
+    "failed": "Couldn't save — press Enter in the field to try again"
+  },
+  "preview": {
+    "label": "Form preview",
+    "legend": "Legend",
+    "tone": {
+      "entered": "Entered by you",
+      "empty": "Empty",
+      "signature": "Sign by hand"
+    },
+    "loadError": "We couldn't load the form preview. Your answers are still saved."
+  },
+  "export": {
+    "open": "Export {format}",
+    "title": "Export {format}",
+    "preparing": "Preparing the export",
+    "loadError": "We couldn't prepare the export.",
+    "ready": "Ready to submit",
+    "stillEmpty": "{count, plural, one {# field} other {# fields}} still empty",
+    "filledSummary": "{formTitle} · {filled} of {fillable} fields filled",
+    "emptyWarning": "{count, plural, one {# field still empty — it will be exported blank} other {# fields still empty — they will be exported blank}}",
+    "emptyFields": "Empty fields",
+    "beforeSubmit": "Before you submit",
+    "signByHand": "Sign by hand: {label}",
+    "layoutPreserved": "Buyer's original layout preserved · answers written into the existing fields",
+    "backToReview": "Back to review",
+    "download": "Download {format}"
+  }
+}

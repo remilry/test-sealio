@@ -74,6 +74,7 @@ frontend/src/
 │  ├─ api/               client.ts (initialisation du client HTTP typé) · schema.gen.ts (généré)
 │  ├─ ui/                composants shadcn, StatusBadge, tokens de couleur
 │  ├─ components/        composants partagés hors shadcn (LoadStates : EmptyState, LoadError)
+│  ├─ i18n/              next-intl : config (langues, fuseau), request.ts, messages/en.json (tous les textes)
 │  ├─ lib/               utilitaires sans dépendance métier
 │  ├─ utils/date.ts      seul point de manipulation des dates (règle ESLint), remplaçable par une lib
 │  └─ test/              setup, serveur MSW, handlers, fixtures typées, renderScreen, fillStream
@@ -88,6 +89,7 @@ frontend/e2e/            # un test Playwright : le scénario principal
 4. Couche de données (skill `frontend-data-layer`) : chaque feature a son `[feature].api.ts` (types et appels HTTP) et son `[feature].queries.ts` (query keys et hooks `useXxx`, seuls à appeler TanStack Query) ; les composants n'utilisent que ces hooks (règle ESLint `no-restricted-imports`). `shared/api` ne contient que l'initialisation du client et les types générés.
 5. `document-preview` est générique : il reçoit `{id, locator, value, tone}` et émet `onSelect(id)`.
 6. Style (skill `frontend-code-style`) : early return dans les fonctions et composants, pas de ternaires imbriqués (`no-nested-ternary`) : sous-composant ou fonction nommée à la place.
+7. Textes (skill `frontend-i18n`) : aucun texte en dur, tout passe par next-intl (`useTranslations`, messages dans `shared/i18n/messages`) ; règle ESLint `react/jsx-no-literals`. Anglais seulement pour l'instant.
 
 ### État
 - **Données serveur** : cache TanStack Query (seule source côté front). Le flux SSE met à jour ce cache (`setQueryData`) ; les éditions partent en `PATCH` optimiste (« ✓ Saved »).
