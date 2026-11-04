@@ -7,7 +7,8 @@
     "appName": "Formpilot",
     "tryAgain": "Try again",
     "retryLater": "Something went wrong on our side. Please try again in a moment.",
-    "withdrawnByBuyer": "It may have been withdrawn by the buyer."
+    "withdrawnByBuyer": "It may have been withdrawn by the buyer.",
+    "fieldCounts": "{fields, plural, one {# field} other {# fields}} detected{yesNo, plural, =0 {} one { · # Yes/No declaration} other { · # Yes/No declarations}}{signatures, plural, =0 {} one { · # signature} other { · # signatures}}"
   },
   "ui": {
     "close": "Close",
@@ -48,18 +49,14 @@
     "moreActions": "More actions",
     "discardAnswers": "Discard answers",
     "continueReview": "Continue review",
-    "formatNotSupported": "This form format is not supported yet",
-    "fieldsDetected": "{count, plural, one {# field} other {# fields}} detected",
-    "yesNoDeclarations": "{count, plural, one {# Yes/No declaration} other {# Yes/No declarations}}",
-    "signatures": "{count, plural, one {# signature} other {# signatures}}"
+    "formatNotSupported": "This form format is not supported yet"
   },
   "autoFill": {
     "trigger": "Auto-fill",
     "title": "Auto-fill {formTitle}",
-    "description": "Answers are drawn from these sources, then you review each one.",
-    "fieldsDetected": "{count, plural, one {# field} other {# fields}} detected",
     "sources": "Sources",
     "companyKnowledge": "Company knowledge · {count, plural, one {# document} other {# documents}}",
+    "companyKnowledgeUncounted": "Company knowledge",
     "tenderDetails": "Tender details",
     "knowledgeEmpty": "Your company knowledge is empty: only the tender details can be used.",
     "addDocuments": "Add documents",

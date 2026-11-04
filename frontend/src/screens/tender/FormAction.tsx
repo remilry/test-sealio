@@ -20,7 +20,14 @@ import {
  * The action of a form that can be filled: "Auto-fill" (Setup) while untouched; once started (or
  * while a fill runs) "Continue review" and a menu to discard the answers. No re-run on a started form.
  */
-export function FormAction({ form, documentCount }: { form: FormSummary; documentCount: number }) {
+export function FormAction({
+  form,
+  documentCount,
+}: {
+  form: FormSummary;
+  /** Undefined while the company knowledge is unknown (loading or failed). */
+  documentCount: number | undefined;
+}) {
   const t = useTranslations("forms");
   const router = useRouter();
   const [discarding, setDiscarding] = useState(false);

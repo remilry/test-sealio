@@ -1,6 +1,6 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { http, HttpResponse } from "msw";
+import { delay, http, HttpResponse } from "msw";
 import { API_URL } from "@/shared/api";
 import { freezeToday, handlers, renderScreen, server } from "@/shared/test";
 import { form, knowledgeBase, knowledgeDocument, tender } from "@/shared/test/fixtures";
@@ -180,6 +180,78 @@ describe("Tender", () => {
       expect(dialog.getByText("No API key configured")).toBeInTheDocument();
       expect(push).not.toHaveBeenCalled();
     });
+
+    it("asks me to try again when the fill could not be requested, and stays open", async () => {
+      // Given the back cannot be reached
+      server.use(
+        handlers.tender(tender()),
+        handlers.knowledge(elevenDocuments()),
+        http.post(`${API_URL}/forms/2/fill`, () => HttpResponse.error()),
+      );
+      const user = userEvent.setup();
+      renderScreen(<TenderScreen tenderId={1} />);
+      const dialog = await openSetup(user);
+
+      // When I start
+      await user.click(dialog.getByRole("button", { name: "Start" }));
+
+      // Then I am asked to try again, in the dialog still open
+      expect(await dialog.findByRole("alert")).toHaveTextContent(
+        "Something went wrong on our side. Please try again in a moment.",
+      );
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+      expect(push).not.toHaveBeenCalled();
+    });
+
+    it("shows every count of the form: fields, declarations, signature", async () => {
+      // Given a parsed form with Yes/No declarations
+      server.use(
+        handlers.tender(
+          tender({
+            forms: [
+              form({
+                id: 2,
+                title: "Annex 7 — Sanctions self-declaration (Art. 29c)",
+                file_format: "pdf",
+                field_counts: { fields: 10, yes_no: 2, signatures: 1 },
+              }),
+            ],
+          }),
+        ),
+      );
+      const user = userEvent.setup();
+      renderScreen(<TenderScreen tenderId={1} />);
+
+      // When I open Auto-fill
+      const dialog = await openSetup(user);
+
+      // Then the dialog gives the same counts as the card
+      expect(
+        dialog.getByText("10 fields detected · 2 Yes/No declarations · 1 signature"),
+      ).toBeInTheDocument();
+    });
+
+    it.each([
+      ["is slow", () => http.get(`${API_URL}/knowledge`, () => delay("infinite"))],
+      ["fails", () => handlers.error("/knowledge", 500, "Something went wrong")],
+    ])(
+      "never claims the company knowledge is empty while it %s",
+      async (_case, knowledgeHandler) => {
+        // Given the company knowledge unknown
+        server.use(handlers.tender(tender()), knowledgeHandler());
+        const user = userEvent.setup();
+        renderScreen(<TenderScreen tenderId={1} />);
+
+        // When I open Auto-fill
+        const dialog = await openSetup(user);
+
+        // Then the source is named without a count, and no warning is shown
+        expect(dialog.getByText("Company knowledge")).toBeInTheDocument();
+        expect(dialog.queryByText(/documents?$/)).not.toBeInTheDocument();
+        expect(dialog.queryByText(/company knowledge is empty/)).not.toBeInTheDocument();
+        expect(dialog.queryByRole("link", { name: "Add documents" })).not.toBeInTheDocument();
+      },
+    );
 
     it("opens the live fill anyway when the form was already filled", async () => {
       // Given the back says it is already filled

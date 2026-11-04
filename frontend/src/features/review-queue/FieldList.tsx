@@ -184,15 +184,16 @@ function FieldStatus({ field, context }: { field: QueueField; context: FieldCont
   if (field.unsaved !== null) {
     return <p className="text-xs text-destructive">{t("notSaved")}</p>;
   }
-  if (field.state === "searching") {
-    return <p className="animate-pulse text-xs text-primary">{t("searching")}</p>;
-  }
+  // A value saved while the field is searched is the user's: the fill will not replace it.
   if (field.resolvedBy === "user" && field.enteredAt) {
     return (
       <p className="text-xs text-muted-foreground">
         {t("enteredByYou", { time: formatTime(field.enteredAt) })}
       </p>
     );
+  }
+  if (field.state === "searching") {
+    return <p className="animate-pulse text-xs text-primary">{t("searching")}</p>;
   }
   if (field.type === "manual") {
     return (

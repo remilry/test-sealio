@@ -44,7 +44,7 @@ export function TenderScreen({ tenderId }: { tenderId: number }) {
         <FormList
           forms={tender.forms}
           renderAction={(form) => (
-            <FormAction form={form} documentCount={knowledge?.documents.length ?? 0} />
+            <FormAction form={form} documentCount={knowledge?.documents.length} />
           )}
         />
         <aside className="lg:pt-8.5">

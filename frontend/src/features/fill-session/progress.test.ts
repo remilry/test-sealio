@@ -57,6 +57,14 @@ describe("fillProgress", () => {
     expect(fillProgress(run, opts(600 * SECOND))).toBeLessThan(0.05 + 0.9 / 4);
   });
 
+  it("still visibly moves late in the wait for the first answer", () => {
+    // The model thinks several seconds before its first answer (~7 s measured, often more).
+    const run = searching(0, 9);
+    const at7 = fillProgress(run, opts(7 * SECOND));
+    const at10 = fillProgress(run, opts(10 * SECOND));
+    expect(at10 - at7).toBeGreaterThan(0.005);
+  });
+
   it("creeps from the last answer", () => {
     const run = searching(1, 4, 20 * SECOND);
     expect(fillProgress(run, opts(20 * SECOND))).toBeCloseTo(0.05 + 0.9 / 4);

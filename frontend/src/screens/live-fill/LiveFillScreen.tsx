@@ -431,6 +431,8 @@ function fieldState(run: FillRun, fieldId: number): QueueField["state"] {
  */
 function zoneTone(field: QueueField, value: string | null, answer: Answer | undefined): ZoneTone {
   if (!field.fillable) return "signature";
+  // A value saved while the field is searched is the user's: the fill will not replace it.
+  if (value && answer?.resolved_by === "user") return "entered";
   if (field.state === "searching") return "searching";
   if (!value) return "empty";
   if (!answer || answer.resolved_by === "user") return "entered";

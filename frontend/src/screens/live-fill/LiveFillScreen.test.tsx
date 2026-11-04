@@ -588,6 +588,25 @@ describe("Live fill (watching the automatic fill)", () => {
     back.stream.close();
   });
 
+  it("shows a value I save while its field is searched as mine at once", async () => {
+    // Given the fill searching the telephone
+    const { back, user } = watchFill();
+    startSearch(back);
+    back.searching(6);
+    const card = within(await screen.findByRole("listitem", { name: "Telephone" }));
+    expect(await card.findByText("Searching your documents…")).toBeInTheDocument();
+
+    // When I type a value and leave the field, before the fill answers it
+    await user.type(card.getByRole("textbox"), "044 000 11");
+    await user.tab();
+
+    // Then it is shown as entered by me, in the list and on the form
+    expect(await card.findByText(/Entered by you/)).toBeInTheDocument();
+    expect(card.queryByText("Searching your documents…")).not.toBeInTheDocument();
+    await waitFor(() => expect(zone(6)).toHaveAttribute("data-tone", "entered"));
+    back.stream.close();
+  });
+
   it("picks up where the fill was when I reload the page", async () => {
     // Given a fill that already found two values and is searching a third
     const { back, view } = watchFill();

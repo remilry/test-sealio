@@ -4,9 +4,14 @@ import type { FillRun } from "./fill-events";
 const BEFORE_SEARCH_MAX = 0.05;
 const SEARCH_END = 0.95;
 const REVIEW_END = 0.99;
-/** A creep never covers more than this share of the gap to the next milestone. */
 const DEFAULT_ESTIMATED_SECONDS = 25;
+/** A creep never covers more than this share of the gap to the next milestone. */
 const CREEP_SHARE = 0.9;
+/**
+ * Time constant of the wait for the first answer, as a share of the estimate: the model thinks
+ * several seconds before its first output, so the bar must still move then.
+ */
+const FIRST_ANSWER_TAU_SHARE = 0.4;
 
 export type ProgressTiming = { now: number; startedAt: number; estimatedSeconds: number };
 
@@ -50,7 +55,8 @@ export function fillProgress(run: FillRun, timing: ProgressTiming): number {
         const floor = BEFORE_SEARCH_MAX + gap * (total - 1) + gap * CREEP_SHARE;
         return floor + (SEARCH_END - floor) * creep(elapsed, tau);
       }
-      return BEFORE_SEARCH_MAX + gap * answered + gap * creep(elapsed, tau);
+      const gapTau = answered === 0 ? FIRST_ANSWER_TAU_SHARE * estimatedSeconds : tau;
+      return BEFORE_SEARCH_MAX + gap * answered + gap * creep(elapsed, gapTau);
     }
     case "cross_checking":
     case "preparing_review":

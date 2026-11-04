@@ -82,14 +82,12 @@ function FormRow({
 
 /** "10 fields detected · 2 Yes/No declarations · 1 signature" */
 function FieldCounts({ counts }: { counts: NonNullable<FormSummary["field_counts"]> }) {
-  const t = useTranslations("forms");
-  return [
-    t("fieldsDetected", { count: counts.fields }),
-    counts.yes_no > 0 && t("yesNoDeclarations", { count: counts.yes_no }),
-    counts.signatures > 0 && t("signatures", { count: counts.signatures }),
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  const t = useTranslations("common");
+  return t("fieldCounts", {
+    fields: counts.fields,
+    yesNo: counts.yes_no,
+    signatures: counts.signatures,
+  });
 }
 
 function FormatTile({ format }: { format: FormSummary["file_format"] }) {

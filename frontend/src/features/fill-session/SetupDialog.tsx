@@ -21,21 +21,26 @@ type SetupForm = {
   id: number;
   title: string;
   file_name: string;
-  field_counts: { fields: number } | null;
+  field_counts: { fields: number; yes_no: number; signatures: number } | null;
   estimated_fill_seconds: number | null;
 };
 
-/** The Setup step: what the automatic fill uses and how long it takes, then Start. */
+/**
+ * The Setup step: what the automatic fill uses and how long it takes, then Start.
+ * `documentCount` is undefined while the company knowledge is unknown (loading or failed): then
+ * neither its count nor the empty warning is shown.
+ */
 export function SetupDialog({
   form,
   documentCount,
   onStarted,
 }: {
   form: SetupForm;
-  documentCount: number;
+  documentCount: number | undefined;
   onStarted: () => void;
 }) {
   const t = useTranslations("autoFill");
+  const tCommon = useTranslations("common");
   const [open, setOpen] = useState(false);
   const start = useStartFill(form.id);
 
@@ -53,8 +58,9 @@ export function SetupDialog({
       },
     });
 
+  // Any failure but a 409 (handled above), a network error included, shows in the dialog.
   const error = start.error;
-  const failure = error instanceof ApiError && error.status !== 409 ? error : null;
+  const failure = error && !(error instanceof ApiError && error.status === 409) ? error : null;
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -65,9 +71,21 @@ export function SetupDialog({
           <DialogDescription>{form.file_name}</DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-3 text-sm">
-          {form.field_counts && <p>{t("fieldsDetected", { count: form.field_counts.fields })}</p>}
+          {form.field_counts && (
+            <p>
+              {tCommon("fieldCounts", {
+                fields: form.field_counts.fields,
+                yesNo: form.field_counts.yes_no,
+                signatures: form.field_counts.signatures,
+              })}
+            </p>
+          )}
           <ul aria-label={t("sources")} className="flex list-disc flex-col gap-1 pl-5">
-            <li>{t("companyKnowledge", { count: documentCount })}</li>
+            <li>
+              {documentCount === undefined
+                ? t("companyKnowledgeUncounted")
+                : t("companyKnowledge", { count: documentCount })}
+            </li>
             <li>{t("tenderDetails")}</li>
           </ul>
           {documentCount === 0 && (
@@ -98,10 +116,12 @@ export function SetupDialog({
   );
 }
 
-function Failure({ error }: { error: ApiError }) {
+function Failure({ error }: { error: Error }) {
   const t = useTranslations("autoFill");
   const tCommon = useTranslations("common");
-  if (error.status !== 503) return <p role="alert">{tCommon("retryLater")}</p>;
+  if (!(error instanceof ApiError) || error.status !== 503) {
+    return <p role="alert">{tCommon("retryLater")}</p>;
+  }
   return (
     <div role="alert" className="flex flex-col gap-0.5">
       <p className="font-medium">{t("unavailable")}</p>
