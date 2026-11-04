@@ -2,7 +2,7 @@
 
 > Document vivant. Chaque étape y est cochée et détaillée au fur et à mesure.
 > Contexte produit et priorités : voir `CLAUDE.md`. Échéance : jeudi 5 novembre.
-> Statut : étapes 0 à 4.5 faites ; étape 5 découpée en 5a–5d, 5a, 5b et 5c mergées ; prochaine : 5d (remplissage IA dans l'UI). Parcours détaillé : `docs/USER_FLOW.md`. Les choix techniques marqués _proposition_ restent à confirmer à l'étape 3.
+> Statut : étapes 0 à 4.5 faites ; étape 5 découpée en 5a–5d, 5a, 5b et 5c mergées, 5d faite (remplissage automatique dans l'UI, en attente de validation) ; prochaine : étape 6 (relecture). Parcours détaillé : `docs/USER_FLOW.md`. Les choix techniques marqués _proposition_ restent à confirmer à l'étape 3.
 
 ## 1. Ce qu'on a appris des deux formulaires
 
@@ -106,8 +106,22 @@ Chaque étape à partir de la 4 livre une **fonctionnalité utilisable de bout e
 - **Vraies réponses de l'Annex 7** enregistrées (`llm_recordings/`) et relues : les 9 champs conformes à `GROUND_TRUTH.md` (7 sourcés, signataire proposé depuis le registre, lieu et date pré-écrits en `manual`), 1 appel, ~23 s, ~0,5 centime. Un test les rejoue dans tout le remplissage. Le premier enregistrement a conduit à 3 corrections génériques : le prompt demande une seule réponse complète par champ (plusieurs candidats seulement si des sources se contredisent sur le même fait), le validateur fusionne une valeur qui ne fait qu'en compléter une autre (« …, Switzerland ») et met les valeurs sur une ligne ; le moteur associe une réponse par clé ou, à défaut, par libellé du champ.
 - Limite connue : en mode `fake`, le lieu et la date suggérés sont ceux du jour de l'enregistrement.
 
-#### 5d — Remplissage IA dans l'UI ⬜
-- *Setup* (modale), *Live fill* en flux, source par champ (document, page, citation), état répondu / introuvable, e2e du parcours. Cartes Conflit / Périmé dans l'UI aux étapes 6–7.
+#### 5d — Remplissage automatique dans l'UI ✅
+- **Vocabulaire produit** : aucun « IA » dans l'interface (« Auto-fill », « Filling the form… », « Filled automatically », pas de ✦) ; les messages d'erreur du back suivent la même règle.
+- **Façade LLM en flux** : `generate_structured(request, on_partial=...)` ; l'adaptateur OpenAI lit le flux de la Responses API et remet à `on_partial` la sortie partielle à chaque delta ; `FakeLLM` rejoue l'enregistrement en simulant la vraie latence d'après le bloc `timing` (`first_output_seconds`, `total_seconds` : premier champ après ~7 s, fin après ~17 s) ; réglage `FORMPILOT_FAKE_LLM_LATENCY` = `recorded` par défaut, `none` dans les tests et l'e2e.
+- **Moteur** : `on_field` publie chaque champ dès que le modèle l'a complet (recherche faite, validé, règles appliquées), sans attendre la fin de la section ; les champs non publiés en cours de route le sont à la fin. Le job émet `answered` et commite champ par champ.
+- **API** : `DELETE /forms/{id}/fill` (204) supprime toutes les réponses (celles de l'utilisateur aussi) et le run, y compris pendant un remplissage (le run s'arrête), le formulaire revient à `not_started` ; `POST /fill` refuse (409, sans le mot « IA ») un formulaire déjà commencé ; le détail d'une offre expose par formulaire `estimated_fill_seconds` (sections × `fill_seconds_per_section`) et `filling` (remplissage en cours).
+- **Front** : *Tender* : bouton `Auto-fill` (formulaire vierge), `Continue review` + menu `Discard answers` (formulaire commencé), modale *Setup* (fichier, source utilisée, « Takes about N seconds ») ; *Live fill* : le flux SSE est lu par `fetch` + `eventsource-parser` (pas d'`EventSource` sous Node/jsdom), reconnexion automatique avec `Last-Event-ID`, réponses appliquées au cache TanStack Query champ par champ ; barre de progression qui ne s'arrête et ne recule jamais (fonction pure `fillProgress` : phases + réponses reçues + glissement dans le temps ; plus un maximum atteint dans le composant pour les reconnexions) ; en-tête de phase puis résumé final (« 9 of 9 fields filled in N seconds ») ; pastille de statut par réponse (*Filled automatically*, *To check*, *Entered by you*), source (document, page, citation) ; `Discard answers` avec confirmation, aussi pendant le remplissage ; onglet *Source* gardé pour l'étape 6.
+- **Tests** : back : flux (publication au fil du modèle, FakeLLM avec latence), `discard` (avant, pendant, SSE), 409 sur formulaire commencé, durée estimée ; front : fonction de progression, lecture des événements SSE, hooks (invalidation), écrans *Tender* (Setup, Auto-fill, Discard) et *Live fill* (réponses une à une, reconnexion, erreur, discard pendant le remplissage) ; e2e : Auto-fill de l'Annex 7 de bout en bout (documents déposés, remplissage, compteurs « 9 / 9 filled · 0 empty · 0 doubts », source avec la bonne page, export PDF).
+- **Mesuré** (vrai modèle, Annex 7, un appel) : premier champ ~7 s, fin ~17 s, ~0,3 à 0,5 centime.
+- **Limites connues** :
+  - La qualité des citations du vrai modèle n'est pas fiable : les nouveaux enregistrements réels ont échoué à la vérité terrain 4 fois sur 4 sur `name_and_legal_form` (citation à cheval sur deux lignes / deux passages). L'enregistrement versionné garde la réponse précédente (conforme à la vérité terrain) avec le temps mesuré (7,1 s / 16,7 s). Le moteur doit être durci → étape 8.
+  - Le bandeau d'erreur d'un remplissage échoué n'est pas réaffiché après un rechargement de la page (les événements sont pourtant conservés).
+  - L'e2e vérifie les compteurs finaux, pas le résumé en direct (avec latence `none`, le remplissage finit avant que la page se connecte) ; le flux en direct est couvert par les tests d'écran et la vérification manuelle.
+  - Pas de nouveau remplissage sur un formulaire commencé : `Discard answers` puis `Auto-fill` (la valeur de l'utilisateur est effacée aussi). Un meilleur nouveau remplissage est prévu en V2 (voir *Remaining features*).
+  - Retaper la même valeur ne confirme pas une réponse *To check* ; une carte explicite viendra à l'étape 6.
+  - Pas encore de cartes Conflit / Périmé ni de vue *Source* (étapes 6–7).
+  - Le numéro de page d'une source est 0-based dans l'API (comme `chunk` / `locator`) ; la carte affiche page + 1.
 
 ### Étape 6 — Relecture et humain dans la boucle ⬜ _(testé)_
 - UI : relecture champ par champ avec source visible/cliquable, édition, validation individuelle ou en lot, tri par priorité (introuvables, conflits, déclarations engageantes).
@@ -130,6 +144,7 @@ Chaque étape à partir de la 4 livre une **fonctionnalité utilisable de bout e
 - Mise à jour de `CLAUDE.md` (état du projet).
 
 ### Si le temps le permet
+- Nouveau remplissage d'un formulaire commencé qui garde les valeurs de l'utilisateur (aujourd'hui : `Discard answers` efface tout), V2.
 - Réutilisation inter-formulaires (mémoriser les corrections), support d'autres formats, historique/versions, métriques de qualité.
 
 ## 4. Parcours utilisateur
@@ -218,3 +233,8 @@ UI (relecture)  ──►  API locale
 | 2026-11-04 | Durée du remplissage : sections appelées en parallèle, prévu à l'étape 7 (mesurable avec l'Annex 4) ; plafond de taille de section, effort `minimal` et sortie allégée gardés en pistes | validé |
 | 2026-11-04 | Étape 5c validée et mergée dans `main` | validé |
 | 2026-11-04 | e2e dans un environnement dédié et propre : base `formpilot_e2e` supprimée et recréée à chaque lancement (script `scripts/reset_e2e.py`, refuse toute base dont le nom ne finit pas par `_e2e`), dossier `data-e2e/` vidé, back :8100 et front :3100 jamais réutilisés, build Next dans `.next-e2e` (le serveur de dev n'est pas touché) | validé |
+| 2026-11-04 | 5d : les réponses apparaissent champ par champ pendant que le modèle écrit (streaming OpenAI dans la façade LLM, chaque champ validé et publié dès qu'il est complet) | validé |
+| 2026-11-04 | 5d : `FakeLLM` simule la vraie latence d'après le temps enregistré (`FORMPILOT_FAKE_LLM_LATENCY` = `recorded` par défaut, `none` dans les tests et l'e2e) | validé |
+| 2026-11-04 | 5d : vocabulaire produit, pas de « IA » dans l'interface (« Auto-fill », « Filled automatically », pas de ✦) | validé |
+| 2026-11-04 | 5d : onglet *Source* gardé pour l'étape 6 | validé |
+| 2026-11-04 | 5d : pas de nouveau remplissage sur un formulaire commencé : `Discard answers` (supprime toutes les réponses, celles de l'utilisateur aussi, même pendant un remplissage) puis `Auto-fill` ; un meilleur nouveau remplissage en V2 | validé |

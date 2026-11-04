@@ -32,9 +32,9 @@ data/ (ignoré par git) : uploads, exports. Seed au démarrage : tenant, offre, 
 | Base de données | PostgreSQL + pgvector. Toutes les tables ont `created_at` et `updated_at` |
 | Source de vérité | Le back : état des champs, fichiers, règles. Next.js = UI seule (pas de routes API) |
 | Contrat | Modèles Pydantic → OpenAPI → `openapi-typescript` → types TS |
-| Communication | REST + SSE (remplissage). Corrections utilisateur en `PATCH` pendant le flux |
+| Communication | REST + SSE (remplissage). Corrections utilisateur en `PATCH` pendant le flux ; `DELETE /forms/{id}/fill` abandonne le remplissage (réponses de l'utilisateur comprises) |
 | Remplissage | Job asyncio côté back, événements persistés → SSE rejouable (rechargement), écrans de repli sur le même modèle |
-| LLM | OpenAI `gpt-5-mini` (décision 2026-11-04, Claude auparavant) via une façade `llm/` (`generate_structured`) ; aucun autre module n'importe le SDK. **Un appel par section** du formulaire, événement SSE par champ |
+| LLM | OpenAI `gpt-5-mini` (décision 2026-11-04, Claude auparavant) via une façade `llm/` (`generate_structured`) ; aucun autre module n'importe le SDK. **Un appel par section** du formulaire, lu en flux (`on_partial`) : événement SSE par champ, publié dès que le modèle l'a complet |
 | Recherche | RAG hybride dans PostgreSQL : vecteurs (`fastembed` local + pgvector) + plein texte (`tsvector`), fusion des rangs (RRF). Passages = document + page + rectangle |
 | Fiabilité | Le LLM renvoie toutes les valeurs candidates avec leurs citations exactes, ou rien. Le code vérifie chaque citation et chaque valeur, détecte les conflits (valeurs normalisées divergentes) et la péremption (date de validité renvoyée avec sa citation, comparée à aujourd'hui). Plus aucun candidat vérifié → `missing` |
 | Ingestion V1 | Pas d'extraction de faits (coût) : *Company knowledge* liste les documents |
@@ -94,6 +94,8 @@ frontend/e2e/            # un test Playwright : le scénario principal
 ### État
 - **Données serveur** : cache TanStack Query (seule source côté front). Le flux SSE met à jour ce cache (`setQueryData`) ; les éditions partent en `PATCH` optimiste (« ✓ Saved »).
 - **État d'interface** : local à l'écran. Sur *Live fill*, `LiveFillProvider` (Context limité à l'écran) porte `selectedFieldId`, le filtre et l'onglet Form/Source, partagés par la file et l'aperçu. Pas de store global.
+- **Flux SSE** : lu avec `fetch` + `eventsource-parser` (pas d'`EventSource`, absent de Node / jsdom, et `Last-Event-ID` est géré à la main pour la reconnexion avec attente croissante). Chaque événement `answered` est appliqué au cache des réponses.
+- **Progression** : fonction pure `fillProgress(phase, réponses reçues, temps écoulé, durée estimée)` ; le composant d'affichage garde un maximum atteint pour que la barre ne recule pas lors d'une reconnexion (le flux rejoue le run).
 - **Logique métier** : aucune côté front. Statut, groupe, tri, compteurs et blocage d'export sont calculés par le back.
 
 ### Aperçu des documents
@@ -183,8 +185,10 @@ Toutes les tables héritent d'un `TimestampMixin` : `created_at` (`timestamptz`,
 ### Remplissage
 - Tâche de fond (`BackgroundTasks`, thread) dans le processus, une section à la fois. Chaque champ validé écrit son `answer` puis un `fill_event`, commité aussitôt. Les champs fixés par l'utilisateur ne sont pas redemandés, et l'upsert de l'IA ne remplace jamais une valeur de l'utilisateur, même enregistrée pendant le remplissage.
 - SSE : renvoie les événements depuis `Last-Event-ID`, puis lit la base toutes les 250 ms jusqu'à la fin du run (plus simple qu'une `asyncio.Queue` entre threads, et identique après un rechargement). Un run resté `running` au démarrage du serveur passe `failed`.
+- **Streaming** : la façade accepte `on_partial` (sortie partielle à chaque delta, dans l'ordre) ; l'adaptateur OpenAI lit le flux de la Responses API. Le moteur passe `on_field` : dès qu'un champ est complet dans la sortie partielle, il est validé, ses règles appliquées, son `answer` écrit et son événement émis, sans attendre la fin de la section ; ce qui reste à la fin est traité comme avant. `FakeLLM` rejoue les mêmes étapes en dormant d'après le bloc `timing` des enregistrements (`first_output_seconds`, `total_seconds`), selon `FORMPILOT_FAKE_LLM_LATENCY` (`recorded` par défaut, `none` dans les tests et l'e2e).
+- **Abandon** : `DELETE /forms/{id}/fill` supprime les réponses et le run ; un run en cours s'en aperçoit (plus de `form_fill`) et s'arrête sans rien écrire. `POST /fill` répond 409 sur un formulaire commencé.
 - **Appel LLM par section** : champs de la section, passages retrouvés par champ (top 8, dédoublonnés, étiquetés `P1…`), « Tender details ». Sortie structurée au schéma strict (`responses.parse`), effort de raisonnement bas. Par champ : candidats avec une ou plusieurs citations, date de la source et fin de validité avec citation, `user_only` + raison + valeur suggérée, ou rien.
-- Enregistrement : `scripts/record_llm.py` rejoue le moteur avec le vrai modèle et écrit `backend/llm_recordings/<formulaire>--<section>.json`, que `FakeLLM` rejoue (clé stable : le prompt dépend de l'embedder).
+- Enregistrement : `scripts/record_llm.py` rejoue le moteur avec le vrai modèle en flux et écrit `backend/llm_recordings/<formulaire>--<section>.json` (réponse + bloc `timing` mesuré), que `FakeLLM` rejoue (clé stable : le prompt dépend de l'embedder).
 
 ### Validateur (pur)
 - La citation doit se trouver dans le texte d'un passage envoyé, l'étiqueté d'abord (seuls lettres et chiffres comparés : casse, accents, espaces, ponctuation et césures tolérés).

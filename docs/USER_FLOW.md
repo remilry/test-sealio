@@ -22,11 +22,12 @@ Company knowledge ──(alertes)──┐
 Tender (offre fictive) ──► Setup (modale) ──► Live fill ──► Export (modale) ──► Tender (formulaire « Ready »)
                                                  │  ▲
                                    repli technique▼  │
-                                  AI filling ──► Review
+                                  Auto-fill (repli) ──► Review
 ```
 
-- **Écran principal** : *Live fill*. L'IA remplit le formulaire sous les yeux de l'utilisateur, qui peut corriger pendant le remplissage.
-- **Écrans de repli** : *AI filling* (progression seule) puis *Review* (même écran que Live fill, sans animation). Utilisés uniquement si le remplissage en flux s'avère techniquement problématique (voir §5).
+- **Vocabulaire** (décision 2026-11-04) : l'interface ne dit jamais « AI » ni « IA » : « Auto-fill », « Filling the form… », « Filled automatically », « To check », pas de ✦. Ces libellés l'emportent sur ceux des maquettes `docs/design/`.
+- **Écran principal** : *Live fill*. Le formulaire se remplit tout seul sous les yeux de l'utilisateur, qui peut corriger pendant le remplissage.
+- **Écrans de repli** : *Auto-fill progress* (progression seule) puis *Review* (même écran que Live fill, sans animation). Utilisés uniquement si le remplissage en flux s'avère techniquement problématique (voir §5).
 - **Une seule offre**, fictive, pré-chargée : *Cloud Platform Services – Canton of Zurich*, qui contient les deux formulaires réels (Annex 4 DOCX, Annex 7 PDF).
 - **Même écran pour les deux formulaires** : seul l'aperçu du document change (tableaux Word vs page PDF).
 
@@ -52,7 +53,7 @@ But : voir ce qui est demandé et lancer le remplissage.
 - **Formulaires à compléter** (2) — une carte par formulaire :
   - format (DOCX/PDF), titre, méta : `N fields detected · N Yes/No declarations · 1 signature` ;
   - statut : `Not started` · `In review · x/y` · `✓ Ready` ;
-  - actions : `✦ Fill with AI` (non commencé) · `Continue review` + `✦` relancer (commencé) · `⤓ DOCX` / `⤓ PDF` (prêt, format d'origine uniquement).
+  - actions : `Auto-fill` (non commencé) · `Continue review` + menu `Discard answers` (commencé ; pas de relance directe, voir ci-dessous) · `⤓ DOCX` / `⤓ PDF` (prêt, format d'origine uniquement).
 - Carte **Company knowledge** résumée : nombre de documents, lien *Manage*.
 
 ### 3.3 Setup (modale avant remplissage)
@@ -61,19 +62,20 @@ But : un dernier coup d'œil, un clic pour lancer.
 
 - Fichier détecté : nom, `N fields detected · N Yes/No declarations · 1 signature`.
 - Source utilisée : *Company knowledge* (`11 documents`) + *Tender details*. Pas d'avertissement préalable en V1 (doutes détectés pendant le remplissage).
-- Durée estimée (« Takes about 15 seconds »), boutons `Cancel` / `✦ Start filling`.
+- Durée estimée (« Takes about 15 seconds », calculée d'après le nombre de sections), boutons `Cancel` / `Auto-fill`.
+- Un formulaire déjà commencé ne peut pas être relancé : il faut d'abord `Discard answers` (confirmation « Discard all answers to … ? », supprime **toutes** les réponses, celles de l'utilisateur aussi, même pendant un remplissage en cours), puis `Auto-fill` à nouveau. Un nouveau remplissage qui garde les valeurs de l'utilisateur viendra en V2.
 
 ### 3.4 Live fill (écran principal)
 
 Écran plein, sans barre latérale. Deux colonnes.
 
-**Barre du haut** : retour, fil d'Ariane `Cloud Platform Services / Annex 4 · Bidder questionnaire`, `✓ Saved`, compteur `x / y filled · n empty · n doubts`, bouton `⤓ Export DOCX` (désactivé, libellé « Filling… », tant que l'IA travaille).
+**Barre du haut** : retour, fil d'Ariane `Cloud Platform Services / Annex 4 · Bidder questionnaire`, `✓ Saved`, compteur `x / y filled · n empty · n doubts`, bouton `⤓ Export DOCX` (désactivé, libellé « Filling… », tant que le remplissage dure) et menu `Discard answers`.
 
 **Colonne gauche — la file de relecture**
 
-- Titre : pendant le remplissage « AI is filling the form… » + phase en cours + `n / total` ; ensuite « n fields need a look ».
+- Titre : pendant le remplissage « Filling the form… » + phase en cours + barre de progression (qui ne s'arrête ni ne recule jamais) + `n / total` ; ensuite « n fields need a look ».
 - Rappel : « Confident answers are already in the form. Only doubts and empty fields are flagged. »
-- **3 pastilles-filtres** cliquables : `No value` (rose) · `Doubt` (ambre) · `Automatic` (bleu).
+- **3 pastilles-filtres** cliquables : `No value` (rose) · `To check` (ambre) · `Automatic` (bleu).
 - Liste groupée, dans cet ordre :
   1. **No value** : introuvables, champs manuels, déclarations sans preuve ;
   2. **Doubt** : conflits, valeurs issues d'un document périmé ;
@@ -87,7 +89,7 @@ But : un dernier coup d'œil, un clic pour lancer.
 | Manuel (lieu/date…) | « Only you can fill this », valeur pré-écrite si possible (date du jour) | `Save` |
 | Périmé | valeur + note « The certificate expired on … » | `Keep this value` · `Enter new value` · `Replace certificate` (→ Knowledge) |
 | Conflit | 2 options radio, chacune avec source, page, date, citation ; la plus récente pré-sélectionnée et marquée *most recent* ; option « Enter another value » | `Use this one` |
-| Déclaration avec preuve | **cochée automatiquement** par l'IA, preuve + citation, « You declare this on behalf of Alpenlogic AG » | `Change` |
+| Déclaration avec preuve | **cochée automatiquement**, preuve + citation, « You declare this on behalf of Alpenlogic AG » | `Change` |
 | Déclaration sans preuve | « No evidence. Your tax attestation covers direct taxes only, not VAT. » + boutons Yes / No | cocher puis `Save` |
 
 - Chaque valeur résolue affiche qui l'a fixée : `Filled automatically` · `Edited by you · 14:32` · `Kept by you · 14:32`, avec `Undo` / `Change`.
@@ -96,7 +98,7 @@ But : un dernier coup d'œil, un clic pour lancer.
 **Colonne droite — le document**
 
 - Onglets `Form` / `Source`.
-- **Form** : aperçu fidèle du formulaire d'origine, mis à jour en direct. Légende : *Filled by AI* (bleu) · *Doubt* (ambre) · *Missing* (hachuré rose) · *Reviewed by you* (vert). Les Oui/Non montrent ☐/☒ et « awaiting you » si non tranchés. Zones signature / cachet visibles, jamais remplies.
+- **Form** : aperçu fidèle du formulaire d'origine, mis à jour en direct. Légende : *Filled automatically* (bleu) · *To check* (ambre) · *Missing* (hachuré rose) · *Reviewed by you* (vert). Les Oui/Non montrent ☐/☒ et « awaiting you » si non tranchés. Zones signature / cachet visibles, jamais remplies.
 - **Source** : le passage du document cité, ouvert à la page, citation surlignée, « Used for: <champ> ». Si aucune source : « No source for this field — nothing relevant found in the passages searched ».
 - **Synchronisation** : cliquer un champ à gauche cadre et surligne sa zone à droite (défilement automatique), et inversement.
 
@@ -104,7 +106,7 @@ But : un dernier coup d'œil, un clic pour lancer.
 
 1. *Reading the form* — format, pages, sections.
 2. *Detecting fields to fill* — nombre de champs, déclarations, signature.
-3. *Searching company knowledge* — les champs se remplissent **un par un** dans le document (« Searching… » sur le champ en cours) et apparaissent dans la file à gauche.
+3. *Searching company knowledge* — les champs se remplissent **un par un, au fil de l'écriture du modèle** (chaque champ est validé puis publié dès qu'il est complet) dans le document (« Searching… » sur le champ en cours) et apparaissent dans la file à gauche.
 4. *Cross-checking sources* — conflits (valeurs candidates divergentes) et sources périmées (date de validité renvoyée par le LLM avec citation vérifiée, comparée à la date du jour) détectés.
 5. *Preparing your review* — tri ; fin : « Done. 20 of 23 fields filled in 14 seconds », sélection automatique du premier champ ouvert.
 
@@ -116,13 +118,13 @@ Modale ouverte par `⤓ Export …` au-dessus de *Live fill* (pas de page sépar
 
 - Titre : « Annex 4 is ready to submit » ou « Annex 4 — n fields still empty ».
 - Résumé : `x of y fields filled · n automatically from your documents · n reviewed by you`.
-- Bandeau si des champs restent ouverts : « n fields still empty — they will be exported blank » / « n doubts not reviewed — the AI's best answer will be used » + *Back to review*.
+- Bandeau si des champs restent ouverts : « n fields still empty — they will be exported blank » / « n doubts not reviewed — the automatic answer will be used » + *Back to review*.
 - `⤓ Download DOCX` (Annex 4) ou `⤓ Download PDF` (Annex 7) : **format d'origine uniquement**. Mention « Buyer's original layout preserved · answers written into the existing fields ».
 - **Before you submit** : « Sign and stamp page n by hand — Signatory: … » ; si des valeurs d'un document périmé ont été gardées : « You kept n values from an expired certificate — attach a valid one » + *Upload new*.
 
-### 3.6 Écrans de repli : AI filling + Review
+### 3.6 Écrans de repli : Auto-fill progress + Review
 
-- **AI filling** : les 5 phases avec coches, un flux « Answers found x / y » (libellé, valeur, source, drapeau *Conflict*/*Outdated*), puis un résumé (`17 filled automatically · 3 with a doubt · 3 without a value`) et `Open the form →`.
+- **Auto-fill progress** : les 5 phases avec coches, un flux « Answers found x / y » (libellé, valeur, source, drapeau *Conflict*/*Outdated*), puis un résumé (`17 filled automatically · 3 with a doubt · 3 without a value`) et `Open the form →`.
 - **Review** : identique à Live fill une fois terminé.
 - Ne sont construits que si Live fill pose un problème technique.
 
