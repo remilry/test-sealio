@@ -61,4 +61,18 @@ describe("reduceRun", () => {
     const failed = play([...events, { id: 6, type: "error", message: "boom" }]);
     expect(failed.outcome).toEqual({ kind: "error", message: "boom" });
   });
+
+  it("stops searching every field when the run ends, even midway through a section", () => {
+    const searching: FillEvent[] = [
+      ...events,
+      { id: 6, type: "field", field_id: 3, state: "searching" },
+    ];
+    expect(play([...searching, { id: 7, type: "error", message: "boom" }]).searching.size).toBe(0);
+    const done = play([
+      ...searching,
+      { id: 7, type: "done", filled: 1, fillable: 3, doubts: 0, seconds: 12 },
+    ]);
+    expect(done.searching.size).toBe(0);
+    expect(done.answered.has(2)).toBe(true);
+  });
 });

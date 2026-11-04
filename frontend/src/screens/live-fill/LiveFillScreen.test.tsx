@@ -522,7 +522,10 @@ describe("Live fill (watching the automatic fill)", () => {
     const { back } = watchFill();
     startSearch(back);
     back.answered(3, "Alpenlogic AG");
+    back.searching(4);
     expect(await screen.findByText("1 / 9")).toBeInTheDocument();
+    const address = within(fieldList().getByRole("listitem", { name: "Business address" }));
+    expect(await address.findByText("Searching your documents…")).toBeInTheDocument();
 
     // When it fails
     back.error("the documents could not be read");
@@ -536,6 +539,10 @@ describe("Live fill (watching the automatic fill)", () => {
       "Alpenlogic AG",
     );
     expect(await screen.findByRole("button", { name: "Export PDF" })).toBeEnabled();
+    // And the field it was searching is no longer shown as searched
+    expect(address.queryByText("Searching your documents…")).not.toBeInTheDocument();
+    expect(address.getByText("Empty — exported blank")).toBeInTheDocument();
+    expect((await findZone(4)).getAttribute("data-tone")).not.toBe("searching");
   });
 
   it("keeps what I am typing when the fill answers the same field, and saves it", async () => {

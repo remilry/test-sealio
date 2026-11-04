@@ -75,9 +75,11 @@ export function reduceRun(run: FillRun, event: FillEvent, at: number): FillRun {
         lastProgressAt: at,
       };
     }
+    // At the end, no field is being searched any more (an error can stop a section midway).
     case "done":
       return {
         ...run,
+        searching: new Set(),
         outcome: {
           kind: "done",
           filled: event.filled,
@@ -86,6 +88,6 @@ export function reduceRun(run: FillRun, event: FillEvent, at: number): FillRun {
         },
       };
     case "error":
-      return { ...run, outcome: { kind: "error", message: event.message } };
+      return { ...run, searching: new Set(), outcome: { kind: "error", message: event.message } };
   }
 }
