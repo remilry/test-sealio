@@ -113,7 +113,7 @@ SSE ─► fill-session (reducer) ─► setQueryData(["form", id])
 
 ### Tests front
 - **Vitest + Testing Library, par écran** : chaque détail de chaque écran, sous forme de scénarios utilisateur ; seul le réseau est simulé (MSW, y compris SSE). Règles complètes : skill `.claude/skills/screen-tests/SKILL.md`.
-- **Playwright** : un seul test, le scénario principal, avec le vrai back en mode `FakeLLM`.
+- **Playwright** : un seul test, le scénario principal, avec le vrai back en mode `FakeLLM`, dans un environnement dédié et propre à chaque lancement (base `formpilot_e2e` recréée, données vidées, ports 8100/3100, build `.next-e2e`) : jamais la base ni les serveurs de dev.
 
 ## 3. Architecture back
 

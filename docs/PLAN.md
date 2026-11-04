@@ -200,3 +200,4 @@ UI (relecture)  ──►  API locale
 | 2026-11-04 | Suppression d'un document depuis *Company knowledge* (corbeille, confirmation, suppression définitive du fichier et des passages) ; zone de dépôt sous la liste | validé |
 | 2026-11-04 | Étape 5b validée et mergée dans `main` | validé |
 | 2026-11-04 | Plus de seed de la base de connaissances (ni au démarrage, ni pour la démo, ni pour l'e2e) : l'utilisateur ajoute les documents ; le scénario Playwright dépose les 11 documents de démo au début ; les tests back qui en ont besoin les ajoutent via une fixture | validé |
+| 2026-11-04 | e2e dans un environnement dédié et propre : base `formpilot_e2e` supprimée et recréée à chaque lancement (script `scripts/reset_e2e.py`, refuse toute base dont le nom ne finit pas par `_e2e`), dossier `data-e2e/` vidé, back :8100 et front :3100 jamais réutilisés, build Next dans `.next-e2e` (le serveur de dev n'est pas touché) | validé |

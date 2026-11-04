@@ -4,8 +4,7 @@ import { expect, test } from "@playwright/test";
 
 // The main scenario, grown slice by slice (docs/PLAN.md): today it adds the company's documents
 // (the knowledge base is not seeded), previews one, fills Annex 7 by hand and downloads the filled
-// PDF. The back may be a dev server with data already entered: documents added again under the
-// same name replace themselves, a form already in review is accepted and its values overwritten.
+// PDF. It runs in a dedicated, clean environment (playwright.config.ts): empty database and data.
 
 // The demo company's documents (Alpenlogic AG, knowledge-base/GROUND_TRUTH.md).
 const DEMO_DIR = path.resolve("../knowledge-base/documents");
