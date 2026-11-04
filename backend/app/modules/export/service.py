@@ -21,10 +21,10 @@ class ExportedFile:
     media_type: str
 
 
-def export_summary(session: Session, form_id: int) -> ExportSummary:
+def export_summary(session: Session, tenant_id: int, form_id: int) -> ExportSummary:
     form = forms_service.get_form(session, form_id)
     fields = form.fields
-    values = filling_service.answer_values(session, form_id)
+    values = filling_service.answer_values(session, tenant_id, form_id)
     fillable = [field for field in fields if field.kind != FieldKind.SIGNATURE]
     return ExportSummary(
         file_format=form.file_format,
@@ -41,12 +41,12 @@ def export_summary(session: Session, form_id: int) -> ExportSummary:
     )
 
 
-def export_file(session: Session, form_id: int, data_dir: Path) -> ExportedFile:
-    """The original file with the answers written in, in its original format and layout."""
+def export_file(session: Session, tenant_id: int, form_id: int, data_dir: Path) -> ExportedFile:
+    """The original file with the tenant's answers written in, in its original format and layout."""
     form_file = forms_service.get_form_file(session, form_id, data_dir)
     if form_file.file_format != FileFormat.PDF:
         raise RuleViolationError("Export of Word forms is not available yet.")
-    values = filling_service.answer_values(session, form_id)
+    values = filling_service.answer_values(session, tenant_id, form_id)
     answers = [
         (field.locator, values[field.id])
         for field in forms_service.list_fields(session, form_id)

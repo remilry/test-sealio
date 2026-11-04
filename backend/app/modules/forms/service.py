@@ -10,10 +10,10 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.errors import NotFoundError
-from app.modules.forms.models import Field, FileFormat, Form, FormStatus
+from app.modules.forms.models import Field, FileFormat, Form
 from app.modules.forms.parsing.pdf_parser import parse_pdf
 from app.modules.forms.parsing.schema import FieldKind, FormSchema, PageSize
-from app.modules.forms.schemas import FieldCounts, FieldOut, FormDetail, FormSummary
+from app.modules.forms.schemas import FieldCounts, FieldOut, FormDetail, FormInfo
 
 MEDIA_TYPES = {
     FileFormat.PDF: "application/pdf",
@@ -32,7 +32,7 @@ class FormFile:
     media_type: str
 
 
-def list_forms(session: Session, tender_id: int) -> list[FormSummary]:
+def list_forms(session: Session, tender_id: int) -> list[FormInfo]:
     forms = session.scalars(
         select(Form).where(Form.tender_id == tender_id).order_by(Form.position)
     ).all()
@@ -64,12 +64,6 @@ def get_field(session: Session, form_id: int, field_id: int) -> FieldOut:
     if field is None or field.form_id != form_id:
         raise NotFoundError(f"Field {field_id} not found in form {form_id}")
     return FieldOut.model_validate(field)
-
-
-def mark_in_review(session: Session, form_id: int) -> None:
-    form = _get(session, form_id)
-    if form.status == FormStatus.NOT_STARTED:
-        form.status = FormStatus.IN_REVIEW
 
 
 def get_form_file(session: Session, form_id: int, data_dir: Path) -> FormFile:
@@ -158,14 +152,13 @@ def _field_counts(session: Session, form_ids: list[int]) -> dict[int, dict[Field
     return counts
 
 
-def _summary(form: Form, counts: dict[int, dict[FieldKind, int]]) -> FormSummary:
+def _summary(form: Form, counts: dict[int, dict[FieldKind, int]]) -> FormInfo:
     by_kind = counts.get(form.id, {})
-    return FormSummary(
+    return FormInfo(
         id=form.id,
         title=form.title,
         file_name=form.file_name,
         file_format=form.file_format,
-        status=form.status,
         field_counts=None
         if form.parsed_at is None
         else FieldCounts(

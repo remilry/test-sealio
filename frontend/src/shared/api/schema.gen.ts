@@ -82,7 +82,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Answers */
+        /**
+         * Get Answers
+         * @description The current tenant's answers to the form.
+         */
         get: operations["get_answers_forms__form_id__answers_get"];
         put?: never;
         post?: never;
@@ -280,6 +283,11 @@ export interface components {
             /** Answers */
             answers: components["schemas"]["AnswerOut"][];
         };
+        /**
+         * FillStatus
+         * @enum {string}
+         */
+        FillStatus: "not_started" | "in_review" | "ready";
         /** FormDetail */
         FormDetail: {
             /** Id */
@@ -289,7 +297,6 @@ export interface components {
             /** File Name */
             file_name: string;
             file_format: components["schemas"]["FileFormat"];
-            status: components["schemas"]["FormStatus"];
             field_counts: components["schemas"]["FieldCounts"] | null;
             /** Tender Id */
             tender_id: number;
@@ -299,13 +306,8 @@ export interface components {
             fields: components["schemas"]["FieldOut"][];
         };
         /**
-         * FormStatus
-         * @enum {string}
-         */
-        FormStatus: "not_started" | "in_review" | "ready";
-        /**
          * FormSummary
-         * @description A form as listed on its tender page.
+         * @description A form as listed on its tender page, with where the current tenant is in filling it.
          */
         FormSummary: {
             /** Id */
@@ -315,8 +317,8 @@ export interface components {
             /** File Name */
             file_name: string;
             file_format: components["schemas"]["FileFormat"];
-            status: components["schemas"]["FormStatus"];
             field_counts: components["schemas"]["FieldCounts"] | null;
+            status: components["schemas"]["FillStatus"];
         };
         /** HTTPValidationError */
         HTTPValidationError: {

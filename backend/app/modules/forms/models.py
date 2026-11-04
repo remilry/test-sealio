@@ -15,14 +15,9 @@ class FileFormat(StrEnum):
     DOCX = "docx"
 
 
-class FormStatus(StrEnum):
-    NOT_STARTED = "not_started"
-    IN_REVIEW = "in_review"
-    READY = "ready"
-
-
 class Form(TimestampMixin, Base):
-    """A buyer form to fill, attached to a tender. The original file is kept untouched on disk."""
+    """A buyer form to fill, attached to a tender. Shared by every tenant: each fills it in its own
+    `form_fill`. The original file is kept untouched on disk."""
 
     __tablename__ = "form"
     __table_args__ = (
@@ -39,9 +34,6 @@ class Form(TimestampMixin, Base):
     file_format: Mapped[FileFormat] = mapped_column(str_enum(FileFormat))
     # Relative to settings.data_dir.
     file_path: Mapped[str]
-    status: Mapped[FormStatus] = mapped_column(
-        str_enum(FormStatus), default=FormStatus.NOT_STARTED, server_default=FormStatus.NOT_STARTED
-    )
     # Set once the file has been parsed into fields; null while its format has no parser yet.
     parsed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # Page sizes in points ([{width, height}]), for the preview overlay.

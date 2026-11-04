@@ -105,7 +105,6 @@ export function annex7(overrides: Partial<FormDetail> = {}): FormDetail {
     title: "Annex 7 — Sanctions self-declaration (Art. 29c)",
     file_name: "Annex_7_Self-Declaration_Art29c_Ukraine_Ordinance.pdf",
     file_format: "pdf",
-    status: "not_started",
     field_counts: { fields: 10, yes_no: 0, signatures: 1 },
     pages: [{ width: 595.3, height: 841.9 }],
     fields: annex7Fields,

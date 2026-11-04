@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     # Stand-in for the external source the tender forms come from in the real product.
     seed_forms_dir: Path = REPO_ROOT / "forms"
     cors_origins: list[str] = ["http://localhost:3000"]
+    # Slug of the tenant every request acts for, until real authentication (tenants/service.py).
+    current_tenant: str = "alpenlogic"
 
     llm_provider: Literal["anthropic", "fake"] = "fake"
     anthropic_api_key: SecretStr | None = Field(

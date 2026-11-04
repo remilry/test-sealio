@@ -6,9 +6,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.errors import NotFoundError
+from app.modules.filling import service as filling_service
 from app.modules.forms import service as forms_service
 from app.modules.tenders.models import Tender
-from app.modules.tenders.schemas import TenderDetail, TenderSummary
+from app.modules.tenders.schemas import FormSummary, TenderDetail, TenderSummary
 
 
 def list_tenders(session: Session) -> list[TenderSummary]:
@@ -16,7 +17,8 @@ def list_tenders(session: Session) -> list[TenderSummary]:
     return [TenderSummary.model_validate(tender) for tender in tenders]
 
 
-def get_tender(session: Session, tender_id: int) -> TenderDetail:
+def get_tender(session: Session, tenant_id: int, tender_id: int) -> TenderDetail:
+    """The tender with its forms, each with the given tenant's fill status."""
     tender = session.get(Tender, tender_id)
     if tender is None:
         raise NotFoundError(f"Tender {tender_id} not found")
@@ -25,8 +27,14 @@ def get_tender(session: Session, tender_id: int) -> TenderDetail:
         procedure=tender.procedure,
         authority=tender.authority,
         summary=tender.summary,
-        forms=forms_service.list_forms(session, tender.id),
+        forms=_forms_with_status(session, tenant_id, tender.id),
     )
+
+
+def _forms_with_status(session: Session, tenant_id: int, tender_id: int) -> list[FormSummary]:
+    forms = forms_service.list_forms(session, tender_id)
+    statuses = filling_service.fill_statuses(session, tenant_id, [form.id for form in forms])
+    return [FormSummary(**form.model_dump(), status=statuses[form.id]) for form in forms]
 
 
 def upsert_tender(

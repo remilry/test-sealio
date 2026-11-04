@@ -2,7 +2,8 @@ from datetime import date
 
 from pydantic import BaseModel, ConfigDict
 
-from app.modules.forms.schemas import FormSummary
+from app.modules.filling.models import FillStatus
+from app.modules.forms.schemas import FormInfo
 
 
 class TenderSummary(BaseModel):
@@ -12,6 +13,12 @@ class TenderSummary(BaseModel):
     reference: str
     title: str
     submission_deadline: date
+
+
+class FormSummary(FormInfo):
+    """A form as listed on its tender page, with where the current tenant is in filling it."""
+
+    status: FillStatus
 
 
 class TenderDetail(TenderSummary):
