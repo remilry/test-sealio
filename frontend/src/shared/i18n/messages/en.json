@@ -148,6 +148,12 @@
     "dropZone": "Drop documents here",
     "dropHere": "Drop PDF or Word documents here, or <browse>browse your files</browse>",
     "dropRelease": "Release to add them",
-    "dropFormats": "PDF or DOCX · up to 20 MB each"
+    "dropFormats": "PDF or DOCX · up to 20 MB each",
+    "deleteDocument": "Delete {name}",
+    "deleteTitle": "Delete {name}?",
+    "deleteDescription": "The AI will no longer answer from this document, and its file is removed. This can't be undone.",
+    "deleteConfirm": "Delete document",
+    "cancel": "Cancel",
+    "deleteFailed": "{name} could not be deleted"
   }
 }

@@ -9,7 +9,7 @@ import { cn } from "@/shared/lib/utils";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Button } from "@/shared/ui/button";
 import { ACCEPTED_FILES } from "./knowledge-base.api";
-import { useAddDocuments } from "./knowledge-base.queries";
+import { useAddDocuments, useDeleteDocument } from "./knowledge-base.queries";
 
 type AddDocuments = ReturnType<typeof useAddDocuments>;
 
@@ -148,4 +148,23 @@ export function AddDocumentsError({ add }: { add: AddDocuments }) {
 
 function refusal(error: Error): string | null {
   return error instanceof ApiError && error.status === 422 ? error.message : null;
+}
+
+/** A deletion failed: the document is back in the list, and the user is told. */
+export function DeleteDocumentError({ remove }: { remove: ReturnType<typeof useDeleteDocument> }) {
+  const t = useTranslations("knowledge");
+  const tCommon = useTranslations("common");
+  if (!remove.error || !remove.variables) return null;
+  return (
+    <Alert variant="destructive">
+      <TriangleAlertIcon />
+      <AlertTitle>{t("deleteFailed", { name: remove.variables.name })}</AlertTitle>
+      <AlertDescription>{tCommon("retryLater")}</AlertDescription>
+      <AlertAction>
+        <Button variant="outline" size="sm" onClick={() => remove.reset()}>
+          {t("dismiss")}
+        </Button>
+      </AlertAction>
+    </Alert>
+  );
 }

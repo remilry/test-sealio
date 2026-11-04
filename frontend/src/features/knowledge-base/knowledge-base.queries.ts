@@ -8,6 +8,7 @@ export const PROCESSING_POLL_MS = 1000;
 export const knowledgeKeys = {
   all: ["knowledge"] as const,
   add: () => [...knowledgeKeys.all, "add"] as const,
+  remove: () => [...knowledgeKeys.all, "remove"] as const,
 };
 
 const knowledgeQueries = {
@@ -52,4 +53,28 @@ function withDocuments(base: KnowledgeBase, added: KnowledgeDocument[]): Knowled
     ...base,
     documents: [...added, ...base.documents.filter((document) => !ids.has(document.id))],
   };
+}
+
+/**
+ * Deletes a document. Optimistic: it leaves the list at once and comes back if the back fails
+ * (the error is then on the mutation, for the screen to explain).
+ */
+export function useDeleteDocument() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationKey: knowledgeKeys.remove(),
+    mutationFn: (document: KnowledgeDocument) => knowledgeApi.remove(document.id),
+    onMutate: async (document) => {
+      await queryClient.cancelQueries({ queryKey: knowledgeKeys.all });
+      const previous = queryClient.getQueryData<KnowledgeBase>(knowledgeKeys.all);
+      queryClient.setQueryData(knowledgeKeys.all, (base: KnowledgeBase | undefined) =>
+        base ? { ...base, documents: base.documents.filter(({ id }) => id !== document.id) } : base,
+      );
+      return { previous };
+    },
+    onError: (_error, _document, context) => {
+      if (context?.previous) queryClient.setQueryData(knowledgeKeys.all, context.previous);
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: knowledgeKeys.all }),
+  });
 }

@@ -25,6 +25,12 @@ export const knowledgeApi = {
         },
       }),
     ),
+  remove: (documentId: number) =>
+    unwrap(
+      api.DELETE("/knowledge/documents/{document_id}", {
+        params: { path: { document_id: documentId } },
+      }),
+    ),
 };
 
 /** The original company document, as it was added. */

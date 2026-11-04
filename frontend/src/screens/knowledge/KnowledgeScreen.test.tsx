@@ -434,4 +434,99 @@ describe("Company knowledge", () => {
       expect(screen.getByRole("button", { name: "Add documents" })).toBeEnabled();
     });
   });
+
+  describe("deleting a document", () => {
+    it("deletes a document once I confirm", async () => {
+      // Given two documents; after the deletion, the back lists only the other one
+      let deletedOnBack = false;
+      const removal = handlers.deleteDocument();
+      server.use(
+        removal.handler,
+        handlers.knowledge(() =>
+          deletedOnBack
+            ? knowledgeBase({ documents: knowledgeBase().documents.slice(1) })
+            : knowledgeBase(),
+        ),
+      );
+      const user = userEvent.setup();
+      renderScreen(<KnowledgeScreen />);
+
+      // When I delete the register extract and confirm
+      await user.click(
+        await screen.findByRole("button", { name: "Delete Commercial register extract" }),
+      );
+      const confirm = await screen.findByRole("alertdialog", {
+        name: "Delete Commercial register extract?",
+      });
+      expect(
+        within(confirm).getByText(
+          "The AI will no longer answer from this document, and its file is removed. This can't be undone.",
+        ),
+      ).toBeInTheDocument();
+      deletedOnBack = true;
+      await user.click(within(confirm).getByRole("button", { name: "Delete document" }));
+
+      // Then it leaves the list and the back deleted it
+      await waitFor(() =>
+        expect(
+          screen.queryByRole("row", { name: "Commercial register extract" }),
+        ).not.toBeInTheDocument(),
+      );
+      expect(removal.deleted).toEqual([1]);
+      expect(screen.getByRole("row", { name: "Annual report 2024" })).toBeInTheDocument();
+      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    });
+
+    it("keeps the document when I cancel", async () => {
+      // Given the seeded knowledge base
+      const removal = handlers.deleteDocument();
+      server.use(removal.handler, handlers.knowledge(knowledgeBase()));
+      const user = userEvent.setup();
+      renderScreen(<KnowledgeScreen />);
+
+      // When I ask to delete, then cancel
+      await user.click(
+        await screen.findByRole("button", { name: "Delete Commercial register extract" }),
+      );
+      const confirm = await screen.findByRole("alertdialog");
+      await user.click(within(confirm).getByRole("button", { name: "Cancel" }));
+
+      // Then nothing was deleted
+      await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+      expect(screen.getByRole("row", { name: "Commercial register extract" })).toBeInTheDocument();
+      expect(removal.deleted).toEqual([]);
+    });
+
+    it("brings the document back and tells me when it could not be deleted", async () => {
+      // Given a back that fails to delete
+      server.use(
+        handlers.knowledge(knowledgeBase()),
+        handlers.error("/knowledge/documents/1", 500, "Internal Server Error", "delete"),
+      );
+      const user = userEvent.setup();
+      renderScreen(<KnowledgeScreen />);
+
+      // When I delete a document
+      await user.click(
+        await screen.findByRole("button", { name: "Delete Commercial register extract" }),
+      );
+      await user.click(
+        within(await screen.findByRole("alertdialog")).getByRole("button", {
+          name: "Delete document",
+        }),
+      );
+
+      // Then it is still listed, and I am told in plain words
+      const alert = await screen.findByRole("alert");
+      expect(
+        within(alert).getByText("Commercial register extract could not be deleted"),
+      ).toBeInTheDocument();
+      expect(
+        within(alert).getByText("Something went wrong on our side. Please try again in a moment."),
+      ).toBeInTheDocument();
+      expect(
+        await screen.findByRole("row", { name: "Commercial register extract" }),
+      ).toBeInTheDocument();
+    });
+  });
 });

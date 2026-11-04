@@ -5,9 +5,11 @@ import { useTranslations } from "next-intl";
 import {
   AddDocumentsButton,
   AddDocumentsError,
+  DeleteDocumentError,
   DocumentDropZone,
   DocumentTable,
   useAddDocuments,
+  useDeleteDocument,
   useDocumentPicker,
   useKnowledgeBase,
   type KnowledgeBase,
@@ -27,6 +29,7 @@ export function KnowledgeScreen() {
   const { data: knowledge, error, isPending, refetch } = useKnowledgeBase();
   const add = useAddDocuments();
   const { picker, browse } = useDocumentPicker(add);
+  const remove = useDeleteDocument();
 
   if (isPending) {
     return (
@@ -53,7 +56,13 @@ export function KnowledgeScreen() {
       </header>
       {picker}
       <AddDocumentsError add={add} />
-      <Documents knowledge={knowledge} add={add} onBrowse={browse} />
+      <DeleteDocumentError remove={remove} />
+      <Documents
+        knowledge={knowledge}
+        add={add}
+        onBrowse={browse}
+        onDelete={(document) => remove.mutate(document)}
+      />
     </KnowledgeFrame>
   );
 }
@@ -79,10 +88,12 @@ function Documents({
   knowledge,
   add,
   onBrowse,
+  onDelete,
 }: {
   knowledge: KnowledgeBase;
   add: ReturnType<typeof useAddDocuments>;
   onBrowse: () => void;
+  onDelete: (document: KnowledgeBase["documents"][number]) => void;
 }) {
   const [openedId, setOpenedId] = useState<number | null>(null);
   const opened = knowledge.documents.find((document) => document.id === openedId) ?? null;
@@ -94,6 +105,7 @@ function Documents({
       <DocumentTable
         documents={knowledge.documents}
         onOpen={(document) => setOpenedId(document.id)}
+        onDelete={onDelete}
       />
       <DocumentDropZone add={add} onBrowse={onBrowse} empty={false} />
       <DocumentPreviewDialog document={opened} onClose={() => setOpenedId(null)} />

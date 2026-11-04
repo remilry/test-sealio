@@ -71,11 +71,24 @@ export const handlers = {
     return { handler, requests };
   },
 
+  /** `DELETE /knowledge/documents/{id}`: records the ids deleted, answers 204. */
+  deleteDocument: () => {
+    const deleted: number[] = [];
+    const handler = http.delete<{ documentId: string }>(
+      url("/knowledge/documents/:documentId"),
+      ({ params }) => {
+        deleted.push(Number(params.documentId));
+        return new HttpResponse(null, { status: 204 });
+      },
+    );
+    return { handler, deleted };
+  },
+
   /** Any endpoint answering with an HTTP error. */
   error: (
     path: string,
     status: number,
     detail = "Something went wrong",
-    method: "get" | "patch" | "post" = "get",
+    method: "get" | "patch" | "post" | "delete" = "get",
   ) => http[method](url(path), () => HttpResponse.json({ detail }, { status })),
 };
