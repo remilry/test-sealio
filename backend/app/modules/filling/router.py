@@ -23,7 +23,7 @@ def get_language_model() -> LLM:
     try:
         return get_llm()
     except LLMError as error:
-        raise UnavailableError(f"The AI is not available: {error}") from error
+        raise UnavailableError(f"Automatic filling is not available: {error}") from error
 
 
 LanguageModel = Annotated[LLM, Depends(get_language_model)]
@@ -56,7 +56,7 @@ def update_field(
     tenant_id: CurrentTenantId,
 ) -> FillState:
     """Save the value the user entered. Returns the whole fill state (counts change).
-    Allowed while the AI is filling: the user's value is never replaced by the AI."""
+    Allowed while the form is being filled: the user's value is never replaced."""
     return service.set_answer(session, tenant_id, form_id, field_id, body.value)
 
 
@@ -65,9 +65,9 @@ def update_field(
     status_code=status.HTTP_202_ACCEPTED,
     responses={
         404: {"description": "Unknown form"},
-        409: {"description": "The AI is already filling this form"},
-        422: {"description": "The form cannot be filled with AI (format not read)"},
-        503: {"description": "The AI is not available (no API key)"},
+        409: {"description": "This form is already being filled"},
+        422: {"description": "The form cannot be filled automatically (format not read)"},
+        503: {"description": "Automatic filling is not available (no API key)"},
     },
 )
 def start_fill(
@@ -77,7 +77,7 @@ def start_fill(
     tenant_id: CurrentTenantId,
     llm: LanguageModel,
 ) -> AiRun:
-    """Start the AI fill of the form, in the background: follow it on `GET …/fill/events`.
+    """Start the automatic fill of the form, in the background: follow it on `GET …/fill/events`.
 
     Every field the user has not set is answered again; the user's values are kept.
     """
@@ -97,8 +97,8 @@ async def fill_events(
     fill_id: Annotated[int | None, Depends(_fill_of_form)],
     last_event_id: Annotated[int | None, Header()] = None,
 ) -> AsyncIterable[ServerSentEvent]:
-    """The events of the last AI fill, from the start or after `Last-Event-ID`, then the new
-    ones as they happen. Ends with the run ("done" or "error"); empty when the AI never ran.
+    """The events of the last automatic fill, from the start or after `Last-Event-ID`, then the new
+    ones as they happen. Ends with the run ("done" or "error"); empty when no fill ever ran.
 
     Event types: `phase` ({phase, …}), `field` ({field_id, state: "searching" | "answered",
     answer, counts}), `done` ({filled, fillable, doubts, seconds}), `error` ({message}).

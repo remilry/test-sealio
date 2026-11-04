@@ -2,6 +2,7 @@
 
 import json
 import logging
+import re
 import threading
 import time
 from collections.abc import Callable, Iterator
@@ -382,6 +383,7 @@ def test_without_an_api_key_the_fill_is_refused_clearly(
 
     assert response.status_code == 503
     assert "OPENAI_API_KEY" in response.json()["detail"]
+    assert not re.search(r"\bAI\b", response.json()["detail"])
     assert client.get(f"/forms/{annex_7}/answers").json()["ai_run"] is None
 
 
