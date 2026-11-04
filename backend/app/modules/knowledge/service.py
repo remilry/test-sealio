@@ -5,6 +5,7 @@ A tenant's knowledge base: its company documents, split into passages and indexe
 
 import logging
 import re
+import shutil
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -119,19 +120,37 @@ def add_documents(
 def index_documents(document_ids: list[int], data_dir: Path) -> None:
     """Extract, split and index stored documents, each in its own transaction (background task).
 
-    Never raises: a document that cannot be indexed ends with status "error" and a message.
+    Never raises: a document that cannot be indexed ends with status "error" and a message, and
+    a document deleted meanwhile is skipped.
     """
     for document_id in document_ids:
         with SessionLocal() as session:
-            document = session.get_one(Document, document_id)
+            document = session.get(Document, document_id)
+            if document is None:
+                continue
             try:
                 _index(session, document, (data_dir / document.file_path).read_bytes())
+                session.commit()
             except Exception:
-                logger.exception("Indexing document %s failed", document_id)
                 session.rollback()
-                document = session.get_one(Document, document_id)
+                document = session.get(Document, document_id)
+                if document is None:
+                    continue
+                logger.exception("Indexing document %s failed", document_id)
                 _fail(document, UNEXPECTED_ERROR)
-            session.commit()
+                session.commit()
+
+
+def delete_document(session: Session, tenant_id: int, document_id: int, data_dir: Path) -> None:
+    """Remove a document, its passages and its file: the AI no longer answers from it."""
+    document = session.get(Document, document_id)
+    if document is None or document.tenant_id != tenant_id:
+        raise NotFoundError(f"Document {document_id} not found")
+    folder = (data_dir / document.file_path).parent
+    session.delete(document)
+    session.commit()
+    # After the commit: a failed delete keeps the file the row still points to.
+    shutil.rmtree(folder, ignore_errors=True)
 
 
 def pending_document_ids(session: Session) -> list[int]:

@@ -1,4 +1,5 @@
-"""Adding company documents: stored at once as "processing", then indexed in the background.
+"""Adding company documents (stored at once as "processing", then indexed in the background) and
+deleting them.
 
 TestClient runs background tasks before returning, so the final status is visible right after.
 """
@@ -177,3 +178,43 @@ def test_documents_left_processing_are_indexed_at_the_next_start(
         pass
 
     assert _documents(restarted)["Notes.docx"]["status"] == "indexed"
+
+
+def test_deleting_a_document_removes_it_its_passages_and_its_file(client: TestClient) -> None:
+    register = _documents(client)["01_commercial_register_extract.pdf"]
+    with SessionLocal() as session:
+        path = get_settings().data_dir / session.get_one(Document, register["id"]).file_path
+    assert path.exists()
+
+    response = client.delete(f"/knowledge/documents/{register['id']}")
+
+    assert response.status_code == 204
+    assert "01_commercial_register_extract.pdf" not in _documents(client)
+    assert "Commercial register extract" not in _search("UID CHE-123.456.789")
+    assert not path.exists()
+    assert client.get(f"/knowledge/documents/{register['id']}/file").status_code == 404
+
+
+def test_deleting_an_unknown_or_another_tenants_document_is_a_404(client: TestClient) -> None:
+    assert client.delete("/knowledge/documents/999999").status_code == 404
+    with SessionLocal() as session:
+        other = tenants_service.ensure_tenant(session, slug="other", name="Other AG")
+        session.commit()
+        [theirs] = service.add_documents(
+            session, other.id, [service.NewFile("Notes.docx", _word("x"))], get_settings().data_dir
+        )
+
+    assert client.delete(f"/knowledge/documents/{theirs.id}").status_code == 404
+
+
+def test_a_document_deleted_before_its_indexing_is_skipped(client: TestClient) -> None:
+    with SessionLocal() as session:
+        tenant_id = tenants_service.get_current_tenant_id(session)
+        [stored] = service.add_documents(
+            session, tenant_id, [service.NewFile("Notes.docx", _word("x"))], get_settings().data_dir
+        )
+        service.delete_document(session, tenant_id, stored.id, get_settings().data_dir)
+
+    service.index_documents([stored.id], get_settings().data_dir)
+
+    assert "Notes.docx" not in _documents(client)

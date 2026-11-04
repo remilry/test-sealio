@@ -42,6 +42,16 @@ def add_documents(
     return documents
 
 
+@router.delete(
+    "/documents/{document_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses={404: {"description": "Unknown document"}},
+)
+def delete_document(document_id: int, session: SessionDep, tenant_id: CurrentTenantId) -> None:
+    """Remove a company document: its passages are no longer searched, its file is deleted."""
+    service.delete_document(session, tenant_id, document_id, get_settings().data_dir)
+
+
 @router.get(
     "/documents/{document_id}/file",
     response_class=FileResponse,
