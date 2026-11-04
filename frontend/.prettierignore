@@ -5,3 +5,5 @@ pnpm-lock.yaml
 playwright-report
 test-results
 src/shared/api/schema.gen.ts
+# Rewritten by Next.js (next typegen, next dev) in its own format.
+tsconfig.json

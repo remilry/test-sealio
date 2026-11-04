@@ -17,6 +17,13 @@ const preview = () => screen.getByRole("region", { name: "Form preview" });
 /** The zone drawn on the document for a field (the only place where data-field-id is used). */
 const zone = (fieldId: number) =>
   preview().querySelector<HTMLButtonElement>(`[data-field-id="${fieldId}"]`)!;
+/** The same zone, waited for: the document preview is loaded lazily. */
+const findZone = (fieldId: number) =>
+  waitFor(() => {
+    const found = preview().querySelector<HTMLButtonElement>(`[data-field-id="${fieldId}"]`);
+    if (!found) throw new Error(`No zone for field ${fieldId} on the document yet`);
+    return found;
+  });
 
 /** The back keeps the answers it receives and returns the new fill state. */
 function backWithAnswers(initial: FillState = fillState()) {
@@ -73,10 +80,13 @@ describe("Live fill (manual)", () => {
     // When the form opens
     await screen.findByRole("heading", { name: "9 fields to fill" });
 
-    // Then the original PDF is rendered with one zone per field, placed from the parser's box
-    expect(preview().querySelector("[data-pdf-file]")).toHaveAttribute(
-      "data-pdf-file",
-      "http://localhost:8000/forms/2/file",
+    // Then the original PDF is rendered (loaded lazily, so waited for) with one zone per field,
+    // placed from the parser's box
+    await waitFor(() =>
+      expect(preview().querySelector("[data-pdf-file]")).toHaveAttribute(
+        "data-pdf-file",
+        "http://localhost:8000/forms/2/file",
+      ),
     );
     expect(preview().querySelectorAll("[data-field-id]")).toHaveLength(10);
     expect(zone(6)).toHaveAccessibleName("Telephone");
@@ -105,7 +115,7 @@ describe("Live fill (manual)", () => {
     expect(fieldList().getByRole("textbox", { name: "Name and legal form" })).toHaveValue(
       "Alpenlogic AG",
     );
-    expect(within(zone(3)).getByText("Alpenlogic AG")).toBeInTheDocument();
+    expect(within(await findZone(3)).getByText("Alpenlogic AG")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Back to the tender" })).toHaveAttribute(
       "href",
       "/tenders/1",
@@ -125,7 +135,7 @@ describe("Live fill (manual)", () => {
     await waitFor(() =>
       expect(saved.requests).toEqual([{ fieldId: 6, value: "+41 44 512 38 00" }]),
     );
-    expect(await within(zone(6)).findByText("+41 44 512 38 00")).toBeInTheDocument();
+    expect(await within(await findZone(6)).findByText("+41 44 512 38 00")).toBeInTheDocument();
     expect(await screen.findByText("1 / 9 filled · 8 empty")).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("Saved");
     const card = within(fieldList().getByRole("listitem", { name: "Telephone" }));
@@ -141,7 +151,7 @@ describe("Live fill (manual)", () => {
     await user.type(telephone, "+4");
 
     // Then the document shows them already, though nothing is saved yet
-    expect(within(zone(6)).getByText("+4")).toBeInTheDocument();
+    expect(within(await findZone(6)).getByText("+4")).toBeInTheDocument();
     await user.type(telephone, "1");
     expect(within(zone(6)).getByText("+41")).toBeInTheDocument();
     expect(saved.requests).toEqual([]);
@@ -222,7 +232,7 @@ describe("Live fill (manual)", () => {
     await screen.findByRole("textbox", { name: "E-mail" });
 
     // When I click the e-mail zone on the document
-    await user.click(zone(7));
+    await user.click(await findZone(7));
 
     // Then the e-mail input has the focus, and the zone shows as selected
     expect(screen.getByRole("textbox", { name: "E-mail" })).toHaveFocus();
@@ -236,7 +246,7 @@ describe("Live fill (manual)", () => {
     // When it opens, the first empty field is selected in the list and on the document
     const item = await screen.findByRole("listitem", { name: "Name and legal form" });
     expect(item).toHaveAttribute("aria-current", "true");
-    expect(zone(3)).toHaveAttribute("aria-pressed", "true");
+    expect(await findZone(3)).toHaveAttribute("aria-pressed", "true");
   });
 
   it("moves through the fields with the keyboard: ↓ ↑ j k, Enter to type", async () => {
@@ -276,7 +286,7 @@ describe("Live fill (manual)", () => {
     const card = within(fieldList().getByRole("listitem", { name: "Telephone" }));
     expect(card.getByRole("textbox")).toHaveValue("044");
     expect(card.getByText("Not saved — press Enter to try again")).toBeInTheDocument();
-    expect(within(zone(6)).getByText("044")).toBeInTheDocument();
+    expect(within(await findZone(6)).getByText("044")).toBeInTheDocument();
 
     // And when the back is reachable again, Enter saves it
     server.use(saved.handler);
