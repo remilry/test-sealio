@@ -101,4 +101,42 @@ describe("fillProgress", () => {
       previous = p;
     }
   });
+
+  it("does not drop when the last field is answered after a long creep", () => {
+    const before = fillProgress(searching(2, 3, 0), opts(600 * SECOND));
+    const after = fillProgress(searching(3, 3, 600 * SECOND), opts(600 * SECOND));
+    expect(after).toBeGreaterThanOrEqual(before);
+    expect(fillProgress(searching(3, 3, 0), opts(6000 * SECOND))).toBeLessThan(0.95);
+  });
+
+  it("never drops with an unknown field count while answers arrive", () => {
+    let previous = 0;
+    for (const [k, t] of [
+      [0, 1],
+      [0, 10],
+      [1, 11],
+      [1, 40],
+      [2, 41],
+      [3, 300],
+    ] as const) {
+      const run: FillRun = {
+        ...initialRun,
+        phase: "searching",
+        toAnswer: null,
+        answered: new Set(Array.from({ length: k }, (_, i) => i)),
+        lastProgressAt: k ? t * SECOND : null,
+      };
+      const p = fillProgress(run, opts(t * SECOND));
+      expect(p).toBeGreaterThanOrEqual(previous);
+      previous = p;
+    }
+  });
+
+  it("falls back to 25 s for an invalid estimate", () => {
+    const run = searching(0, 3);
+    const expected = fillProgress(run, { now: 5 * SECOND, startedAt: 0, estimatedSeconds: 25 });
+    for (const estimatedSeconds of [NaN, -3, 0]) {
+      expect(fillProgress(run, { now: 5 * SECOND, startedAt: 0, estimatedSeconds })).toBe(expected);
+    }
+  });
 });
