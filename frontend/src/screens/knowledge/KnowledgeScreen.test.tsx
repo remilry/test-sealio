@@ -393,18 +393,18 @@ describe("Company knowledge", () => {
       expect(screen.queryByText("Release to add them")).not.toBeInTheDocument();
     });
 
-    it("shows where to drop documents, above the ones already there", async () => {
+    it("shows where to drop documents, below the ones already there", async () => {
       // Given documents already indexed
       server.use(handlers.knowledge(knowledgeBase()));
       renderScreen(<KnowledgeScreen />);
 
-      // Then a drop zone sits right above the list, with a way to browse instead
+      // Then a drop zone sits right below the list, with a way to browse instead
       const zone = await screen.findByRole("region", { name: "Drop documents here" });
       expect(zone).toHaveTextContent("Drop PDF or Word documents here, or browse your files");
       expect(zone).toHaveTextContent("PDF or DOCX · up to 20 MB each");
       expect(within(zone).getByRole("button", { name: "browse your files" })).toBeEnabled();
       const table = screen.getByRole("table", { name: "Documents" });
-      expect(zone.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(zone.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
     });
 
     it("makes the empty page itself the drop zone", async () => {

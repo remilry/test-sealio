@@ -37,7 +37,7 @@ export function AddDocumentsButton({ add, onBrowse }: { add: AddDocuments; onBro
 }
 
 /**
- * Where to drop documents, always shown: a strip above the list, or the whole empty state when
+ * Where to drop documents, always shown: a strip below the list, or the whole empty state when
  * there is no document yet. It lights up while files are dragged over the page (the drop itself
  * is handled by the page's `FileDropArea`), and also lets the user browse for files.
  */

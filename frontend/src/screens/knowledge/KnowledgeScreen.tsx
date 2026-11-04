@@ -91,11 +91,11 @@ function Documents({
   }
   return (
     <>
-      <DocumentDropZone add={add} onBrowse={onBrowse} empty={false} />
       <DocumentTable
         documents={knowledge.documents}
         onOpen={(document) => setOpenedId(document.id)}
       />
+      <DocumentDropZone add={add} onBrowse={onBrowse} empty={false} />
       <DocumentPreviewDialog document={opened} onClose={() => setOpenedId(null)} />
     </>
   );
