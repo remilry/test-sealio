@@ -113,7 +113,7 @@
     "summary": "{count, plural, =0 {No documents} one {# document} other {# documents}}",
     "summaryIndexed": "{count, plural, =0 {No documents} one {# document} other {# documents}} · last indexed {date} at {time}",
     "noneTitle": "No documents yet",
-    "noneDescription": "The AI answers only from your company documents: add them with “Add documents” or drop them here.",
+    "noneDescription": "The AI answers only from your company documents.",
     "documents": "Documents",
     "column": {
       "document": "Document",
@@ -145,7 +145,9 @@
     "addFailedRetry": "Something went wrong on our side. Please try again in a moment.",
     "dismiss": "Dismiss",
     "reading": "Reading and indexing…",
-    "dropHint": "PDF or Word documents · add them with the button or drop them anywhere on this page",
-    "dropOverlay": "Drop PDF or Word documents to add them"
+    "dropZone": "Drop documents here",
+    "dropHere": "Drop PDF or Word documents here, or <browse>browse your files</browse>",
+    "dropRelease": "Release to add them",
+    "dropFormats": "PDF or DOCX · up to 20 MB each"
   }
 }

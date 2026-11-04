@@ -345,23 +345,22 @@ describe("Company knowledge", () => {
       renderScreen(<KnowledgeScreen />);
       const page = await screen.findByRole("heading", { level: 1, name: "Alpenlogic AG" });
 
-      // When I drag a PDF over the page, the page tells me what dropping does
+      // When I drag a PDF over the page, the drop zone tells me to release it
       const files = [pdf("UVG certificate.pdf")];
       fireEvent.dragEnter(page, dragFiles(files));
-      expect(screen.getByRole("status")).toHaveTextContent(
-        "Drop PDF or Word documents to add them",
-      );
+      const zone = within(screen.getByRole("region", { name: "Drop documents here" }));
+      expect(zone.getByText("Release to add them")).toBeInTheDocument();
 
       // And when I drop it, it is added like with the button
       fireEvent.drop(page, dragFiles(files));
-      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+      expect(zone.queryByText("Release to add them")).not.toBeInTheDocument();
       const row = within(await screen.findByRole("row", { name: "UVG certificate" }));
       expect(row.getByText("Processing")).toBeInTheDocument();
       expect(added.requests).toHaveLength(1);
       expect(await row.findByText("Indexed", {}, POLLED)).toBeInTheDocument();
     });
 
-    it("hides the drop hint when the files leave the page without being dropped", async () => {
+    it("calms the drop zone down when the files leave without being dropped", async () => {
       // Given the seeded knowledge base
       server.use(handlers.knowledge(knowledgeBase()));
       renderScreen(<KnowledgeScreen />);
@@ -373,11 +372,12 @@ describe("Company knowledge", () => {
       fireEvent.dragEnter(page, dragFiles(files));
       fireEvent.dragEnter(table, dragFiles(files));
       fireEvent.dragLeave(page, dragFiles(files));
-      expect(screen.getByRole("status")).toBeInTheDocument();
+      expect(screen.getByText("Release to add them")).toBeInTheDocument();
       fireEvent.dragLeave(table, dragFiles(files));
 
-      // Then the hint is gone and nothing was sent
-      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+      // Then the drop zone is back to its invitation
+      expect(screen.queryByText("Release to add them")).not.toBeInTheDocument();
+      expect(screen.getByText(/Drop PDF or Word documents here/)).toBeInTheDocument();
     });
 
     it("ignores text or links dragged inside the page", async () => {
@@ -389,8 +389,36 @@ describe("Company knowledge", () => {
       // When I drag some text over the page
       fireEvent.dragEnter(page, { dataTransfer: { types: ["text/plain"], files: [] } });
 
-      // Then nothing happens
-      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+      // Then the drop zone does not react
+      expect(screen.queryByText("Release to add them")).not.toBeInTheDocument();
+    });
+
+    it("shows where to drop documents, above the ones already there", async () => {
+      // Given documents already indexed
+      server.use(handlers.knowledge(knowledgeBase()));
+      renderScreen(<KnowledgeScreen />);
+
+      // Then a drop zone sits right above the list, with a way to browse instead
+      const zone = await screen.findByRole("region", { name: "Drop documents here" });
+      expect(zone).toHaveTextContent("Drop PDF or Word documents here, or browse your files");
+      expect(zone).toHaveTextContent("PDF or DOCX · up to 20 MB each");
+      expect(within(zone).getByRole("button", { name: "browse your files" })).toBeEnabled();
+      const table = screen.getByRole("table", { name: "Documents" });
+      expect(zone.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it("makes the empty page itself the drop zone", async () => {
+      // Given no document yet
+      server.use(handlers.knowledge(knowledgeBase({ documents: [], last_indexed_at: null })));
+      renderScreen(<KnowledgeScreen />);
+
+      // Then the explanation and the invitation to drop are one zone
+      const zone = within(await screen.findByRole("region", { name: "Drop documents here" }));
+      expect(zone.getByRole("heading", { name: "No documents yet" })).toBeInTheDocument();
+      expect(
+        zone.getByText("The AI answers only from your company documents."),
+      ).toBeInTheDocument();
+      expect(zone.getByRole("button", { name: "browse your files" })).toBeInTheDocument();
     });
 
     it("only offers PDF and Word documents in the file picker", async () => {

@@ -1,24 +1,27 @@
 "use client";
 
-import { useRef, useState, type DragEvent, type ReactNode } from "react";
-import { UploadIcon } from "lucide-react";
+import { createContext, use, useRef, useState, type DragEvent, type ReactNode } from "react";
 import { cn } from "@/shared/lib/utils";
 
+const DraggingFiles = createContext(false);
+
+/** Whether files are being dragged over the enclosing `FileDropArea` (to highlight a drop zone). */
+export function useDraggingFiles() {
+  return use(DraggingFiles);
+}
+
 /**
- * An area files can be dropped on (from the desktop or a file manager). While files are dragged
- * over it, an overlay says what dropping does. Only file drags react: dragging text or a link
- * inside the page does nothing.
+ * An area files can be dropped on (from the desktop or a file manager). It draws nothing itself:
+ * a visible drop zone inside it reads `useDraggingFiles()` to light up during the drag. Only file
+ * drags react: dragging text or a link inside the page does nothing.
  */
 export function FileDropArea({
   onFiles,
-  overlay,
   disabled = false,
   className,
   children,
 }: {
   onFiles: (files: File[]) => void;
-  /** What dropping does, shown over the area during the drag. */
-  overlay: string;
   disabled?: boolean;
   className?: string;
   children: ReactNode;
@@ -62,18 +65,7 @@ export function FileDropArea({
         if (files.length > 0) onFiles(files);
       }}
     >
-      {children}
-      {dragging && (
-        <div
-          role="status"
-          className="pointer-events-none absolute inset-3 z-20 grid place-items-center rounded-xl border-2 border-dashed border-primary bg-primary/5 backdrop-blur-[1px]"
-        >
-          <p className="flex items-center gap-2 rounded-lg bg-card px-4 py-2.5 text-sm font-medium shadow-sm">
-            <UploadIcon className="size-4 text-primary" aria-hidden />
-            {overlay}
-          </p>
-        </div>
-      )}
+      <DraggingFiles value={dragging}>{children}</DraggingFiles>
     </div>
   );
 }

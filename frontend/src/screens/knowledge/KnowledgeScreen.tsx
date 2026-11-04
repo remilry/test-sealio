@@ -1,18 +1,19 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { LibraryIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import {
   AddDocumentsButton,
   AddDocumentsError,
+  DocumentDropZone,
   DocumentTable,
   useAddDocuments,
+  useDocumentPicker,
   useKnowledgeBase,
   type KnowledgeBase,
 } from "@/features/knowledge-base";
 import { FileDropArea } from "@/shared/components/FileDropArea";
-import { EmptyState, LoadError } from "@/shared/components/LoadStates";
+import { LoadError } from "@/shared/components/LoadStates";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { formatDay, formatTime } from "@/shared/utils/date";
 import { DocumentPreviewDialog } from "./DocumentPreviewDialog";
@@ -25,6 +26,7 @@ export function KnowledgeScreen() {
   const t = useTranslations("knowledge");
   const { data: knowledge, error, isPending, refetch } = useKnowledgeBase();
   const add = useAddDocuments();
+  const { picker, browse } = useDocumentPicker(add);
 
   if (isPending) {
     return (
@@ -42,16 +44,16 @@ export function KnowledgeScreen() {
   }
   return (
     <KnowledgeFrame
-      actions={<AddDocumentsButton add={add} />}
+      actions={<AddDocumentsButton add={add} onBrowse={browse} />}
       onDropFiles={add.isPending ? undefined : (files) => add.mutate(files)}
     >
       <header className="flex flex-col gap-1">
         <h1 className="text-[22px] font-semibold tracking-tight">{knowledge.company_name}</h1>
         <Summary knowledge={knowledge} />
-        <p className="text-xs text-muted-foreground">{t("dropHint")}</p>
       </header>
+      {picker}
       <AddDocumentsError add={add} />
-      <Documents knowledge={knowledge} />
+      <Documents knowledge={knowledge} add={add} onBrowse={browse} />
     </KnowledgeFrame>
   );
 }
@@ -73,19 +75,23 @@ function Summary({ knowledge }: { knowledge: KnowledgeBase }) {
   );
 }
 
-function Documents({ knowledge }: { knowledge: KnowledgeBase }) {
-  const t = useTranslations("knowledge");
+function Documents({
+  knowledge,
+  add,
+  onBrowse,
+}: {
+  knowledge: KnowledgeBase;
+  add: ReturnType<typeof useAddDocuments>;
+  onBrowse: () => void;
+}) {
   const [openedId, setOpenedId] = useState<number | null>(null);
   const opened = knowledge.documents.find((document) => document.id === openedId) ?? null;
   if (knowledge.documents.length === 0) {
-    return (
-      <EmptyState icon={<LibraryIcon />} level={2} title={t("noneTitle")}>
-        {t("noneDescription")}
-      </EmptyState>
-    );
+    return <DocumentDropZone add={add} onBrowse={onBrowse} empty />;
   }
   return (
     <>
+      <DocumentDropZone add={add} onBrowse={onBrowse} empty={false} />
       <DocumentTable
         documents={knowledge.documents}
         onOpen={(document) => setOpenedId(document.id)}
@@ -121,7 +127,6 @@ function KnowledgeFrame({
       </div>
       <FileDropArea
         onFiles={(files) => onDropFiles?.(files)}
-        overlay={t("dropOverlay")}
         disabled={!onDropFiles}
         className="flex flex-1 flex-col"
       >
