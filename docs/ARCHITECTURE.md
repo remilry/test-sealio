@@ -23,7 +23,7 @@
 │ llm/            façade + adaptateurs (Claude, Fake)                   │
 │ core/db         PostgreSQL + pgvector ; fichiers sur disque           │
 └──────────────────────────────────────────────────────────────────────┘
-data/ (ignoré par git) : uploads, exports. Seed au démarrage : offre, 11 documents, 2 formulaires
+data/ (ignoré par git) : uploads, exports. Seed au démarrage : tenant, offre, 2 formulaires. La base de connaissances n'est pas seedée : l'utilisateur y ajoute les documents (ceux de la démo sont dans `knowledge-base/documents/`)
 ```
 
 | Sujet | Décision |
@@ -125,7 +125,7 @@ Python 3.14 · FastAPI (SSE natif `fastapi.sse`) · SQLAlchemy 2.1 + psycopg 3 �
 ```
 backend/
 ├─ app/
-│  ├─ main.py                 # FastAPI : routers ; au démarrage, migrations + seed (offre, 11 docs, 2 formulaires)
+│  ├─ main.py                 # FastAPI : routers ; au démarrage, migrations + seed (tenant, offre, 2 formulaires)
 │  ├─ core/                   # config (pydantic-settings), db (engine, session, Base + TimestampMixin), erreurs
 │  ├─ llm/                    # façade : Protocol LLM.generate_structured(prompt, schema)
 │  │  ├─ anthropic_adapter.py

@@ -41,7 +41,7 @@ But : savoir **sur quoi l'IA s'appuie**.
 - En-tête : nom de l'entreprise, `11 documents · last sync`.
 - Tableau des documents : type (PDF/DOC), nom, nombre de pages, date d'ajout, statut : `Indexed` · `Processing` (avec progression « Reading… 3/5 pages ») · `Error` (fichier illisible, avec message).
 - Bouton **Add documents** : dépôt PDF/DOCX → la ligne apparaît en `Processing` puis passe à son statut final. Retour immédiat par document, pas de rechargement de page.
-- Pré-chargé avec les 11 documents de `knowledge-base/documents/`.
+- Vide au départ (décision 2026-11-04) : pendant la démo, l'utilisateur ajoute les 11 documents de `knowledge-base/documents/`.
 
 ### 3.2 Tender (détail de l'offre)
 
