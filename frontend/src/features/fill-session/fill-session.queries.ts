@@ -1,34 +1,42 @@
-import { queryOptions, useMutation, useMutationState, useQueryClient } from "@tanstack/react-query";
-import { api, API_URL, unwrap, type Schema } from "@/shared/api";
+/** Data of a form being filled, for components: query keys and hooks (the only useQuery calls). */
+import {
+  queryOptions,
+  useMutation,
+  useMutationState,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { now } from "@/shared/utils/date";
+import { fillApi, type Answer, type FillState } from "./fill-session.api";
 
-export type FormDetail = Schema<"FormDetail">;
-export type FormField = Schema<"FieldOut">;
-export type FillState = Schema<"FillState">;
-export type Answer = Schema<"AnswerOut">;
+export const fillKeys = {
+  form: (formId: number) => ["forms", formId] as const,
+  answers: (formId: number) => [...fillKeys.form(formId), "answers"] as const,
+  save: (formId: number) => [...fillKeys.form(formId), "save"] as const,
+};
 
-/** Query keys and fetchers of a form being filled. */
-export const fillQueries = {
+const fillQueries = {
   form: (formId: number) =>
     queryOptions({
-      queryKey: ["forms", formId],
-      queryFn: ({ signal }) =>
-        unwrap(api.GET("/forms/{form_id}", { params: { path: { form_id: formId } }, signal })),
+      queryKey: fillKeys.form(formId),
+      queryFn: ({ signal }) => fillApi.getForm(formId, signal),
     }),
   answers: (formId: number) =>
     queryOptions({
-      queryKey: ["forms", formId, "answers"],
-      queryFn: ({ signal }) =>
-        unwrap(
-          api.GET("/forms/{form_id}/answers", { params: { path: { form_id: formId } }, signal }),
-        ),
+      queryKey: fillKeys.answers(formId),
+      queryFn: ({ signal }) => fillApi.getAnswers(formId, signal),
     }),
 };
 
-/** The original file, as the buyer sent it (rendered in the preview). */
-export const originalFileUrl = (formId: number) => `${API_URL}/forms/${formId}/file`;
+/** The form with its detected fields, in reading order. */
+export function useFormDetail(formId: number) {
+  return useQuery(fillQueries.form(formId));
+}
 
-const saveKey = (formId: number) => ["forms", formId, "save"];
+/** The current tenant's answers to the form, with the counts. */
+export function useFillState(formId: number) {
+  return useQuery(fillQueries.answers(formId));
+}
 
 type SaveVariables = { fieldId: number; value: string | null };
 
@@ -44,14 +52,8 @@ export function useSaveAnswer(
   const queryClient = useQueryClient();
   const answersKey = fillQueries.answers(formId).queryKey;
   return useMutation({
-    mutationKey: saveKey(formId),
-    mutationFn: ({ fieldId, value }: SaveVariables) =>
-      unwrap(
-        api.PATCH("/forms/{form_id}/fields/{field_id}", {
-          params: { path: { form_id: formId, field_id: fieldId } },
-          body: { value },
-        }),
-      ),
+    mutationKey: fillKeys.save(formId),
+    mutationFn: ({ fieldId, value }: SaveVariables) => fillApi.saveAnswer(formId, fieldId, value),
     onMutate: async ({ fieldId, value }) => {
       await queryClient.cancelQueries({ queryKey: answersKey });
       const previous = queryClient.getQueryData(answersKey);
@@ -89,7 +91,7 @@ export type SaveStatus = "idle" | "saving" | "saved" | "failed";
 /** Whether the latest edit of the form is saved (for the "✓ Saved" indicator). */
 export function useSaveStatus(formId: number): SaveStatus {
   const statuses = useMutationState({
-    filters: { mutationKey: saveKey(formId) },
+    filters: { mutationKey: fillKeys.save(formId) },
     select: (mutation) => mutation.state.status,
   });
   const latest = statuses.at(-1);

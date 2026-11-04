@@ -61,18 +61,19 @@ frontend/src/
 │  └─ live-fill/   LiveFillScreen.tsx  · LiveFillProvider.tsx · LiveFillScreen.test.tsx (export en modale inclus)
 │
 ├─ features/                     # modules autonomes ; API publique = index.ts
-│  ├─ knowledge-base/    api.ts · DocumentTable · UploadDocuments · useDocuments
-│  ├─ tender/            api.ts · TenderHeader · FormCard · SetupDialog · useTender
-│  ├─ fill-session/      api.ts (SSE + PATCH) · useFillSession · fillEventsReducer · useUpdateField
+│  ├─ knowledge-base/    knowledge-base.{api,queries}.ts · DocumentTable · UploadDocuments · useDocuments
+│  ├─ tender/            tender.{api,queries}.ts (useTenders, useTender) · TenderHeader · FormList · SetupDialog
+│  ├─ fill-session/      fill-session.{api,queries}.ts (useFormDetail, useFillState, useSaveAnswer ; SSE à l'étape 5) · SaveIndicator
 │  ├─ review-queue/      ReviewQueue · FilterChips · FieldCard/{Auto,NotFound,Manual,
 │  │                     Outdated,Conflict,Declaration} · useReviewKeyboard
 │  ├─ document-preview/  DocumentPreview · renderers/{pdf,docx} · FieldOverlay · locator.ts
-│  ├─ source-viewer/     api.ts · SourceView
-│  └─ form-export/       api.ts · ExportDialog (résumé, champs vides, téléchargement)
+│  ├─ source-viewer/     source-viewer.{api,queries}.ts · SourceView
+│  └─ form-export/       form-export.{api,queries}.ts · ExportDialog (résumé, champs vides, téléchargement)
 │
 ├─ shared/
 │  ├─ api/               client.ts (initialisation du client HTTP typé) · schema.gen.ts (généré)
 │  ├─ ui/                composants shadcn, StatusBadge, tokens de couleur
+│  ├─ components/        composants partagés hors shadcn (LoadStates : EmptyState, LoadError)
 │  ├─ lib/               utilitaires sans dépendance métier
 │  ├─ utils/date.ts      seul point de manipulation des dates (règle ESLint), remplaçable par une lib
 │  └─ test/              setup, serveur MSW, handlers, fixtures typées, renderScreen, fillStream
@@ -84,8 +85,9 @@ frontend/e2e/            # un test Playwright : le scénario principal
 1. Dépendances à sens unique : `app → screens → features → shared`.
 2. Une feature n'importe pas une autre feature ; elles se composent dans les écrans. _Règle par défaut, révisable au cas par cas._
 3. Une feature s'importe uniquement par son `index.ts`.
-4. Chaque feature possède son `api.ts` (appels, query keys, hooks TanStack Query de son domaine). `shared/api` ne contient que l'initialisation du client et les types générés.
+4. Couche de données (skill `frontend-data-layer`) : chaque feature a son `[feature].api.ts` (types et appels HTTP) et son `[feature].queries.ts` (query keys et hooks `useXxx`, seuls à appeler TanStack Query) ; les composants n'utilisent que ces hooks (règle ESLint `no-restricted-imports`). `shared/api` ne contient que l'initialisation du client et les types générés.
 5. `document-preview` est générique : il reçoit `{id, locator, value, tone}` et émet `onSelect(id)`.
+6. Style (skill `frontend-code-style`) : early return dans les fonctions et composants, pas de ternaires imbriqués (`no-nested-ternary`) : sous-composant ou fonction nommée à la place.
 
 ### État
 - **Données serveur** : cache TanStack Query (seule source côté front). Le flux SSE met à jour ce cache (`setQueryData`) ; les éditions partent en `PATCH` optimiste (« ✓ Saved »).

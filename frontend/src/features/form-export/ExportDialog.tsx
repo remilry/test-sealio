@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import type { ReactNode } from "react";
 import { CircleCheckIcon, DownloadIcon, PenLineIcon, TriangleAlertIcon } from "lucide-react";
 import { messages } from "@/shared/lib/messages";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/shared/ui/alert";
@@ -15,7 +15,8 @@ import {
   DialogTrigger,
 } from "@/shared/ui/dialog";
 import { Skeleton } from "@/shared/ui/skeleton";
-import { exportedFileUrl, exportQueries, type ExportSummary } from "./api";
+import { exportedFileUrl, type ExportSummary } from "./form-export.api";
+import { useExportSummary } from "./form-export.queries";
 
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`;
 
@@ -66,20 +67,11 @@ function ExportContent({
   format: string;
   savePending: boolean;
 }) {
-  const summary = useQuery({ ...exportQueries.summary(formId), enabled: !savePending });
+  const summary = useExportSummary(formId, { enabled: !savePending });
 
-  if (summary.data) {
+  if (summary.error) {
     return (
-      <ExportReady formId={formId} formTitle={formTitle} format={format} summary={summary.data} />
-    );
-  }
-  return (
-    <>
-      <DialogHeader>
-        <DialogTitle>Export {format}</DialogTitle>
-        <DialogDescription>{formTitle}</DialogDescription>
-      </DialogHeader>
-      {summary.error ? (
+      <ExportPending formTitle={formTitle} format={format}>
         <Alert variant="destructive">
           <AlertTitle>We couldn&apos;t prepare the export.</AlertTitle>
           <AlertDescription>{messages.retryLater}</AlertDescription>
@@ -89,12 +81,41 @@ function ExportContent({
             </Button>
           </AlertAction>
         </Alert>
-      ) : (
+      </ExportPending>
+    );
+  }
+  if (!summary.data) {
+    return (
+      <ExportPending formTitle={formTitle} format={format}>
         <div aria-label="Preparing the export" className="flex flex-col gap-3">
           <Skeleton className="h-5 w-1/2" />
           <Skeleton className="h-20 w-full" />
         </div>
-      )}
+      </ExportPending>
+    );
+  }
+  return (
+    <ExportReady formId={formId} formTitle={formTitle} format={format} summary={summary.data} />
+  );
+}
+
+/** The dialog before the summary is there: a neutral header, then the loading or error state. */
+function ExportPending({
+  formTitle,
+  format,
+  children,
+}: {
+  formTitle: string;
+  format: string;
+  children: ReactNode;
+}) {
+  return (
+    <>
+      <DialogHeader>
+        <DialogTitle>Export {format}</DialogTitle>
+        <DialogDescription>{formTitle}</DialogDescription>
+      </DialogHeader>
+      {children}
     </>
   );
 }

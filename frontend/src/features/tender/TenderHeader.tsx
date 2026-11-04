@@ -1,5 +1,5 @@
 import { Badge } from "@/shared/ui/badge";
-import type { TenderDetail } from "./api";
+import type { TenderDetail } from "./tender.api";
 import { formatDeadline } from "./deadline";
 
 export function TenderHeader({ tender }: { tender: TenderDetail }) {

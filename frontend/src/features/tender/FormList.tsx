@@ -5,7 +5,7 @@ import { cn } from "@/shared/lib/utils";
 import { Badge } from "@/shared/ui/badge";
 import { Button, buttonVariants } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
-import type { FormSummary } from "./api";
+import type { FormSummary } from "./tender.api";
 
 const STATUS = {
   not_started: { label: "Not started", variant: "secondary" },

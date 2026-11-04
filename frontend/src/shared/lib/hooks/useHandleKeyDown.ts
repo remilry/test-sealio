@@ -40,9 +40,15 @@ function parseCombo(combo: string): Combo {
     ctrl: modifiers.has("Ctrl") || (mod && !apple),
     meta: modifiers.has("Meta") || (mod && apple),
     alt: modifiers.has("Alt"),
-    // Shift is significant for named keys ("Shift+Tab"), ignored for letters unless explicit.
-    shift: modifiers.has("Shift") ? true : key.length === 1 ? null : false,
+    shift: shiftRequirement(modifiers, key),
   };
+}
+
+/** Shift is significant for named keys ("Shift+Tab"), ignored for letters unless explicit (null). */
+function shiftRequirement(modifiers: Set<string>, key: string): boolean | null {
+  if (modifiers.has("Shift")) return true;
+  if (key.length === 1) return null;
+  return false;
 }
 
 function matches(combo: Combo, event: KeyboardEvent): boolean {

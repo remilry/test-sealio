@@ -1,5 +1,5 @@
 import { CheckIcon } from "lucide-react";
-import { useSaveStatus } from "./api";
+import { useSaveStatus } from "./fill-session.queries";
 
 const LABELS = {
   idle: "All changes saved",

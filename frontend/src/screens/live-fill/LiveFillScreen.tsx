@@ -2,27 +2,25 @@
 
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
-import { ArrowLeftIcon, FileQuestionIcon, FileXIcon } from "lucide-react";
-import { DocumentPreview, type PreviewZone } from "@/features/document-preview";
+import { ArrowLeftIcon, FileXIcon } from "lucide-react";
+import { DocumentPreview, type PreviewZone, type ZoneTone } from "@/features/document-preview";
 import {
-  fillQueries,
   originalFileUrl,
   SaveIndicator,
+  useFillState,
+  useFormDetail,
   useSaveAnswer,
   type FillState,
   type FormDetail,
 } from "@/features/fill-session";
 import { ExportDialog } from "@/features/form-export";
 import { FieldList, type FocusRequest, type QueueField } from "@/features/review-queue";
-import { tenderQueries } from "@/features/tender";
+import { useTender } from "@/features/tender";
 import { isNotFound } from "@/shared/api";
+import { EmptyState, LoadError } from "@/shared/components/LoadStates";
 import { useHandleKeyDown } from "@/shared/lib/hooks/useHandleKeyDown";
 import { routes } from "@/shared/lib/routes";
-import { messages } from "@/shared/lib/messages";
-import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/shared/ui/alert";
-import { Button, buttonVariants } from "@/shared/ui/button";
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/shared/ui/empty";
+import { buttonVariants } from "@/shared/ui/button";
 import { Skeleton } from "@/shared/ui/skeleton";
 
 /**
@@ -30,8 +28,8 @@ import { Skeleton } from "@/shared/ui/skeleton";
  * kept in sync. Step 4.5: the user types every value; the AI fills them from step 5.
  */
 export function LiveFillScreen({ formId }: { formId: number }) {
-  const form = useQuery(fillQueries.form(formId));
-  const fill = useQuery(fillQueries.answers(formId));
+  const form = useFormDetail(formId);
+  const fill = useFillState(formId);
 
   if (form.isPending || fill.isPending) {
     return (
@@ -41,41 +39,38 @@ export function LiveFillScreen({ formId }: { formId: number }) {
     );
   }
   if (form.isError || fill.isError) {
-    const error = form.error ?? fill.error;
     return (
-      <Frame>
-        {isNotFound(error) ? (
-          <Message icon={<FileQuestionIcon />} title="Form not found">
-            It may have been withdrawn by the buyer.
-          </Message>
-        ) : (
-          <div className="mx-auto w-full max-w-xl p-8">
-            <Alert variant="destructive">
-              <AlertTitle>We couldn&apos;t load this form.</AlertTitle>
-              <AlertDescription>{messages.retryLater}</AlertDescription>
-              <AlertAction>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    void form.refetch();
-                    void fill.refetch();
-                  }}
-                >
-                  Try again
-                </Button>
-              </AlertAction>
-            </Alert>
-          </div>
-        )}
-      </Frame>
+      <FormLoadFailed
+        error={form.error ?? fill.error}
+        onRetry={() => {
+          void form.refetch();
+          void fill.refetch();
+        }}
+      />
     );
   }
   return <FillWorkspace form={form.data} fill={fill.data} />;
 }
 
+function FormLoadFailed({ error, onRetry }: { error: unknown; onRetry: () => void }) {
+  if (isNotFound(error)) {
+    return (
+      <Frame>
+        <EmptyState title="Form not found">It may have been withdrawn by the buyer.</EmptyState>
+      </Frame>
+    );
+  }
+  return (
+    <Frame>
+      <div className="mx-auto w-full max-w-xl p-8">
+        <LoadError title="We couldn't load this form." onRetry={onRetry} />
+      </div>
+    </Frame>
+  );
+}
+
 function FillWorkspace({ form, fill }: { form: FormDetail; fill: FillState }) {
-  const { data: tender } = useQuery(tenderQueries.detail(form.tender_id));
+  const { data: tender } = useTender(form.tender_id);
   // Values the back refused: kept in their input (and on the document) until saved.
   const [unsaved, setUnsaved] = useState<ReadonlyMap<number, string>>(new Map());
   const save = useSaveAnswer(form.id, {
@@ -108,7 +103,7 @@ function FillWorkspace({ form, fill }: { form: FormDetail; fill: FillState }) {
       fontSize: field.locator.font_size,
       placeholders: field.locator.erase,
       value,
-      tone: !fields[index].fillable ? "signature" : value ? "entered" : "empty",
+      tone: zoneTone(fields[index], value),
     };
   });
   const fillable = fields.filter((field) => field.fillable);
@@ -147,9 +142,9 @@ function FillWorkspace({ form, fill }: { form: FormDetail; fill: FillState }) {
   if (!form.field_counts) {
     return (
       <Frame form={form} tenderTitle={tender?.title}>
-        <Message icon={<FileXIcon />} title="This form can't be filled yet">
+        <EmptyState icon={<FileXIcon />} level={2} title="This form can't be filled yet">
           Only PDF forms can be filled for now. You can still download the original from the tender.
-        </Message>
+        </EmptyState>
       </Frame>
     );
   }
@@ -262,28 +257,6 @@ function Frame({
   );
 }
 
-function Message({
-  icon,
-  title,
-  children,
-}: {
-  icon: ReactNode;
-  title: string;
-  children: ReactNode;
-}) {
-  return (
-    <Empty>
-      <EmptyHeader>
-        <EmptyMedia variant="icon">{icon}</EmptyMedia>
-        <EmptyTitle role="heading" aria-level={2}>
-          {title}
-        </EmptyTitle>
-        <EmptyDescription>{children}</EmptyDescription>
-      </EmptyHeader>
-    </Empty>
-  );
-}
-
 function LoadingState() {
   return (
     <div aria-label="Loading form" className="grid flex-1 grid-cols-[420px_1fr] gap-6 p-5">
@@ -303,4 +276,10 @@ function withEntry(map: ReadonlyMap<number, string>, id: number, text: string | 
   if (text === null) next.delete(id);
   else next.set(id, text);
   return next;
+}
+
+/** How a field shows on the document: to sign by hand, entered, or still empty. */
+function zoneTone(field: QueueField, value: string | null): ZoneTone {
+  if (!field.fillable) return "signature";
+  return value ? "entered" : "empty";
 }
