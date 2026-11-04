@@ -5,6 +5,7 @@ import type {
   FillState,
   FormDetail,
   KnowledgeBase,
+  KnowledgeDocument,
   TenderDetail,
   TenderSummary,
 } from "./fixtures";
@@ -21,8 +22,26 @@ export const handlers = {
   tender: (tender: TenderDetail) =>
     http.get(url(`/tenders/${tender.id}`), () => HttpResponse.json(tender)),
 
-  knowledge: (knowledge: KnowledgeBase) =>
-    http.get(url("/knowledge"), () => HttpResponse.json(knowledge)),
+  /** `GET /knowledge`; a function is called at each request (the list follows indexing). */
+  knowledge: (knowledge: KnowledgeBase | (() => KnowledgeBase)) =>
+    http.get(url("/knowledge"), () =>
+      HttpResponse.json(typeof knowledge === "function" ? knowledge() : knowledge),
+    ),
+
+  /**
+   * `POST /knowledge/documents`: records the content type of each request and answers with
+   * `respond()` (the documents the back stored, "processing"). The multipart body is not read:
+   * under jsdom + Vitest, reading a body built from jsdom Files makes the fetch fail. The files
+   * themselves are checked by the back's tests and the e2e scenario.
+   */
+  addDocuments: (respond: () => KnowledgeDocument[]) => {
+    const requests: { contentType: string | null }[] = [];
+    const handler = http.post(url("/knowledge/documents"), ({ request }) => {
+      requests.push({ contentType: request.headers.get("content-type") });
+      return HttpResponse.json(respond(), { status: 202 });
+    });
+    return { handler, requests };
+  },
 
   form: (form: FormDetail) => http.get(url(`/forms/${form.id}`), () => HttpResponse.json(form)),
 
@@ -57,6 +76,6 @@ export const handlers = {
     path: string,
     status: number,
     detail = "Something went wrong",
-    method: "get" | "patch" = "get",
+    method: "get" | "patch" | "post" = "get",
   ) => http[method](url(path), () => HttpResponse.json({ detail }, { status })),
 };

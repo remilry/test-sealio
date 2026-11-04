@@ -113,7 +113,7 @@
     "summary": "{count, plural, =0 {No documents} one {# document} other {# documents}}",
     "summaryIndexed": "{count, plural, =0 {No documents} one {# document} other {# documents}} · last indexed {date} at {time}",
     "noneTitle": "No documents yet",
-    "noneDescription": "The AI answers only from your company documents: add them here.",
+    "noneDescription": "The AI answers only from your company documents: add them with “Add documents”.",
     "documents": "Documents",
     "column": {
       "document": "Document",
@@ -137,6 +137,13 @@
     "download": "Download",
     "downloadDocument": "Download {name}",
     "previewDocx": "Word documents can't be previewed yet. Download the file to read it.",
-    "previewDocxTitle": "No preview for Word documents yet"
+    "previewDocxTitle": "No preview for Word documents yet",
+    "addDocuments": "Add documents",
+    "adding": "Adding…",
+    "chooseFiles": "Choose PDF or Word documents",
+    "addFailed": "These documents could not be added",
+    "addFailedRetry": "Something went wrong on our side. Please try again in a moment.",
+    "dismiss": "Dismiss",
+    "reading": "Reading and indexing…"
   }
 }

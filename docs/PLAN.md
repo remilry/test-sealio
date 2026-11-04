@@ -2,7 +2,7 @@
 
 > Document vivant. Chaque étape y est cochée et détaillée au fur et à mesure.
 > Contexte produit et priorités : voir `CLAUDE.md`. Échéance : jeudi 5 novembre.
-> Statut : étapes 0 à 4.5 faites ; étape 5 découpée en 5a–5d, 5a faite et mergée ; prochaine : 5b (upload de documents). Parcours détaillé : `docs/USER_FLOW.md`. Les choix techniques marqués _proposition_ restent à confirmer à l'étape 3.
+> Statut : étapes 0 à 4.5 faites ; étape 5 découpée en 5a–5d, 5a mergée, 5b faite (à valider) ; prochaine : 5c (moteur IA back). Parcours détaillé : `docs/USER_FLOW.md`. Les choix techniques marqués _proposition_ restent à confirmer à l'étape 3.
 
 ## 1. Ce qu'on a appris des deux formulaires
 
@@ -88,8 +88,11 @@ Chaque étape à partir de la 4 livre une **fonctionnalité utilisable de bout e
 - Front : écran *Company knowledge* (entreprise, nombre de documents, dernière indexation, tableau type / nom / pages / date d'ajout / statut, erreur affichée, téléchargement par ligne) ; clic sur un document → aperçu en modale (pages du PDF via `PdfViewer` de `document-preview`, bouton *Download* ; DOCX : message « pas encore d'aperçu » + téléchargement), entrée dans la barre latérale, carte *Company knowledge* sur l'écran *Tender* (nombre de documents, *Manage*).
 - Tests : extraction et découpage (vrais documents + cas synthétiques), API, recherche (identifiant, tri, isolation des tenants), écran *Knowledge* et carte (Vitest), scénario Playwright étendu. Test `slow` de rappel avec le vrai modèle : pour chaque section des formulaires, les passages trouvés pour ses champs contiennent chaque valeur attendue de `GROUND_TRUTH.md` (mesure par section car l'IA répond section par section ; deux libellés seuls, « Legal form since » et « Main activity », ne trouvent pas leur passage en top 8).
 
-#### 5b — Ajout de documents ⬜
-- *Add documents* (PDF/DOCX) : ligne en `Processing` puis statut final, retour par document sans rechargement, `Error` pour un fichier illisible.
+#### 5b — Ajout de documents ✅ (à valider, branche `step-5b-upload`)
+- Back : `POST /knowledge/documents` (multipart, plusieurs fichiers) → 202 avec les documents en `processing`, indexation en tâche de fond (`BackgroundTasks`, une transaction par document). Tout ou rien : un fichier non PDF/DOCX, vide ou de plus de 20 Mo refuse la requête (422, message pour l'utilisateur). Un fichier du même nom remplace le document existant (passages supprimés, réindexé, « ajouté » maintenant). Échec inattendu → `error` avec un message générique. Au démarrage, les documents restés `processing` (serveur arrêté) sont réindexés en arrière-plan.
+- Front : bouton *Add documents* (sélecteur PDF/DOCX, plusieurs fichiers) ; les documents apparaissent aussitôt en tête en `Processing` (« Reading and indexing… »), la liste se rafraîchit chaque seconde tant qu'un document est en cours, puis `Indexed` ou `Error` avec la raison, sans recharger la page. Refus du back affiché tel quel (422), autre échec en mots simples, bandeau fermable.
+- Tests : API d'upload (succès, plusieurs fichiers, illisible, remplacement, refus, taille, échec inattendu, reprise au démarrage) ; écran *Knowledge* (Processing → Indexed, → Error, plusieurs fichiers, refus, échec serveur, sélecteur) ; e2e : ré-ajout d'un document existant sous son nom (remplacement, Processing → Indexed).
+- Limite des tests front : sous jsdom + Vitest, un handler MSW ne peut pas lire un corps multipart construit avec des `File` jsdom (le fetch échoue) ; le handler vérifie donc le type de contenu, et les fichiers eux-mêmes sont vérifiés par les tests back et l'e2e.
 
 #### 5c — Moteur de réponse IA (back) ⬜
 - Façade LLM (Claude Sonnet 5.5 + `FakeLLM` rejouant des réponses réelles enregistrées), un appel par section, sortie structurée, validateur (citation vérifiée, format), toutes les règles génériques (auto, missing, manual, conflict, outdated, declaration) testées, job + événements persistés + SSE.
@@ -192,3 +195,4 @@ UI (relecture)  ──►  API locale
 | 2026-11-04 | Documents de la base gardés tels quels, défauts compris (`&amp;` dans la plaquette, noms tirés des fichiers) : un cas réel en aura aussi | validé |
 | 2026-11-04 | *Company knowledge* : clic sur un document = aperçu en modale (PDF), téléchargement toujours possible ; aperçu DOCX à l'étape 7 | validé |
 | 2026-11-04 | Étape 5a validée et mergée dans `main` | validé |
+| 2026-11-04 | 5b : ajout tout ou rien (PDF/DOCX, ≤ 20 Mo) ; même nom de fichier = remplacement du document ; indexation en tâche de fond, rafraîchissement de la liste chaque seconde tant qu'un document est `processing` ; reprise des documents `processing` au démarrage ; pas de glisser-déposer pour l'instant | à valider |

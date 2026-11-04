@@ -3,7 +3,14 @@
 import { useState, type ReactNode } from "react";
 import { LibraryIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { DocumentTable, useKnowledgeBase, type KnowledgeBase } from "@/features/knowledge-base";
+import {
+  AddDocumentsButton,
+  AddDocumentsError,
+  DocumentTable,
+  useAddDocuments,
+  useKnowledgeBase,
+  type KnowledgeBase,
+} from "@/features/knowledge-base";
 import { EmptyState, LoadError } from "@/shared/components/LoadStates";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { formatDay, formatTime } from "@/shared/utils/date";
@@ -16,6 +23,7 @@ import { DocumentPreviewDialog } from "./DocumentPreviewDialog";
 export function KnowledgeScreen() {
   const t = useTranslations("knowledge");
   const { data: knowledge, error, isPending, refetch } = useKnowledgeBase();
+  const add = useAddDocuments();
 
   if (isPending) {
     return (
@@ -32,11 +40,12 @@ export function KnowledgeScreen() {
     );
   }
   return (
-    <KnowledgeFrame>
+    <KnowledgeFrame actions={<AddDocumentsButton add={add} />}>
       <header className="flex flex-col gap-1">
         <h1 className="text-[22px] font-semibold tracking-tight">{knowledge.company_name}</h1>
         <Summary knowledge={knowledge} />
       </header>
+      <AddDocumentsError add={add} />
       <Documents knowledge={knowledge} />
     </KnowledgeFrame>
   );
@@ -82,12 +91,14 @@ function Documents({ knowledge }: { knowledge: KnowledgeBase }) {
 }
 
 /** The top bar and the page column, whatever the state of the knowledge base. */
-function KnowledgeFrame({ children }: { children: ReactNode }) {
+function KnowledgeFrame({ actions, children }: { actions?: ReactNode; children: ReactNode }) {
   const t = useTranslations("knowledge");
   return (
     <div className="flex flex-1 flex-col">
       <div className="sticky top-0 z-10 flex h-13 items-center gap-2 border-b bg-card px-6">
         <span className="font-medium">{t("breadcrumb")}</span>
+        <div className="flex-1" />
+        {actions}
       </div>
       <div className="mx-auto flex w-full max-w-275 flex-col gap-5 px-8 pt-7 pb-24">{children}</div>
     </div>

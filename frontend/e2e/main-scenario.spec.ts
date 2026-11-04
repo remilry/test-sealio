@@ -1,8 +1,13 @@
+import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 
-// The main scenario, grown slice by slice (docs/PLAN.md): today it checks the company knowledge,
-// fills Annex 7 by hand and downloads the filled PDF. The back may be a dev server with data already entered: the scenario
-// accepts a form already in review and overwrites the values it types.
+// The main scenario, grown slice by slice (docs/PLAN.md): today it checks the company knowledge
+// (preview, adding a document), fills Annex 7 by hand and downloads the filled PDF. The back may be
+// a dev server with data already entered: the scenario accepts a form already in review and
+// overwrites the values it types.
+
+// Added again under its own name, it replaces itself: the knowledge base keeps its 11 documents.
+const REPLACED_DOCUMENT = "08_pension_fund_confirmation.pdf";
 test("I fill Annex 7 by hand and download it in its original PDF layout", async ({ page }) => {
   await page.goto("/");
 
@@ -33,6 +38,16 @@ test("I fill Annex 7 by hand and download it in its original PDF layout", async 
   await expect(viewer.getByRole("link", { name: "Download" })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(viewer).toBeHidden();
+  // Adding a document: listed while processed, then indexed, without reloading the page.
+  await page.getByLabel("Choose PDF or Word documents").setInputFiles({
+    name: REPLACED_DOCUMENT,
+    mimeType: "application/pdf",
+    buffer: readFileSync(`../knowledge-base/documents/${REPLACED_DOCUMENT}`),
+  });
+  const replaced = page.getByRole("row", { name: "Pension fund confirmation" });
+  await expect(replaced).toContainText("Processing");
+  await expect(replaced).toContainText("Indexed");
+  await expect(documents).toHaveCount(12);
   await page.getByRole("list", { name: "Main" }).getByRole("link", { name: "Tenders" }).click();
 
   // Open Annex 7: its detected fields are listed and drawn on the original form.

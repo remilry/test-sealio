@@ -1,4 +1,4 @@
-import { DownloadIcon } from "lucide-react";
+import { DownloadIcon, LoaderCircleIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { cn } from "@/shared/lib/utils";
 import { Badge } from "@/shared/ui/badge";
@@ -67,13 +67,21 @@ function DocumentRow({ document, onOpen }: { document: KnowledgeDocument; onOpen
         </button>
         <div className="truncate text-xs text-muted-foreground">{document.file_name}</div>
         {document.error && <p className="mt-1 text-xs text-destructive">{document.error}</p>}
+        {document.status === "processing" && (
+          <p className="mt-1 text-xs text-muted-foreground">{t("reading")}</p>
+        )}
       </TableCell>
       <TableCell className="text-muted-foreground">
         {document.pages === null ? t("noPages") : t("pages", { count: document.pages })}
       </TableCell>
       <TableCell className="text-muted-foreground">{formatDay(document.created_at)}</TableCell>
       <TableCell>
-        <Badge variant={STATUS_VARIANT[document.status]}>{t(`status.${document.status}`)}</Badge>
+        <Badge variant={STATUS_VARIANT[document.status]}>
+          {document.status === "processing" && (
+            <LoaderCircleIcon data-icon="inline-start" className="animate-spin" aria-hidden />
+          )}
+          {t(`status.${document.status}`)}
+        </Badge>
       </TableCell>
       <TableCell className="pr-4">
         <a

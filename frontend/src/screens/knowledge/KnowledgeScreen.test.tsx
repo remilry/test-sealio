@@ -186,4 +186,166 @@ describe("Company knowledge", () => {
     // Then the documents show
     expect(await screen.findByRole("table", { name: "Documents" })).toBeInTheDocument();
   });
+
+  describe("adding documents", () => {
+    const uvg = knowledgeDocument({
+      id: 12,
+      name: "UVG certificate",
+      file_name: "UVG certificate.pdf",
+      pages: null,
+      status: "processing",
+      indexed_at: null,
+      created_at: "2026-11-04T14:10:00Z",
+    });
+    const pdf = (name: string) => new File(["%PDF-1.7"], name, { type: "application/pdf" });
+    // The polling interval is 1 s: give the final status a little longer to show up.
+    const POLLED = { timeout: 3000 };
+
+    /** A back that indexes (or fails) the added document by the next refresh of the list. */
+    function backIndexing(final: typeof uvg) {
+      let stage: "before" | "processing" | "done" = "before";
+      const added = handlers.addDocuments(() => {
+        stage = "processing";
+        return [uvg];
+      });
+      server.use(
+        added.handler,
+        handlers.knowledge(() => {
+          const base = knowledgeBase();
+          if (stage === "before") return base;
+          const document = stage === "processing" ? uvg : final;
+          stage = "done";
+          return { ...base, documents: [document, ...base.documents] };
+        }),
+      );
+      return added;
+    }
+
+    it("shows an added document as processing, then indexed", async () => {
+      // Given a back that indexes what I add
+      const added = backIndexing({
+        ...uvg,
+        status: "indexed",
+        pages: 1,
+        indexed_at: "2026-11-04T14:10:03Z",
+      });
+      const user = userEvent.setup();
+      renderScreen(<KnowledgeScreen />);
+      await screen.findByRole("table", { name: "Documents" });
+
+      // When I add a PDF
+      await user.upload(
+        screen.getByLabelText("Choose PDF or Word documents"),
+        pdf("UVG certificate.pdf"),
+      );
+
+      // Then it is listed at once as being processed
+      const row = within(await screen.findByRole("row", { name: "UVG certificate" }));
+      expect(row.getByText("Processing")).toBeInTheDocument();
+      expect(row.getByText("Reading and indexing…")).toBeInTheDocument();
+      expect(added.requests).toEqual([
+        { contentType: expect.stringMatching(/^multipart\/form-data; boundary=/) },
+      ]);
+      // And it turns indexed without reloading the page
+      expect(await row.findByText("Indexed", {}, POLLED)).toBeInTheDocument();
+      expect(row.getByText("1 page")).toBeInTheDocument();
+      expect(screen.getByText(/^3 documents/)).toBeInTheDocument();
+    });
+
+    it("tells me when an added file could not be read", async () => {
+      // Given a back that cannot read what I add
+      backIndexing({ ...uvg, status: "error", error: "This file is not a readable PDF." });
+      const user = userEvent.setup();
+      renderScreen(<KnowledgeScreen />);
+      await screen.findByRole("table", { name: "Documents" });
+
+      // When I add it
+      await user.upload(
+        screen.getByLabelText("Choose PDF or Word documents"),
+        pdf("UVG certificate.pdf"),
+      );
+
+      // Then it ends in error with the reason
+      const row = within(await screen.findByRole("row", { name: "UVG certificate" }));
+      expect(await row.findByText("Error", {}, POLLED)).toBeInTheDocument();
+      expect(row.getByText("This file is not a readable PDF.")).toBeInTheDocument();
+    });
+
+    it("sends several files at once", async () => {
+      // Given a back that stores what I add
+      const added = backIndexing({ ...uvg, status: "indexed" });
+      const user = userEvent.setup();
+      renderScreen(<KnowledgeScreen />);
+      await screen.findByRole("table", { name: "Documents" });
+
+      // When I choose two files
+      await user.upload(screen.getByLabelText("Choose PDF or Word documents"), [
+        pdf("UVG certificate.pdf"),
+        pdf("VAT statement.pdf"),
+      ]);
+
+      // Then both go in one request
+      await screen.findByRole("row", { name: "UVG certificate" });
+      expect(added.requests).toHaveLength(1);
+    });
+
+    it("tells me why files were refused, and lets me dismiss it", async () => {
+      // Given a back that refuses the file
+      server.use(
+        handlers.knowledge(knowledgeBase()),
+        handlers.error("/knowledge/documents", 422, "big.pdf is larger than 20 MB.", "post"),
+      );
+      const user = userEvent.setup();
+      renderScreen(<KnowledgeScreen />);
+      await screen.findByRole("table", { name: "Documents" });
+
+      // When I add it
+      await user.upload(screen.getByLabelText("Choose PDF or Word documents"), pdf("big.pdf"));
+
+      // Then I see why, and nothing was added
+      const alert = await screen.findByRole("alert");
+      expect(within(alert).getByText("These documents could not be added")).toBeInTheDocument();
+      expect(within(alert).getByText("big.pdf is larger than 20 MB.")).toBeInTheDocument();
+      expect(documents().getAllByRole("row")).toHaveLength(3);
+      await user.click(within(alert).getByRole("button", { name: "Dismiss" }));
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    });
+
+    it("says it in plain words when adding fails on our side", async () => {
+      // Given the back fails
+      server.use(
+        handlers.knowledge(knowledgeBase()),
+        handlers.error("/knowledge/documents", 500, "Internal Server Error", "post"),
+      );
+      const user = userEvent.setup();
+      renderScreen(<KnowledgeScreen />);
+      await screen.findByRole("table", { name: "Documents" });
+
+      // When I add a file
+      await user.upload(
+        screen.getByLabelText("Choose PDF or Word documents"),
+        pdf("UVG certificate.pdf"),
+      );
+
+      // Then the message is not technical
+      const alert = await screen.findByRole("alert");
+      expect(
+        within(alert).getByText("Something went wrong on our side. Please try again in a moment."),
+      ).toBeInTheDocument();
+      expect(within(alert).queryByText("Internal Server Error")).not.toBeInTheDocument();
+    });
+
+    it("only offers PDF and Word documents in the file picker", async () => {
+      // Given the seeded knowledge base
+      server.use(handlers.knowledge(knowledgeBase()));
+      renderScreen(<KnowledgeScreen />);
+      await screen.findByRole("table", { name: "Documents" });
+
+      // Then the picker accepts PDF and DOCX, several at once
+      const picker = screen.getByLabelText("Choose PDF or Word documents");
+      expect(picker).toHaveAttribute("accept", ".pdf,.docx");
+      expect(picker).toHaveAttribute("multiple");
+      expect(screen.getByRole("button", { name: "Add documents" })).toBeEnabled();
+    });
+  });
 });
