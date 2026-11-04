@@ -1,5 +1,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { delay, http } from "msw";
+import { API_URL } from "@/shared/api";
 import { handlers, renderScreen, server } from "@/shared/test";
 import {
   aiAnswer,
@@ -852,6 +854,23 @@ describe("Live fill (status and source of each answer)", () => {
     expect(contact.getByRole("textbox")).toHaveValue("Marc Keller");
   });
 
+  it.each([
+    ["is slow", () => http.get(`${API_URL}/knowledge`, () => delay("infinite"))],
+    ["fails", () => handlers.error("/knowledge", 500, "Something went wrong")],
+  ])("never claims 0 documents while the company knowledge %s", async (_case, knowledgeHandler) => {
+    // Given the company knowledge unknown, with a declaration and a missing answer
+    server.use(knowledgeHandler());
+    given(annex7(), fillState([aiAnswer(3, "Yes", "declaration"), aiAnswer(4, null, "missing")]));
+
+    // Then the texts stay neutral
+    expect(
+      await (await findCard("Business address")).findByText("Not found in your documents"),
+    ).toBeInTheDocument();
+    expect(card("Name and legal form").getByText("Filled automatically")).toBeInTheDocument();
+    expect(screen.queryByText(/0 documents/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/on behalf of/)).not.toBeInTheDocument();
+  });
+
   it("lists every source when sources disagree", async () => {
     // Given two sources that disagree on the address
     const conflict = aiAnswer(4, "Bahnhofstrasse 1", "conflict", undefined, {
@@ -940,14 +959,22 @@ describe("Live fill (status and source of each answer)", () => {
       back.phase("reading_form");
       expect(await screen.findByRole("heading", { name: "Filling the form…" })).toBeInTheDocument();
 
-      // When I discard and confirm
+      // When I discard and confirm (the back ends the stream without a result, as it does when
+      // the fill is discarded: the screen must not reconnect or fall into an error)
       const dialog = await openDiscard(user);
+      back.stream.close();
       await user.click(dialog.getByRole("button", { name: "Discard" }));
 
       // Then I am back on the tender
       await waitFor(() => expect(push).toHaveBeenCalledWith("/tenders/1"));
       expect(discard.state.discards).toBe(1);
-      back.stream.close();
+      // And the screen stopped following: no new stream, no error or "not found" meanwhile
+      const connections = back.stream.connections();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(back.stream.connections()).toBe(connections);
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      expect(screen.queryByText("Form not found")).not.toBeInTheDocument();
+      expect(screen.queryByText("We couldn't load this form.")).not.toBeInTheDocument();
     });
   });
 });

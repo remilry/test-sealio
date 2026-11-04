@@ -30,7 +30,7 @@ export type QueueField = {
   userOnlyReason: string | null;
 };
 
-/** What the status lines name: the bidder and how many documents were searched. */
+/** What the status lines name: the bidder and how many documents were searched (when known). */
 export type FieldContext = { companyName: string; documentCount: number };
 
 /** Ask the list to move the keyboard focus to a field's input (changes on every request). */
@@ -51,7 +51,7 @@ export function FieldList({
   onNext,
   onDraft,
 }: {
-  context: FieldContext;
+  context: FieldContext | undefined;
   fields: QueueField[];
   selectedId: number | null;
   focusRequest: FocusRequest | null;
@@ -121,7 +121,7 @@ function FieldInput({
 }: {
   field: QueueField;
   selected: boolean;
-  context: FieldContext;
+  context: FieldContext | undefined;
   inputRef: (input: HTMLInputElement | null) => void;
   onFocus: () => void;
   onSave: (value: string | null) => void;
@@ -179,7 +179,7 @@ function FieldInput({
 }
 
 /** The line under the input: what the field's value is, or where its search is. */
-function FieldStatus({ field, context }: { field: QueueField; context: FieldContext }) {
+function FieldStatus({ field, context }: { field: QueueField; context: FieldContext | undefined }) {
   const t = useTranslations("fieldList");
   if (field.unsaved !== null) {
     return <p className="text-xs text-destructive">{t("notSaved")}</p>;
@@ -205,7 +205,7 @@ function FieldStatus({ field, context }: { field: QueueField; context: FieldCont
   if (field.type === "missing" && !field.value) {
     return (
       <p className="text-xs text-muted-foreground">
-        {t("missing", { count: context.documentCount })}
+        {context ? t("missing", { count: context.documentCount }) : t("missingUnknown")}
       </p>
     );
   }
@@ -229,7 +229,7 @@ function FieldStatus({ field, context }: { field: QueueField; context: FieldCont
       );
     }
   }
-  if (field.type === "declaration") {
+  if (field.type === "declaration" && context) {
     return (
       <p className="text-xs text-muted-foreground">
         {t("declaration", { company: context.companyName })}
@@ -262,7 +262,9 @@ function FieldSources({ field, expanded }: { field: QueueField; expanded: boolea
           <p className="font-medium">
             <SourceName citation={citation} />
           </p>
-          <blockquote className="text-muted-foreground">{t("quote", { quote: citation.quote })}</blockquote>
+          <blockquote className="text-muted-foreground">
+            {t("quote", { quote: citation.quote })}
+          </blockquote>
         </li>
       ))}
     </ul>

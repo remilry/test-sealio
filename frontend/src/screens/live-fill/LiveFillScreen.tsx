@@ -43,6 +43,20 @@ import { Skeleton } from "@/shared/ui/skeleton";
  * kept in sync. While the form fills itself, both follow the run field by field.
  */
 export function LiveFillScreen({ formId }: { formId: number }) {
+  // Once discarded, nothing of the form is read or followed any more (its data is gone): the
+  // screen waits for the navigation to the tender.
+  const [discarded, setDiscarded] = useState(false);
+  if (discarded) {
+    return (
+      <Frame>
+        <LoadingState />
+      </Frame>
+    );
+  }
+  return <LiveFill formId={formId} onDiscarded={() => setDiscarded(true)} />;
+}
+
+function LiveFill({ formId, onDiscarded }: { formId: number; onDiscarded: () => void }) {
   const form = useFormDetail(formId);
   const fill = useFillState(formId);
 
@@ -64,7 +78,7 @@ export function LiveFillScreen({ formId }: { formId: number }) {
       />
     );
   }
-  return <FillWorkspace form={form.data} fill={fill.data} />;
+  return <FillWorkspace form={form.data} fill={fill.data} onDiscarded={onDiscarded} />;
 }
 
 function FormLoadFailed({ error, onRetry }: { error: unknown; onRetry: () => void }) {
@@ -86,7 +100,15 @@ function FormLoadFailed({ error, onRetry }: { error: unknown; onRetry: () => voi
   );
 }
 
-function FillWorkspace({ form, fill }: { form: FormDetail; fill: FillState }) {
+function FillWorkspace({
+  form,
+  fill,
+  onDiscarded,
+}: {
+  form: FormDetail;
+  fill: FillState;
+  onDiscarded: () => void;
+}) {
   const t = useTranslations("liveFill");
   const { data: tender } = useTender(form.tender_id);
   const { data: knowledge } = useKnowledgeBase();
@@ -207,7 +229,10 @@ function FillWorkspace({ form, fill }: { form: FormDetail; fill: FillState }) {
             formTitle={form.title}
             open={discarding}
             onOpenChange={setDiscarding}
-            onDiscarded={() => router.push(routes.tender(form.tender_id))}
+            onDiscarded={() => {
+              onDiscarded();
+              router.push(routes.tender(form.tender_id));
+            }}
           />
           <SaveIndicator formId={form.id} />
           <span className="text-xs whitespace-nowrap text-muted-foreground">
@@ -236,10 +261,12 @@ function FillWorkspace({ form, fill }: { form: FormDetail; fill: FillState }) {
             fields={fields}
             selectedId={selectedId}
             focusRequest={focusRequest}
-            context={{
-              companyName: knowledge?.company_name ?? "",
-              documentCount: knowledge?.documents.length ?? 0,
-            }}
+            context={
+              knowledge && {
+                companyName: knowledge.company_name,
+                documentCount: knowledge.documents.length,
+              }
+            }
             onSelect={setChosenId}
             onSave={(fieldId, value) => {
               // The saved answer takes over from the draft (and comes back if the save fails).
