@@ -31,8 +31,8 @@ class Settings(BaseSettings):
     llm_model: str = "gpt-5-mini"
     llm_reasoning_effort: Literal["minimal", "low", "medium", "high"] = "low"
     llm_recordings_dir: Path = REPO_ROOT / "backend" / "llm_recordings"
-    # US dollars per million tokens, for the cost in the logs (gpt-5-mini list prices: check
-    # https://openai.com/api/pricing when changing the model).
+    # US dollars per million tokens, for the cost in the logs: gpt-5-mini, Standard tier
+    # (https://developers.openai.com/api/docs/pricing, checked 2026-11-04). Update with the model.
     llm_price_input: float = 0.25
     llm_price_cached_input: float = 0.025
     llm_price_output: float = 2.0
