@@ -179,5 +179,9 @@
         }
       ]
     }
-  ]
+  ],
+  "timing": {
+    "first_output_seconds": 7.12,
+    "total_seconds": 16.68
+  }
 }

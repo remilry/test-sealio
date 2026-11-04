@@ -11,6 +11,7 @@ Needs OPENAI_API_KEY (backend/.env) and costs a few cents per run.
 """
 
 import argparse
+import time
 from datetime import date
 from itertools import groupby
 
@@ -82,6 +83,19 @@ def main() -> None:
                     to_answer = [FieldToAnswer(f.id, f.key, f.label, f.kind) for f in fields]
                     key = request_key(form.file_name, section)
                     print(f"\n{key}")
+                    started = time.monotonic()
+
+                    keys = {f.id: f.key for f in to_answer}
+
+                    def on_field(
+                        field_id: int,
+                        _evidence: object,
+                        started: float = started,
+                        keys: dict[int, str] = keys,
+                    ) -> None:
+                        elapsed = time.monotonic() - started
+                        print(f"  [+{elapsed:5.1f}s] arrived: {keys[field_id]}")
+
                     result = answer_section(
                         llm,
                         company=company,
@@ -92,6 +106,7 @@ def main() -> None:
                         search=search,
                         tender_details=details,
                         today=today,
+                        on_field=on_field,
                     )
                     evidence = result.evidence
                     total += result.usage
