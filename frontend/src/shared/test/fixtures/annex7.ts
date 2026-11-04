@@ -149,7 +149,7 @@ export function citation(overrides: Partial<Citation> = {}): Citation {
     document_name: "Commercial register extract",
     document_id: 1,
     chunk_id: 11,
-    page: 1,
+    page: 0,
     ...overrides,
   };
 }

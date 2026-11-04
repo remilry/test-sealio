@@ -275,5 +275,5 @@ function SourceName({ citation }: { citation: Schema<"Citation"> }) {
   const t = useTranslations("fieldList");
   if (citation.document_id === null) return t("tenderDetails");
   if (citation.page === null) return t("sourceNoPage", { document: citation.document_name });
-  return t("source", { document: citation.document_name, page: citation.page });
+  return t("source", { document: citation.document_name, page: citation.page + 1 });
 }

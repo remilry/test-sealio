@@ -749,7 +749,7 @@ describe("Live fill (status and source of each answer)", () => {
           citation({
             quote: "Alpenlogic AG, Zurich",
             document_name: "Commercial register extract",
-            page: 2,
+            page: 1,
           }),
         ]),
       ],
@@ -765,6 +765,26 @@ describe("Live fill (status and source of each answer)", () => {
       card("Name and legal form").getByText("Commercial register extract, page 2"),
     ).toBeInTheDocument();
     expect(card("Name and legal form").getByText(/“?Alpenlogic AG, Zurich”?/)).toBeInTheDocument();
+  });
+
+  it("reads the 0-based page of a citation as a 1-based page number", async () => {
+    // Given an answer found on the first page of a document (page 0 in the API)
+    const found = aiAnswer(3, "Alpenlogic AG", "auto", undefined, {
+      candidates: [
+        candidate("Alpenlogic AG", [
+          citation({ document_name: "Commercial register extract", page: 0 }),
+        ]),
+      ],
+    });
+    const { user } = given(annex7(), fillState([found]));
+
+    // When I open that field
+    await user.click(await screen.findByRole("textbox", { name: "Name and legal form" }));
+
+    // Then the source reads page 1
+    expect(
+      card("Name and legal form").getByText("Commercial register extract, page 1"),
+    ).toBeInTheDocument();
   });
 
   it("shows the source of the selected field only, the others are collapsed", async () => {
