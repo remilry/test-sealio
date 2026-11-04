@@ -256,19 +256,34 @@ describe("Live fill (manual)", () => {
     expect(screen.getByRole("textbox", { name: "Name and legal form" })).toHaveFocus();
   });
 
-  it("tells me when a value could not be saved", async () => {
+  it("keeps what I typed when it could not be saved, so I can try again", async () => {
     // Given the back refuses the save
-    given();
+    const { saved } = given();
     server.use(handlers.error("/forms/2/fields/6", 500, "Boom", "patch"));
     const user = userEvent.setup();
 
     // When I type a value and leave the field
-    await user.type(await screen.findByRole("textbox", { name: "Telephone" }), "044");
+    const telephone = await screen.findByRole("textbox", { name: "Telephone" });
+    await user.type(telephone, "044");
     await user.tab();
 
-    // Then I am told it is not saved, and the form does not pretend it is
-    expect(await screen.findByRole("status")).toHaveTextContent("Not saved");
+    // Then I am told it is not saved, without technical details, and the form does not pretend it is
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Couldn't save — press Enter in the field to try again",
+    );
     expect(screen.getByText("0 / 9 filled · 9 empty")).toBeInTheDocument();
+    // But what I typed is still there, on the form too
+    const card = within(fieldList().getByRole("listitem", { name: "Telephone" }));
+    expect(card.getByRole("textbox")).toHaveValue("044");
+    expect(card.getByText("Not saved — press Enter to try again")).toBeInTheDocument();
+    expect(within(zone(6)).getByText("044")).toBeInTheDocument();
+
+    // And when the back is reachable again, Enter saves it
+    server.use(saved.handler);
+    await user.type(card.getByRole("textbox"), "{Enter}");
+    await waitFor(() => expect(saved.requests).toEqual([{ fieldId: 6, value: "044" }]));
+    expect(await screen.findByText("1 / 9 filled · 8 empty")).toBeInTheDocument();
+    expect(card.queryByText(/Not saved/)).not.toBeInTheDocument();
   });
 
   it("tells me when a form cannot be filled yet (format not supported)", async () => {
@@ -302,6 +317,10 @@ describe("Live fill (manual)", () => {
     const user = userEvent.setup();
     renderScreen(<LiveFillScreen formId={2} />);
     const alert = await screen.findByRole("alert");
+    // (told in plain words, nothing technical)
+    expect(alert).toHaveTextContent(
+      "We couldn't load this form.Something went wrong on our side. Please try again in a moment.",
+    );
 
     // When it is back and I retry
     server.use(handlers.form(annex7()), handlers.tender(tender()));

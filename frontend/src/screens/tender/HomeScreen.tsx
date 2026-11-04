@@ -3,7 +3,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { InboxIcon } from "lucide-react";
 import { tenderQueries } from "@/features/tender";
-import { Alert, AlertAction, AlertTitle } from "@/shared/ui/alert";
+import { messages } from "@/shared/lib/messages";
+import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Button } from "@/shared/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/shared/ui/empty";
 import { TenderScreen } from "./TenderScreen";
@@ -17,6 +18,7 @@ export function HomeScreen() {
       <div className="p-8">
         <Alert variant="destructive">
           <AlertTitle>We couldn&apos;t load your tenders.</AlertTitle>
+          <AlertDescription>{messages.retryLater}</AlertDescription>
           <AlertAction>
             <Button variant="outline" size="sm" onClick={() => refetch()}>
               Try again

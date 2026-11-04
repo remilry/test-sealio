@@ -13,6 +13,8 @@ export type QueueField = {
   /** Signatures and stamps are shown but never filled. */
   fillable: boolean;
   value: string | null;
+  /** What the user typed but could not be saved: kept in the input so they can try again. */
+  unsaved: string | null;
   /** When the user entered the value (ISO timestamp). */
   enteredAt: string | null;
 };
@@ -104,11 +106,12 @@ function FieldInput({
   onDraft: (text: string) => void;
 }) {
   const inputId = `field-${field.id}`;
-  // The last value sent (or saved), so Enter then leaving the input saves once.
+  // The last value sent (or saved), so Enter then leaving the input saves once. Back to the saved
+  // value when a save fails, so the kept text is sent again.
   const lastSent = useRef(field.value ?? "");
   useEffect(() => {
     lastSent.current = field.value ?? "";
-  }, [field.value]);
+  }, [field.value, field.unsaved]);
   const saveIfChanged = (input: HTMLInputElement) => {
     const value = input.value.trim();
     if (value === lastSent.current) return;
@@ -128,22 +131,26 @@ function FieldInput({
         {field.label}
       </label>
       <Input
-        // Remounts with the saved value (trimmed by the back) once saved.
-        key={field.value ?? ""}
+        // Remounts with the saved value (trimmed by the back) once saved, or with what could not be.
+        key={field.unsaved ?? field.value ?? ""}
         ref={inputRef}
         id={inputId}
         name="value"
-        defaultValue={field.value ?? ""}
+        defaultValue={field.unsaved ?? field.value ?? ""}
         autoComplete="off"
         onFocus={onFocus}
         onChange={(event) => onDraft(event.currentTarget.value)}
         onBlur={(event) => saveIfChanged(event.currentTarget)}
       />
-      <p className="text-xs text-muted-foreground">
-        {field.value && field.enteredAt
-          ? `Entered by you · ${formatTime(field.enteredAt)}`
-          : "Empty — exported blank"}
-      </p>
+      {field.unsaved !== null ? (
+        <p className="text-xs text-destructive">Not saved — press Enter to try again</p>
+      ) : (
+        <p className="text-xs text-muted-foreground">
+          {field.value && field.enteredAt
+            ? `Entered by you · ${formatTime(field.enteredAt)}`
+            : "Empty — exported blank"}
+        </p>
+      )}
     </form>
   );
 }

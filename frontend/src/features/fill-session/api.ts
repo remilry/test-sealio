@@ -34,9 +34,13 @@ type SaveVariables = { fieldId: number; value: string | null };
 
 /**
  * Saves a value typed by the user. Optimistic: the answer shows at once; the back's fill state
- * (counts included) replaces it when it answers, and an error rolls it back.
+ * (counts included) replaces it when it answers, and an error rolls it back, then calls
+ * `onFailed` so the screen can keep what was typed.
  */
-export function useSaveAnswer(formId: number) {
+export function useSaveAnswer(
+  formId: number,
+  { onFailed }: { onFailed?: (variables: SaveVariables) => void } = {},
+) {
   const queryClient = useQueryClient();
   const answersKey = fillQueries.answers(formId).queryKey;
   return useMutation({
@@ -57,8 +61,9 @@ export function useSaveAnswer(formId: number) {
       return { previous };
     },
     onSuccess: (state) => queryClient.setQueryData(answersKey, state),
-    onError: (_error, _variables, context) => {
+    onError: (_error, variables, context) => {
       if (context?.previous) queryClient.setQueryData(answersKey, context.previous);
+      onFailed?.(variables);
     },
   });
 }

@@ -19,6 +19,7 @@ import { tenderQueries } from "@/features/tender";
 import { isNotFound } from "@/shared/api";
 import { useHandleKeyDown } from "@/shared/lib/hooks/useHandleKeyDown";
 import { routes } from "@/shared/lib/routes";
+import { messages } from "@/shared/lib/messages";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Button, buttonVariants } from "@/shared/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/shared/ui/empty";
@@ -51,7 +52,7 @@ export function LiveFillScreen({ formId }: { formId: number }) {
           <div className="mx-auto w-full max-w-xl p-8">
             <Alert variant="destructive">
               <AlertTitle>We couldn&apos;t load this form.</AlertTitle>
-              <AlertDescription>Check that the API is running, then try again.</AlertDescription>
+              <AlertDescription>{messages.retryLater}</AlertDescription>
               <AlertAction>
                 <Button
                   variant="outline"
@@ -75,23 +76,26 @@ export function LiveFillScreen({ formId }: { formId: number }) {
 
 function FillWorkspace({ form, fill }: { form: FormDetail; fill: FillState }) {
   const { data: tender } = useQuery(tenderQueries.detail(form.tender_id));
-  const save = useSaveAnswer(form.id);
+  // Values the back refused: kept in their input (and on the document) until saved.
+  const [unsaved, setUnsaved] = useState<ReadonlyMap<number, string>>(new Map());
+  const save = useSaveAnswer(form.id, {
+    onFailed: ({ fieldId, value }) => {
+      setUnsaved((previous) => withEntry(previous, fieldId, value ?? ""));
+      setDraft(fieldId, value ?? "");
+    },
+  });
 
   const answers = new Map(fill.answers.map((answer) => [answer.field_id, answer]));
   // Text being typed, not saved yet: shown on the document at every keystroke.
   const [drafts, setDrafts] = useState<ReadonlyMap<number, string>>(new Map());
   const setDraft = (fieldId: number, text: string | null) =>
-    setDrafts((previous) => {
-      const next = new Map(previous);
-      if (text === null) next.delete(fieldId);
-      else next.set(fieldId, text);
-      return next;
-    });
+    setDrafts((previous) => withEntry(previous, fieldId, text));
   const fields: QueueField[] = form.fields.map((field) => ({
     id: field.id,
     label: field.label,
     fillable: field.kind !== "signature",
     value: answers.get(field.id)?.value ?? null,
+    unsaved: unsaved.get(field.id) ?? null,
     enteredAt: answers.get(field.id)?.resolved_at ?? null,
   }));
   const zones: PreviewZone[] = form.fields.map((field, index) => {
@@ -191,6 +195,7 @@ function FillWorkspace({ form, fill }: { form: FormDetail; fill: FillState }) {
             onSave={(fieldId, value) => {
               // The saved answer takes over from the draft (and comes back if the save fails).
               setDraft(fieldId, null);
+              setUnsaved((previous) => withEntry(previous, fieldId, null));
               save.mutate({ fieldId, value });
             }}
             onNext={focusNextFillable}
@@ -290,4 +295,12 @@ function LoadingState() {
       <Skeleton className="aspect-[595/842] w-full max-w-[760px]" />
     </div>
   );
+}
+
+/** A copy of the map with the entry set, or removed when `text` is null. */
+function withEntry(map: ReadonlyMap<number, string>, id: number, text: string | null) {
+  const next = new Map(map);
+  if (text === null) next.delete(id);
+  else next.set(id, text);
+  return next;
 }

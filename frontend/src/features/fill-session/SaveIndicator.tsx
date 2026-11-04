@@ -5,7 +5,7 @@ const LABELS = {
   idle: "All changes saved",
   saving: "Saving…",
   saved: "Saved",
-  failed: "Not saved — check the API and try again",
+  failed: "Couldn't save — press Enter in the field to try again",
 } as const;
 
 /** "✓ Saved" in the top bar: every edit is saved automatically. */

@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { FileQuestionIcon } from "lucide-react";
 import { FormList, TenderHeader, tenderQueries } from "@/features/tender";
 import { isNotFound } from "@/shared/api";
+import { messages } from "@/shared/lib/messages";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Button } from "@/shared/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/shared/ui/empty";
@@ -43,7 +44,7 @@ export function TenderScreen({ tenderId }: { tenderId: number }) {
           ) : (
             <Alert variant="destructive">
               <AlertTitle>We couldn&apos;t load this tender.</AlertTitle>
-              <AlertDescription>Check that the API is running, then try again.</AlertDescription>
+              <AlertDescription>{messages.retryLater}</AlertDescription>
               <AlertAction>
                 <Button variant="outline" size="sm" onClick={() => refetch()}>
                   Try again

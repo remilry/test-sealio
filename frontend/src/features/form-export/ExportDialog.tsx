@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { CircleCheckIcon, DownloadIcon, PenLineIcon, TriangleAlertIcon } from "lucide-react";
+import { messages } from "@/shared/lib/messages";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Button, buttonVariants } from "@/shared/ui/button";
 import {
@@ -81,7 +82,7 @@ function ExportContent({
       {summary.error ? (
         <Alert variant="destructive">
           <AlertTitle>We couldn&apos;t prepare the export.</AlertTitle>
-          <AlertDescription>Check that the API is running, then try again.</AlertDescription>
+          <AlertDescription>{messages.retryLater}</AlertDescription>
           <AlertAction>
             <Button variant="outline" size="sm" onClick={() => void summary.refetch()}>
               Try again
