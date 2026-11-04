@@ -415,9 +415,7 @@ describe("Company knowledge", () => {
       // Then the explanation and the invitation to drop are one zone
       const zone = within(await screen.findByRole("region", { name: "Drop documents here" }));
       expect(zone.getByRole("heading", { name: "No documents yet" })).toBeInTheDocument();
-      expect(
-        zone.getByText("The AI answers only from your company documents."),
-      ).toBeInTheDocument();
+      expect(zone.getByText("Answers come only from your company documents.")).toBeInTheDocument();
       expect(zone.getByRole("button", { name: "browse your files" })).toBeInTheDocument();
     });
 
@@ -460,7 +458,7 @@ describe("Company knowledge", () => {
       });
       expect(
         within(confirm).getByText(
-          "The AI will no longer answer from this document, and its file is removed. This can't be undone.",
+          "Answers will no longer be drawn from this document, and its file is removed. This can't be undone.",
         ),
       ).toBeInTheDocument();
       deletedOnBack = true;

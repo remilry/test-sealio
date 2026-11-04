@@ -204,6 +204,24 @@ describe("Tender", () => {
       await waitFor(() => expect(push).toHaveBeenCalledWith("/forms/2/fill"));
     });
 
+    it("opens the live fill anyway when a fill is already running", async () => {
+      // Given the back says the form is already being filled
+      server.use(
+        handlers.tender(tender()),
+        handlers.knowledge(elevenDocuments()),
+        handlers.error("/forms/2/fill", 409, "This form is already being filled.", "post"),
+      );
+      const user = userEvent.setup();
+      renderScreen(<TenderScreen tenderId={1} />);
+      const dialog = await openSetup(user);
+
+      // When I start
+      await user.click(dialog.getByRole("button", { name: "Start" }));
+
+      // Then I follow the run on the form
+      await waitFor(() => expect(push).toHaveBeenCalledWith("/forms/2/fill"));
+    });
+
     it("warns when the company knowledge is empty", async () => {
       // Given no company documents
       server.use(handlers.tender(tender()), handlers.knowledge(knowledgeBase({ documents: [] })));

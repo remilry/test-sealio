@@ -46,7 +46,8 @@ export function SetupDialog({
   const handleStart = () =>
     start.mutate(undefined, {
       onSuccess: onStarted,
-      // Already filled (a colleague, another tab): the form is there to review.
+      // 409: already filled, or a fill is already running (a colleague, another tab). Either way
+      // Live fill is the right place: review the answers or follow the run.
       onError: (error) => {
         if (error instanceof ApiError && error.status === 409) onStarted();
       },

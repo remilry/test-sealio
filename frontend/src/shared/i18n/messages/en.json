@@ -1,7 +1,7 @@
 {
   "metadata": {
     "title": "Formpilot",
-    "description": "Fill tender forms with AI, grounded in your company documents."
+    "description": "Fill tender forms automatically from your company documents."
   },
   "common": {
     "appName": "Formpilot",
@@ -137,7 +137,7 @@
     "summary": "{count, plural, =0 {No documents} one {# document} other {# documents}}",
     "summaryIndexed": "{count, plural, =0 {No documents} one {# document} other {# documents}} · last indexed {date} at {time}",
     "noneTitle": "No documents yet",
-    "noneDescription": "The AI answers only from your company documents.",
+    "noneDescription": "Answers come only from your company documents.",
     "documents": "Documents",
     "column": {
       "document": "Document",
@@ -175,7 +175,7 @@
     "dropFormats": "PDF or DOCX · up to 20 MB each",
     "deleteDocument": "Delete {name}",
     "deleteTitle": "Delete {name}?",
-    "deleteDescription": "The AI will no longer answer from this document, and its file is removed. This can't be undone.",
+    "deleteDescription": "Answers will no longer be drawn from this document, and its file is removed. This can't be undone.",
     "deleteConfirm": "Delete document",
     "cancel": "Cancel",
     "deleteFailed": "{name} could not be deleted"
