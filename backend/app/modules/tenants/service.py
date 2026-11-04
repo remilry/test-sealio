@@ -22,6 +22,10 @@ def ensure_tenant(session: Session, *, slug: str, name: str) -> Tenant:
     return tenant
 
 
+def get_tenant_name(session: Session, tenant_id: int) -> str:
+    return session.get_one(Tenant, tenant_id).name
+
+
 def get_current_tenant_id(session: SessionDep) -> int:
     """The tenant of the request.
 

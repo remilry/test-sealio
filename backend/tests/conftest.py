@@ -18,6 +18,8 @@ _base_url = make_url(
 TEST_DATABASE_URL = _base_url.set(database=TEST_DB).render_as_string(hide_password=False)
 # Must be set before `app` is imported: the engine reads it at import time.
 os.environ["FORMPILOT_DATABASE_URL"] = TEST_DATABASE_URL
+# Deterministic embeddings: only the tests marked `slow` load the real model.
+os.environ["FORMPILOT_EMBEDDER"] = "hash"
 
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import text  # noqa: E402
