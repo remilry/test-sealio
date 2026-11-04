@@ -169,6 +169,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/knowledge/documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add Documents
+         * @description Add company documents. They are listed at once as "processing", then indexed in the
+         *     background: poll `GET /knowledge` for their final status ("indexed" or "error").
+         */
+        post: operations["add_documents_knowledge_documents_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/knowledge/documents/{document_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Document
+         * @description Remove a company document: its passages are no longer searched, its file is deleted.
+         */
+        delete: operations["delete_document_knowledge_documents__document_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/knowledge/documents/{document_id}/file": {
         parameters: {
             query?: never;
@@ -227,6 +268,14 @@ export interface components {
         AnswerUpdate: {
             /** Value */
             value: string | null;
+        };
+        /** Body_add_documents_knowledge_documents_post */
+        Body_add_documents_knowledge_documents_post: {
+            /**
+             * Files
+             * @description PDF or Word (.docx) documents
+             */
+            files: string[];
         };
         /**
          * Box
@@ -799,6 +848,73 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["KnowledgeBase"];
+                };
+            };
+        };
+    };
+    add_documents_knowledge_documents_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_add_documents_knowledge_documents_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentOut"][];
+                };
+            };
+            /** @description No file, or a file empty, too large or not PDF/DOCX */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    delete_document_knowledge_documents__document_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown document */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

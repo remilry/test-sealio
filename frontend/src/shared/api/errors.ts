@@ -11,17 +11,20 @@ export class ApiError extends Error {
 
 type ApiResult<T> = { data?: T; error?: unknown; response: Response };
 
-/** Turns an openapi-fetch result into its data, or throws an ApiError (for TanStack Query). */
+/**
+ * Turns an openapi-fetch result into its data, or throws an ApiError (for TanStack Query).
+ * A success without a body (204 No Content) resolves to undefined: openapi-fetch gives no data.
+ */
 export async function unwrap<T>(request: Promise<ApiResult<T>>): Promise<T> {
   const { data, error, response } = await request;
-  if (error !== undefined || data === undefined) {
+  if (error !== undefined || !response.ok) {
     const detail =
       typeof error === "object" && error !== null && "detail" in error
         ? String(error.detail)
         : response.statusText;
     throw new ApiError(response.status, detail);
   }
-  return data;
+  return data as T;
 }
 
 export function isNotFound(error: unknown): boolean {

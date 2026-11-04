@@ -19,7 +19,7 @@ event reducer, PDF → CSS coordinate conversion).
 ## Stack
 
 - `vitest` + `jsdom`
-- `@testing-library/react` + `@testing-library/user-event` (always `userEvent.setup()`, never `fireEvent`)
+- `@testing-library/react` + `@testing-library/user-event` (always `userEvent.setup()`, never `fireEvent`, except to drag files from outside the page onto a drop area, which user-event cannot do: `fireEvent.dragEnter/drop(el, { dataTransfer: { types: ["Files"], files } })`)
 - `@testing-library/jest-dom` matchers
 - `msw` (v3) for **all** network: REST handlers and SSE (`sse()` from `msw`). The server
   listens with `onUnhandledFrame: "error"` (v3 name of `onUnhandledRequest`): a request with no handler fails the test
@@ -103,6 +103,6 @@ user action it offers (click, keyboard, upload). Minimum list:
 
 - [ ] Test names are user sentences; body reads Given / When / Then.
 - [ ] Only MSW (and the react-pdf canvas mock) is mocked.
-- [ ] No `fireEvent`, no sleeps, no `container.querySelector` (except `data-field-id` zones).
+- [ ] No `fireEvent` (except file drag and drop), no sleeps, no `container.querySelector` (except `data-field-id` zones).
 - [ ] Fixtures typed from `schema.gen.ts` (a back contract change breaks the tests at compile time).
 - [ ] `pnpm test` passes, and the new test fails if the behavior is removed (check once by breaking it).
