@@ -28,7 +28,7 @@ from app.modules.forms.parsing.schema import FieldKind
 
 DOUBTS = frozenset({AnswerType.CONFLICT, AnswerType.OUTDATED})
 
-INTERRUPTED = "The server stopped while the AI was filling this form. Start the fill again."
+INTERRUPTED = "The server stopped while filling this form. Start the fill again."
 
 
 def fill_statuses(
@@ -117,7 +117,9 @@ def start_ai_fill(session: Session, tenant_id: int, form_id: int) -> int:
     """
     form = forms_service.get_form(session, form_id)
     if form.field_counts is None:
-        raise RuleViolationError("This form cannot be filled with AI yet: its format is not read.")
+        raise RuleViolationError(
+            "This form cannot be filled automatically yet: its format is not read."
+        )
     _start_fill(session, tenant_id, form_id)
     # Locked: two clicks on "Fill with AI" never start two runs.
     fill = session.scalars(
@@ -126,7 +128,7 @@ def start_ai_fill(session: Session, tenant_id: int, form_id: int) -> int:
         .with_for_update()
     ).one()
     if fill.ai_status == AiStatus.RUNNING:
-        raise ConflictError("The AI is already filling this form.")
+        raise ConflictError("This form is already being filled.")
     session.execute(delete(FillEvent).where(FillEvent.form_fill_id == fill.id))
     fill.status = FillStatus.IN_REVIEW
     fill.ai_status = AiStatus.RUNNING

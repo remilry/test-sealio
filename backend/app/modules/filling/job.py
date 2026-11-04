@@ -20,7 +20,7 @@ from app.modules.filling import service
 from app.modules.filling.answer_engine import FieldToAnswer, Search, answer_section
 from app.modules.filling.models import AiStatus, FillEventType, FormFill
 from app.modules.filling.rules import AnswerType, decide
-from app.modules.filling.validator import SourcePassage
+from app.modules.filling.validator import SourcePassage, ValidatedField
 from app.modules.forms import service as forms_service
 from app.modules.forms.parsing.schema import FieldKind
 from app.modules.knowledge import service as knowledge_service
@@ -29,7 +29,7 @@ from app.modules.tenders import service as tenders_service
 
 logger = logging.getLogger(__name__)
 
-UNEXPECTED_ERROR = "Something went wrong while the AI was filling this form. Try again."
+UNEXPECTED_ERROR = "Something went wrong while filling this form."
 
 
 def run_fill(fill_id: int, llm: LLM, today: date | None = None) -> None:
@@ -111,31 +111,23 @@ def _run(session: Session, fill_id: int, llm: LLM, today: date) -> None:
             service.add_event(
                 session, fill_id, FillEventType.FIELD, {"field_id": field.id, "state": "searching"}
             )
-        result = answer_section(
-            llm,
-            company=company,
-            form_title=form.title,
-            form_file_name=form.file_name,
-            section=section,
-            fields=fields,
-            search=search,
-            tender_details=details,
-            today=today,
-        )
-        evidence = result.evidence
-        usage, search_seconds = usage + result.usage, search_seconds + result.search_seconds
-        logger.info("AI fill %s, section %r: %s", fill_id, section, result.describe())
-        for field in fields:
-            for reason in evidence[field.id].rejected:
+
+        by_id = {f.id: f for f in fields}
+
+        def on_field(
+            field_id: int, validated: ValidatedField, by_id: dict[int, FieldToAnswer] = by_id
+        ) -> None:
+            field = by_id[field_id]
+            for reason in validated.rejected:
                 logger.info("Field %s (%s): %s", field.key, field.id, reason)
-            decision = decide(field.kind, evidence[field.id], today)
+            decision = decide(field.kind, validated, today)
             if decision is None:
-                continue
+                return
             service.record_ai_answer(session, fill_id, field.id, decision)
             session.commit()
             answer = service.get_answer(session, fill_id, field.id)
             if answer is None:
-                continue
+                return
             if answer.resolved_by == "ai":
                 types[decision.type] += 1
             counts = service.get_fill_state(session, tenant_id, form.id).counts
@@ -150,6 +142,21 @@ def _run(session: Session, fill_id: int, llm: LLM, today: date) -> None:
                     "counts": counts.model_dump(),
                 },
             )
+
+        result = answer_section(
+            llm,
+            company=company,
+            form_title=form.title,
+            form_file_name=form.file_name,
+            section=section,
+            fields=fields,
+            search=search,
+            tender_details=details,
+            today=today,
+            on_field=on_field,
+        )
+        usage, search_seconds = usage + result.usage, search_seconds + result.search_seconds
+        logger.info("AI fill %s, section %r: %s", fill_id, section, result.describe())
 
     phase(
         "cross_checking",

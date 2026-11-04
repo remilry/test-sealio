@@ -11,7 +11,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.core.db import SessionLocal
-from app.llm.facade import LLMError, LLMRequest, LLMResult
+from app.llm.facade import LLMError, LLMRequest, LLMResult, OnPartial
 from app.llm.fake_adapter import FakeLLM
 from app.main import app
 from app.modules.filling import router as filling_router
@@ -97,10 +97,12 @@ class ScriptedLLM(FakeLLM):
         super().__init__(answers)
         self.while_thinking: Callable[[], None] | None = None
 
-    def generate_structured(self, request: LLMRequest[Any]) -> LLMResult[Any]:  # type: ignore[override]
+    def generate_structured(  # type: ignore[override]
+        self, request: LLMRequest[Any], on_partial: OnPartial | None = None
+    ) -> LLMResult[Any]:
         if self.while_thinking:
             self.while_thinking()
-        return super().generate_structured(request)
+        return super().generate_structured(request, on_partial)
 
 
 @pytest.fixture
@@ -312,7 +314,7 @@ def test_the_fill_cannot_start_twice_at_once(client: TestClient, annex_7: int) -
     response = client.post(f"/forms/{annex_7}/fill")
 
     assert response.status_code == 409
-    assert "already filling" in response.json()["detail"]
+    assert "already being filled" in response.json()["detail"]
 
 
 def test_a_form_that_cannot_be_read_yet_cannot_be_filled(client: TestClient) -> None:
@@ -352,7 +354,7 @@ def test_an_unexpected_failure_shows_a_generic_message(
     client.post(f"/forms/{annex_7}/fill")
 
     assert read_events(client, annex_7)[-1]["data"] == {
-        "message": "Something went wrong while the AI was filling this form. Try again."
+        "message": "Something went wrong while filling this form."
     }
 
 
@@ -432,3 +434,44 @@ def test_an_answer_naming_the_field_by_its_label_is_still_matched(
     client.post(f"/forms/{annex_7}/fill")
 
     assert answers_by_key(client, annex_7)["business_address"]["type"] == "auto"
+
+
+def test_answers_are_emitted_while_the_section_is_being_answered(
+    client: TestClient, annex_7: int, llm: ScriptedLLM
+) -> None:
+    answered_during_call: list[int] = []
+
+    def answered_events() -> int:
+        with SessionLocal() as other:
+            fill_id = service.fill_id_of(
+                other, tenants_service.get_current_tenant_id(other), annex_7
+            )
+            if fill_id is None:
+                return 0
+            _, events = service.events_after(other, fill_id, 0)
+            return sum(
+                1 for e in events if e.type == FillEventType.FIELD and e.data["state"] == "answered"
+            )
+
+    def watch(partial: dict[str, Any]) -> None:
+        answered_during_call.append(answered_events())
+
+    class Watching(ScriptedLLM):
+        def generate_structured(  # type: ignore[override]
+            self, request: LLMRequest[Any], on_partial: OnPartial | None = None
+        ) -> LLMResult[Any]:
+            def both(partial: dict[str, Any]) -> None:
+                if on_partial:
+                    on_partial(partial)
+                watch(partial)
+
+            return super().generate_structured(request, both)
+
+    app.dependency_overrides[filling_router.get_language_model] = lambda: Watching(
+        {ANNEX_7_KEY: ANNEX_7_ANSWER}
+    )
+
+    client.post(f"/forms/{annex_7}/fill")
+
+    # Some answers were already recorded before the model's call returned.
+    assert max(answered_during_call) >= 1
