@@ -28,7 +28,9 @@ from app.modules.forms.parsing.schema import FieldKind
 
 DOUBTS = frozenset({AnswerType.CONFLICT, AnswerType.OUTDATED})
 
-INTERRUPTED = "The server stopped while filling this form. Start the fill again."
+INTERRUPTED = (
+    "The server stopped while filling this form. Discard its answers to auto-fill it again."
+)
 
 
 def fill_statuses(

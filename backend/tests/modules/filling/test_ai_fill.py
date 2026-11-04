@@ -339,14 +339,15 @@ def test_a_form_that_cannot_be_read_yet_cannot_be_filled(client: TestClient) -> 
     assert response.status_code == 422
 
 
-def test_a_model_failure_ends_the_fill_with_a_message(
-    client: TestClient, annex_7: int, llm: ScriptedLLM
+def test_a_model_failure_ends_the_fill_with_a_product_message(
+    client: TestClient, annex_7: int, llm: ScriptedLLM, caplog: pytest.LogCaptureFixture
 ) -> None:
     def fail() -> None:
-        raise LLMError("The language model failed: timeout")
+        raise LLMError("The language model failed: Error code: 429 - {'error': 'rate limit'}")
 
     llm.while_thinking = fail
-    client.post(f"/forms/{annex_7}/fill")
+    with caplog.at_level(logging.WARNING, logger="app.modules.filling.job"):
+        client.post(f"/forms/{annex_7}/fill")
 
     state = client.get(f"/forms/{annex_7}/answers").json()
     assert state["ai_run"]["status"] == "failed"
@@ -354,8 +355,15 @@ def test_a_model_failure_ends_the_fill_with_a_message(
     assert last == {
         "id": last["id"],
         "event": "error",
-        "data": {"message": "The language model failed: timeout"},
+        "data": {
+            "message": (
+                "Answers could not be found right now. Discard the answers to auto-fill again."
+            )
+        },
     }
+    # The technical details are only in the logs.
+    warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
+    assert any("Error code: 429" in r.getMessage() for r in warnings)
 
 
 def test_an_unexpected_failure_shows_a_generic_message(
@@ -368,7 +376,10 @@ def test_an_unexpected_failure_shows_a_generic_message(
     client.post(f"/forms/{annex_7}/fill")
 
     assert read_events(client, annex_7)[-1]["data"] == {
-        "message": "Something went wrong while filling this form."
+        "message": (
+            "Something went wrong while filling this form. "
+            "Discard its answers to auto-fill it again."
+        )
     }
 
 
@@ -380,7 +391,9 @@ def test_a_fill_interrupted_by_a_server_stop_ends_as_failed(
         service.fail_interrupted_fills(session)
 
     assert client.get(f"/forms/{annex_7}/answers").json()["ai_run"]["status"] == "failed"
-    assert "server stopped" in read_events(client, annex_7)[-1]["data"]["message"]
+    assert read_events(client, annex_7)[-1]["data"]["message"] == (
+        "The server stopped while filling this form. Discard its answers to auto-fill it again."
+    )
 
 
 def test_without_an_api_key_the_fill_is_refused_clearly(

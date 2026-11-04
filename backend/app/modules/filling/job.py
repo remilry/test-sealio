@@ -29,7 +29,11 @@ from app.modules.tenders import service as tenders_service
 
 logger = logging.getLogger(__name__)
 
-UNEXPECTED_ERROR = "Something went wrong while filling this form."
+UNEXPECTED_ERROR = (
+    "Something went wrong while filling this form. Discard its answers to auto-fill it again."
+)
+# The model failed (rate limit, timeout, no usable answer): its details go to the logs only.
+MODEL_ERROR = "Answers could not be found right now. Discard the answers to auto-fill again."
 
 
 class _Discarded(Exception):
@@ -54,7 +58,7 @@ def run_fill(fill_id: int, llm: LLM, today: date | None = None) -> None:
                 return
             if isinstance(error, LLMError):
                 logger.warning("AI fill %s failed: %s", fill_id, error)
-                message = str(error)
+                message = MODEL_ERROR
             else:
                 logger.exception("AI fill %s failed", fill_id)
                 message = UNEXPECTED_ERROR
