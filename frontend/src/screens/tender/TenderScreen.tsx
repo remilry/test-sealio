@@ -2,10 +2,11 @@
 
 import type { ReactNode } from "react";
 import { useTranslations } from "next-intl";
-import { KnowledgeCard } from "@/features/knowledge-base";
+import { KnowledgeCard, useKnowledgeBase } from "@/features/knowledge-base";
 import { FormList, TenderHeader, useTender } from "@/features/tender";
 import { isNotFound } from "@/shared/api";
 import { EmptyState, LoadError } from "@/shared/components/LoadStates";
+import { FormAction } from "./FormAction";
 import { Skeleton } from "@/shared/ui/skeleton";
 
 /** Tender detail: what is asked, when, and the forms to fill (docs/USER_FLOW.md §3.2). */
@@ -13,6 +14,7 @@ export function TenderScreen({ tenderId }: { tenderId: number }) {
   const t = useTranslations("tender");
   const tCommon = useTranslations("common");
   const { data: tender, error, isPending, refetch } = useTender(tenderId);
+  const { data: knowledge } = useKnowledgeBase();
 
   if (isPending) {
     return (
@@ -39,7 +41,12 @@ export function TenderScreen({ tenderId }: { tenderId: number }) {
     <TenderFrame title={tender.title}>
       <TenderHeader tender={tender} />
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
-        <FormList forms={tender.forms} />
+        <FormList
+          forms={tender.forms}
+          renderAction={(form) => (
+            <FormAction form={form} documentCount={knowledge?.documents.length ?? 0} />
+          )}
+        />
         <aside className="lg:pt-8.5">
           <KnowledgeCard />
         </aside>

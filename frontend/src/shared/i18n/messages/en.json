@@ -44,12 +44,36 @@
       "in_review": "In review",
       "ready": "Ready"
     },
-    "fillWithAi": "Fill with AI",
+    "autoFill": "Auto-fill",
+    "moreActions": "More actions",
+    "discardAnswers": "Discard answers",
     "continueReview": "Continue review",
     "formatNotSupported": "This form format is not supported yet",
     "fieldsDetected": "{count, plural, one {# field} other {# fields}} detected",
     "yesNoDeclarations": "{count, plural, one {# Yes/No declaration} other {# Yes/No declarations}}",
     "signatures": "{count, plural, one {# signature} other {# signatures}}"
+  },
+  "autoFill": {
+    "trigger": "Auto-fill",
+    "title": "Auto-fill {formTitle}",
+    "description": "Answers are drawn from these sources, then you review each one.",
+    "fieldsDetected": "{count, plural, one {# field} other {# fields}} detected",
+    "sources": "Sources",
+    "companyKnowledge": "Company knowledge · {count, plural, one {# document} other {# documents}}",
+    "tenderDetails": "Tender details",
+    "knowledgeEmpty": "Your company knowledge is empty: only the tender details can be used.",
+    "addDocuments": "Add documents",
+    "duration": "Takes about {seconds} seconds",
+    "cancel": "Cancel",
+    "start": "Start",
+    "unavailable": "Auto-fill is not available right now."
+  },
+  "discardFill": {
+    "title": "Discard all answers to {formTitle}?",
+    "description": "Every value is deleted, including the ones you entered. This can't be undone.",
+    "cancel": "Cancel",
+    "discard": "Discard",
+    "failed": "We couldn't discard the answers. Try again."
   },
   "liveFill": {
     "backToTender": "Back to the tender",
@@ -129,7 +153,7 @@
       "error": "Error"
     },
     "cardTitle": "Company knowledge",
-    "cardHint": "What the AI answers from",
+    "cardHint": "What answers are drawn from",
     "cardDocuments": "{count, plural, one {document} other {documents}}",
     "manage": "Manage",
     "cardUnavailable": "Company knowledge unavailable",

@@ -1,13 +1,19 @@
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { http, HttpResponse } from "msw";
+import { API_URL } from "@/shared/api";
 import { freezeToday, handlers, renderScreen, server } from "@/shared/test";
-import { form, knowledgeBase, tender } from "@/shared/test/fixtures";
+import { form, knowledgeBase, knowledgeDocument, tender } from "@/shared/test/fixtures";
 import { TenderScreen } from "./TenderScreen";
+
+const push = vi.fn();
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
 
 const forms = () => within(screen.getByRole("list", { name: "Forms to complete" }));
 
 describe("Tender", () => {
   beforeEach(() => {
+    push.mockClear();
     freezeToday("2026-11-03");
     server.use(handlers.knowledge(knowledgeBase()));
   });
@@ -73,31 +79,278 @@ describe("Tender", () => {
     ).toBeInTheDocument();
   });
 
-  it("opens a parsed form to fill it", async () => {
-    // Given a parsed form not started yet
-    server.use(handlers.tender(tender()));
-
-    // When I open the tender
-    renderScreen(<TenderScreen tenderId={1} />);
-
-    // Then "Fill with AI" leads to the form
-    const annex7 = within(await screen.findByRole("listitem", { name: /Annex 7/ }));
-    expect(annex7.getByRole("link", { name: "Fill with AI" })).toHaveAttribute(
-      "href",
-      "/forms/2/fill",
-    );
-  });
-
-  it("cannot fill a form whose format is not supported yet", async () => {
+  it("cannot auto-fill a form whose format is not supported yet", async () => {
     // Given the Word form, not parsed yet
     server.use(handlers.tender(tender()));
 
     // When I open the tender
     renderScreen(<TenderScreen tenderId={1} />);
 
-    // Then its fill action is disabled
+    // Then its auto-fill action is disabled
     const annex4 = within(await screen.findByRole("listitem", { name: /Annex 4/ }));
-    expect(annex4.getByRole("button", { name: "Fill with AI" })).toBeDisabled();
+    expect(annex4.getByRole("button", { name: "Auto-fill" })).toBeDisabled();
+  });
+
+  describe("auto-fill", () => {
+    const elevenDocuments = () =>
+      knowledgeBase({
+        documents: Array.from({ length: 11 }, (_, i) =>
+          knowledgeDocument({ id: i + 1, file_name: `doc_${i + 1}.pdf` }),
+        ),
+      });
+
+    async function openSetup(user: ReturnType<typeof userEvent.setup>) {
+      const annex7 = within(await screen.findByRole("listitem", { name: /Annex 7/ }));
+      await user.click(annex7.getByRole("button", { name: "Auto-fill" }));
+      return within(await screen.findByRole("dialog"));
+    }
+
+    it("shows what the fill uses before starting", async () => {
+      // Given a parsed form not started and eleven company documents
+      server.use(handlers.tender(tender()), handlers.knowledge(elevenDocuments()));
+      const user = userEvent.setup();
+      renderScreen(<TenderScreen tenderId={1} />);
+
+      // When I open Auto-fill
+      const dialog = await openSetup(user);
+
+      // Then I see the file, the sources and the duration
+      expect(
+        dialog.getByRole("heading", {
+          name: "Auto-fill Annex 7 — Sanctions self-declaration (Art. 29c)",
+        }),
+      ).toBeInTheDocument();
+      expect(
+        dialog.getByText("Annex_7_Self-Declaration_Art29c_Ukraine_Ordinance.pdf"),
+      ).toBeInTheDocument();
+      expect(dialog.getByText("Company knowledge · 11 documents")).toBeInTheDocument();
+      expect(dialog.getByText("Tender details")).toBeInTheDocument();
+      expect(dialog.getByText("Takes about 25 seconds")).toBeInTheDocument();
+    });
+
+    it("starts the fill and opens the live fill", async () => {
+      // Given the Setup dialog
+      const fill = handlers.startFill(2);
+      server.use(handlers.tender(tender()), handlers.knowledge(elevenDocuments()), fill.handler);
+      const user = userEvent.setup();
+      renderScreen(<TenderScreen tenderId={1} />);
+      const dialog = await openSetup(user);
+
+      // When I start
+      await user.click(dialog.getByRole("button", { name: "Start" }));
+
+      // Then the fill is requested and I land on the form
+      await waitFor(() => expect(push).toHaveBeenCalledWith("/forms/2/fill"));
+      expect(fill.state.starts).toBe(1);
+    });
+
+    it("sends nothing when I cancel", async () => {
+      // Given the Setup dialog
+      const fill = handlers.startFill(2);
+      server.use(handlers.tender(tender()), handlers.knowledge(elevenDocuments()), fill.handler);
+      const user = userEvent.setup();
+      renderScreen(<TenderScreen tenderId={1} />);
+      const dialog = await openSetup(user);
+
+      // When I cancel
+      await user.click(dialog.getByRole("button", { name: "Cancel" }));
+
+      // Then it closes and nothing was sent
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      expect(fill.state.starts).toBe(0);
+      expect(push).not.toHaveBeenCalled();
+    });
+
+    it("tells me when auto-fill is not available, and stays open", async () => {
+      // Given the back cannot fill right now
+      server.use(
+        handlers.tender(tender()),
+        handlers.knowledge(elevenDocuments()),
+        handlers.error("/forms/2/fill", 503, "No API key configured", "post"),
+      );
+      const user = userEvent.setup();
+      renderScreen(<TenderScreen tenderId={1} />);
+      const dialog = await openSetup(user);
+
+      // When I start
+      await user.click(dialog.getByRole("button", { name: "Start" }));
+
+      // Then the reason shows in the dialog
+      expect(await dialog.findByText("Auto-fill is not available right now.")).toBeInTheDocument();
+      expect(dialog.getByText("No API key configured")).toBeInTheDocument();
+      expect(push).not.toHaveBeenCalled();
+    });
+
+    it("opens the live fill anyway when the form was already filled", async () => {
+      // Given the back says it is already filled
+      server.use(
+        handlers.tender(tender()),
+        handlers.knowledge(elevenDocuments()),
+        handlers.error(
+          "/forms/2/fill",
+          409,
+          "This form has already been filled. Discard its answers to auto-fill it again.",
+          "post",
+        ),
+      );
+      const user = userEvent.setup();
+      renderScreen(<TenderScreen tenderId={1} />);
+      const dialog = await openSetup(user);
+
+      // When I start
+      await user.click(dialog.getByRole("button", { name: "Start" }));
+
+      // Then I go to the form
+      await waitFor(() => expect(push).toHaveBeenCalledWith("/forms/2/fill"));
+    });
+
+    it("warns when the company knowledge is empty", async () => {
+      // Given no company documents
+      server.use(handlers.tender(tender()), handlers.knowledge(knowledgeBase({ documents: [] })));
+      const user = userEvent.setup();
+      renderScreen(<TenderScreen tenderId={1} />);
+
+      // When I open Auto-fill
+      const dialog = await openSetup(user);
+
+      // Then I am warned and can add documents
+      expect(
+        dialog.getByText("Your company knowledge is empty: only the tender details can be used."),
+      ).toBeInTheDocument();
+      expect(dialog.getByRole("link", { name: "Add documents" })).toHaveAttribute(
+        "href",
+        "/knowledge",
+      );
+    });
+
+    it("never says AI", async () => {
+      // Given the tender with its Setup dialog open
+      server.use(handlers.tender(tender()));
+      const user = userEvent.setup();
+      renderScreen(<TenderScreen tenderId={1} />);
+      await openSetup(user);
+
+      // Then no text on the screen mentions AI
+      expect(screen.queryByText(/\bAI\b/)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("started forms", () => {
+    const startedTender = (overrides: Partial<ReturnType<typeof form>> = {}) =>
+      tender({
+        forms: [
+          form({
+            id: 2,
+            title: "Annex 7 — Sanctions self-declaration (Art. 29c)",
+            file_format: "pdf",
+            status: "in_review",
+            field_counts: { fields: 10, yes_no: 0, signatures: 1 },
+            ...overrides,
+          }),
+        ],
+      });
+
+    async function openDiscard(user: ReturnType<typeof userEvent.setup>) {
+      const annex7 = within(await screen.findByRole("listitem", { name: /Annex 7/ }));
+      expect(annex7.queryByRole("button", { name: "Auto-fill" })).not.toBeInTheDocument();
+      await user.click(annex7.getByRole("button", { name: "More actions" }));
+      await user.click(await screen.findByRole("menuitem", { name: "Discard answers" }));
+      return within(await screen.findByRole("alertdialog"));
+    }
+
+    it("offers to continue, not to auto-fill again", async () => {
+      // Given a form in review
+      server.use(handlers.tender(startedTender()));
+      renderScreen(<TenderScreen tenderId={1} />);
+
+      // Then I can continue
+      const annex7 = within(await screen.findByRole("listitem", { name: /Annex 7/ }));
+      expect(annex7.getByRole("link", { name: "Continue review" })).toHaveAttribute(
+        "href",
+        "/forms/2/fill",
+      );
+      expect(annex7.queryByRole("button", { name: "Auto-fill" })).not.toBeInTheDocument();
+    });
+
+    it("only offers to continue while a fill is running", async () => {
+      // Given a fill in progress
+      server.use(handlers.tender(startedTender({ filling: true })));
+      renderScreen(<TenderScreen tenderId={1} />);
+
+      // Then only "Continue review" (and the menu) is there
+      const annex7 = within(await screen.findByRole("listitem", { name: /Annex 7/ }));
+      expect(annex7.getByRole("link", { name: "Continue review" })).toBeInTheDocument();
+      expect(annex7.queryByRole("button", { name: "Auto-fill" })).not.toBeInTheDocument();
+      expect(annex7.getByRole("button", { name: "More actions" })).toBeInTheDocument();
+    });
+
+    it("discards the answers after confirmation, and the form is not started again", async () => {
+      // Given a form in review; the tender refreshes to "not started" once discarded
+      const discard = handlers.discardFill(2);
+      server.use(
+        http.get(`${API_URL}/tenders/1`, () =>
+          HttpResponse.json(
+            discard.state.discards > 0 ? startedTender({ status: "not_started" }) : startedTender(),
+          ),
+        ),
+        discard.handler,
+      );
+      const user = userEvent.setup();
+      renderScreen(<TenderScreen tenderId={1} />);
+      const dialog = await openDiscard(user);
+      expect(
+        dialog.getByText("Discard all answers to Annex 7 — Sanctions self-declaration (Art. 29c)?"),
+      ).toBeInTheDocument();
+      expect(
+        dialog.getByText(
+          "Every value is deleted, including the ones you entered. This can't be undone.",
+        ),
+      ).toBeInTheDocument();
+
+      // When I confirm
+      await user.click(dialog.getByRole("button", { name: "Discard" }));
+
+      // Then the card is back to "Not started" with "Auto-fill"
+      const annex7 = within(await screen.findByRole("listitem", { name: /Annex 7/ }));
+      expect(await annex7.findByRole("button", { name: "Auto-fill" })).toBeInTheDocument();
+      expect(annex7.getByText("Not started")).toBeInTheDocument();
+      expect(discard.state.discards).toBe(1);
+    });
+
+    it("sends nothing when I cancel", async () => {
+      // Given the confirmation
+      const discard = handlers.discardFill(2);
+      server.use(handlers.tender(startedTender()), discard.handler);
+      const user = userEvent.setup();
+      renderScreen(<TenderScreen tenderId={1} />);
+      const dialog = await openDiscard(user);
+
+      // When I cancel
+      await user.click(dialog.getByRole("button", { name: "Cancel" }));
+
+      // Then nothing was deleted
+      await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+      expect(discard.state.discards).toBe(0);
+    });
+
+    it("tells me when the answers could not be discarded", async () => {
+      // Given a back that fails
+      server.use(
+        handlers.tender(startedTender()),
+        handlers.error("/forms/2/fill", 500, "boom", "delete"),
+      );
+      const user = userEvent.setup();
+      renderScreen(<TenderScreen tenderId={1} />);
+      const dialog = await openDiscard(user);
+
+      // When I confirm
+      await user.click(dialog.getByRole("button", { name: "Discard" }));
+
+      // Then the failure is shown and the dialog stays
+      expect(
+        await dialog.findByText("We couldn't discard the answers. Try again."),
+      ).toBeInTheDocument();
+    });
   });
 
   it("lets me continue a form in review", async () => {
@@ -174,7 +427,7 @@ describe("Tender", () => {
     expect(within(due).getByText(expected)).toBeInTheDocument();
   });
 
-  it("shows what the AI answers from, with a way to manage it", async () => {
+  it("shows what the answers come from, with a way to manage it", async () => {
     // Given the seeded tender and knowledge base
     server.use(handlers.tender(tender()));
 

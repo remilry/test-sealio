@@ -1,10 +1,9 @@
-import Link from "next/link";
-import { CheckIcon, SparklesIcon } from "lucide-react";
+import type { ReactNode } from "react";
+import { CheckIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { routes } from "@/shared/lib/routes";
 import { cn } from "@/shared/lib/utils";
 import { Badge } from "@/shared/ui/badge";
-import { Button, buttonVariants } from "@/shared/ui/button";
+import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import type { FormSummary } from "./tender.api";
 
@@ -15,7 +14,14 @@ const STATUS_VARIANT = {
 } as const satisfies Record<FormSummary["status"], string>;
 
 /** The buyer forms of a tender, one row per form, in the tender's order. */
-export function FormList({ forms }: { forms: FormSummary[] }) {
+export function FormList({
+  forms,
+  renderAction,
+}: {
+  forms: FormSummary[];
+  /** The action of a form that can be filled (the screen composes it: features don't import each other). */
+  renderAction: (form: FormSummary) => ReactNode;
+}) {
   const t = useTranslations("forms");
   return (
     <section aria-labelledby="forms-to-complete" className="flex flex-col gap-2.5">
@@ -28,7 +34,7 @@ export function FormList({ forms }: { forms: FormSummary[] }) {
       <Card className="gap-0 py-0">
         <ul aria-label={t("title")} className="divide-y">
           {forms.map((form) => (
-            <FormRow key={form.id} form={form} />
+            <FormRow key={form.id} form={form} renderAction={renderAction} />
           ))}
         </ul>
       </Card>
@@ -36,7 +42,13 @@ export function FormList({ forms }: { forms: FormSummary[] }) {
   );
 }
 
-function FormRow({ form }: { form: FormSummary }) {
+function FormRow({
+  form,
+  renderAction,
+}: {
+  form: FormSummary;
+  renderAction: (form: FormSummary) => ReactNode;
+}) {
   const t = useTranslations("forms");
   return (
     <li
@@ -55,37 +67,16 @@ function FormRow({ form }: { form: FormSummary }) {
         {t(`status.${form.status}`)}
       </Badge>
       <div className="flex justify-end">
-        <FormAction form={form} />
+        {form.field_counts ? (
+          renderAction(form)
+        ) : (
+          // This file format cannot be parsed yet: nothing to fill.
+          <Button disabled title={t("formatNotSupported")}>
+            {t("autoFill")}
+          </Button>
+        )}
       </div>
     </li>
-  );
-}
-
-function FormAction({ form }: { form: FormSummary }) {
-  const t = useTranslations("forms");
-  if (!form.field_counts) {
-    // This file format cannot be parsed yet: nothing to fill.
-    return (
-      <Button disabled title={t("formatNotSupported")}>
-        <SparklesIcon data-icon="inline-start" />
-        {t("fillWithAi")}
-      </Button>
-    );
-  }
-  const href = routes.fillForm(form.id);
-  // Opens the form to fill; the Setup step (AI) comes in front of it with the next slice.
-  if (form.status === "not_started") {
-    return (
-      <Link href={href} className={buttonVariants()}>
-        <SparklesIcon data-icon="inline-start" />
-        {t("fillWithAi")}
-      </Link>
-    );
-  }
-  return (
-    <Link href={href} className={buttonVariants({ variant: "outline" })}>
-      {t("continueReview")}
-    </Link>
   );
 }
 

@@ -3,6 +3,8 @@ import { freezeToday, handlers, renderScreen, server } from "@/shared/test";
 import { knowledgeBase, tender, tenderSummary } from "@/shared/test/fixtures";
 import { HomeScreen } from "./HomeScreen";
 
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
+
 describe("Home", () => {
   beforeEach(() => freezeToday("2026-11-03"));
 
