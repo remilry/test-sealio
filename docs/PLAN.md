@@ -118,6 +118,7 @@ Chaque étape à partir de la 4 livre une **fonctionnalité utilisable de bout e
 - Parsing des tableaux Word (libellés, cellules, types texte / Oui-Non / nombre), export dans les cellules en préservant la mise en page, avec la même UI que l'Annex 7.
 - Aperçu des documents Word de la base de connaissances (`docx-preview`) dans la modale de *Company knowledge* et dans la vue *Source*.
 - Cas difficiles de la base de connaissances : donnée absente, documents contradictoires, extrait périmé, déclarations Oui/Non non documentées.
+- **Sections en parallèle** dans le job de remplissage (pool borné, par exemple 4 à 7 appels simultanés, une session de base par section) : mêmes appels et même prompt, aucun surcoût. Mesuré sur l'Annex 7 : ~23 s par section, presque tout en génération de la sortie (recherche 0,6 s) ; l'Annex 4 (~7 sections) prendrait 2 à 3 min en séquence, et environ la durée de la section la plus lente en parallèle. Événements émis à mesure que chaque section finit ; durée de *Setup* calculée d'après le nombre de sections. À mesurer sur l'Annex 4.
 - Tests : parseur (schéma attendu), export (réouverture du DOCX, valeurs aux bons endroits, reste intact, comparaison visuelle par rendu), e2e complet.
 
 ### Étape 8 — Durcissement ⬜
@@ -214,4 +215,5 @@ UI (relecture)  ──►  API locale
 | 2026-11-04 | 5c : champ réservé à l'utilisateur = type `manual`, valeur suggérée écrite dans le formulaire (exportée si gardée) et signalée à revoir | validé |
 | 2026-11-04 | 5c : un nouveau remplissage IA ne remplace jamais une valeur fixée par l'utilisateur (avant ou pendant le remplissage) ; le reste est recalculé | validé |
 | 2026-11-04 | 5c : le LLM cite par texte exact, l'étiquette du passage n'est qu'un indice (citation cherchée dans tous les passages envoyés) ; enregistrements rejoués par clé formulaire + section ; date de la source par candidat (présélection du plus récent en conflit) ; SSE par lecture de la base toutes les 250 ms (pas d'`asyncio.Queue`) | proposé |
+| 2026-11-04 | Durée du remplissage : sections appelées en parallèle, prévu à l'étape 7 (mesurable avec l'Annex 4) ; plafond de taille de section, effort `minimal` et sortie allégée gardés en pistes | validé |
 | 2026-11-04 | e2e dans un environnement dédié et propre : base `formpilot_e2e` supprimée et recréée à chaque lancement (script `scripts/reset_e2e.py`, refuse toute base dont le nom ne finit pas par `_e2e`), dossier `data-e2e/` vidé, back :8100 et front :3100 jamais réutilisés, build Next dans `.next-e2e` (le serveur de dev n'est pas touché) | validé |
