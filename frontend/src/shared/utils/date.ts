@@ -28,6 +28,16 @@ export function now(): Date {
   return new Date();
 }
 
+/** Now, in milliseconds since the epoch (for durations and timers). */
+export function nowMs(): number {
+  return Date.now();
+}
+
+/** A timestamp as sent by the back (ISO 8601 with offset) → milliseconds since the epoch. */
+export function isoToMs(isoDateTime: string): number {
+  return new Date(isoDateTime).getTime();
+}
+
 /** Today at local midnight. */
 export function startOfToday(): Date {
   const current = now();

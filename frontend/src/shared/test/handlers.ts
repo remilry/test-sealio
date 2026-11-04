@@ -48,8 +48,11 @@ export const handlers = {
 
   form: (form: FormDetail) => http.get(url(`/forms/${form.id}`), () => HttpResponse.json(form)),
 
-  answers: (formId: number, state: FillState) =>
-    http.get(url(`/forms/${formId}/answers`), () => HttpResponse.json(state)),
+  /** `GET /forms/{id}/answers`; a function is called at each request (the state follows a run). */
+  answers: (formId: number, state: FillState | (() => FillState)) =>
+    http.get(url(`/forms/${formId}/answers`), () =>
+      HttpResponse.json(typeof state === "function" ? state() : state),
+    ),
 
   /** `GET /forms/{id}/export`; a function is called at each request (the summary follows saves). */
   exportSummary: (formId: number, summary: ExportSummary | (() => ExportSummary)) =>
@@ -100,16 +103,18 @@ export const handlers = {
   /**
    * `GET /forms/{id}/fill/events`: an SSE stream driven by the test. `send(event)` writes an event;
    * `close()` ends the stream. Every request (a reload) first gets the events already sent, as the
-   * back replays them, then the live ones.
+   * back replays them, then the live ones. `connections()` counts the requests.
    */
   fillEvents: (formId: number) => {
     const sent: StreamEvent[] = [];
+    let connections = 0;
     const encoder = new TextEncoder();
     const open = new Set<ReadableStreamDefaultController<Uint8Array>>();
     let closed = false;
     const frame = ({ id, type, ...data }: StreamEvent) =>
       encoder.encode(`id: ${id}\nevent: ${type}\ndata: ${JSON.stringify(data)}\n\n`);
     const handler = http.get(url(`/forms/${formId}/fill/events`), () => {
+      connections += 1;
       let mine: ReadableStreamDefaultController<Uint8Array>;
       const body = new ReadableStream<Uint8Array>({
         start(controller) {
@@ -127,6 +132,7 @@ export const handlers = {
     });
     return {
       handler,
+      connections: () => connections,
       send(event: StreamEvent) {
         sent.push(event);
         for (const controller of open) controller.enqueue(frame(event));

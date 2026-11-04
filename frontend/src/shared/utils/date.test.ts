@@ -5,6 +5,8 @@ import {
   formatDate,
   formatDay,
   formatTime,
+  isoToMs,
+  nowMs,
   parseIsoDate,
   startOfToday,
 } from "./date";
@@ -43,6 +45,14 @@ describe("date helpers", () => {
     expect(daysBetween(startOfToday(), parseIsoDate("2026-11-03"))).toBe(0);
     expect(daysUntil("2026-11-19")).toBe(16);
     expect(daysUntil("2026-11-02")).toBe(-1);
+  });
+
+  it("gives now and a timestamp from the back in milliseconds, to measure durations", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(isoToMs("2026-11-04T10:00:05Z"));
+
+    expect(nowMs() - isoToMs("2026-11-04T10:00:00Z")).toBe(5000);
+    expect(isoToMs("2026-11-04T11:00:00+01:00")).toBe(isoToMs("2026-11-04T10:00:00Z"));
   });
 
   it("formats a timestamp from the back as its local day: dd.mm.yyyy", () => {

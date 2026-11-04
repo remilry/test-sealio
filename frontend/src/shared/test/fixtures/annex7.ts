@@ -4,6 +4,7 @@ export type FormDetail = Schema<"FormDetail">;
 export type FormField = Schema<"FieldOut">;
 export type FillState = Schema<"FillState">;
 export type Answer = Schema<"AnswerOut">;
+export type AiRun = Schema<"AiRun">;
 export type ExportSummary = Schema<"ExportSummary">;
 export type FieldKind = Schema<"FieldKind">;
 type Box = Schema<"Box">;
@@ -127,8 +128,31 @@ export function answer(fieldId: number, value: string | null, at = "2026-11-03T1
   };
 }
 
+/** A value found automatically for a field (`type` says how sure it is). */
+export function aiAnswer(
+  fieldId: number,
+  value: string | null,
+  type: NonNullable<Answer["type"]> = "auto",
+  at = "2026-11-04T10:00:10Z",
+): Answer {
+  return { ...answer(fieldId, value, at), resolved_by: "ai", type };
+}
+
+/** An automatic fill run in progress (or over), as `FillState.ai_run`. */
+export function aiRun(status: AiRun["status"] = "running"): AiRun {
+  return {
+    status,
+    started_at: "2026-11-04T10:00:00Z",
+    finished_at: status === "running" ? null : "2026-11-04T10:00:23Z",
+  };
+}
+
 /** `GET /forms/{id}/answers`: counts are the back's, derived here the same way for consistency. */
-export function fillState(answers: Answer[] = [], fields: FormField[] = annex7Fields): FillState {
+export function fillState(
+  answers: Answer[] = [],
+  fields: FormField[] = annex7Fields,
+  ai_run: AiRun | null = null,
+): FillState {
   const fillable = fields.filter((field) => field.kind !== "signature");
   const filled = fillable.filter((field) =>
     answers.some((a) => a.field_id === field.id && a.value),
@@ -136,7 +160,7 @@ export function fillState(answers: Answer[] = [], fields: FormField[] = annex7Fi
   return {
     counts: { fillable: fillable.length, filled, empty: fillable.length - filled, doubts: 0 },
     answers,
-    ai_run: null,
+    ai_run,
   };
 }
 

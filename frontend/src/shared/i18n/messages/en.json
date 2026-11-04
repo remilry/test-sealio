@@ -83,17 +83,33 @@
     "loadError": "We couldn't load this form.",
     "cannotFillTitle": "This form can't be filled yet",
     "cannotFillDescription": "Only PDF forms can be filled for now. You can still download the original from the tender.",
-    "progress": "{filled} / {fillable} filled · {empty} empty",
+    "progress": "{filled} / {fillable} filled · {empty} empty · {doubts, plural, one {# doubt} other {# doubts}}",
     "fieldsToFill": "{count, plural, one {# field} other {# fields}} to fill",
     "allFilled": "All fields are filled",
-    "instructions": "Type each answer: it is saved as you go and shown on the form. Press Enter to move to the next field."
+    "instructions": "Type each answer: it is saved as you go and shown on the form. Press Enter to move to the next field.",
+    "filling": "Filling the form…",
+    "phase": {
+      "reading_form": "Reading the form",
+      "detecting_fields": "Detecting fields",
+      "searching": "Searching your documents",
+      "cross_checking": "Checking sources",
+      "preparing_review": "Preparing your review"
+    },
+    "answeredOfTotal": "{answered} / {total}",
+    "fillDone": "{filled} of {fillable} fields filled in {seconds, plural, one {# second} other {# seconds}}",
+    "fillStopped": "Auto-fill stopped: {message}"
+  },
+  "fillProgress": {
+    "label": "Fill progress"
   },
   "fieldList": {
     "label": "Fields",
     "signByHand": "Sign by hand after export — never filled.",
     "notSaved": "Not saved — press Enter to try again",
     "enteredByYou": "Entered by you · {time}",
-    "empty": "Empty — exported blank"
+    "empty": "Empty — exported blank",
+    "searching": "Searching your documents…",
+    "filledAutomatically": "Filled automatically"
   },
   "saveStatus": {
     "idle": "All changes saved",
@@ -105,8 +121,10 @@
     "label": "Form preview",
     "legend": "Legend",
     "tone": {
-      "entered": "Entered by you",
+      "auto": "Filled automatically",
+      "toCheck": "To check",
       "empty": "Empty",
+      "entered": "Entered by you",
       "signature": "Sign by hand"
     },
     "loadError": "We couldn't load the form preview. Your answers are still saved.",
@@ -116,6 +134,7 @@
   },
   "export": {
     "open": "Export {format}",
+    "filling": "Filling…",
     "title": "Export {format}",
     "preparing": "Preparing the export",
     "loadError": "We couldn't prepare the export.",

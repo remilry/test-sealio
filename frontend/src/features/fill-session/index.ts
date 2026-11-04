@@ -14,5 +14,6 @@ export { fillProgress } from "./progress";
 export type { FillEvent, FillPhase, FillRun } from "./fill-events";
 export type { SaveStatus } from "./fill-session.queries";
 export { SaveIndicator } from "./SaveIndicator";
+export { FillProgress } from "./FillProgress";
 export { SetupDialog } from "./SetupDialog";
 export { DiscardFillDialog } from "./DiscardFillDialog";

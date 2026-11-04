@@ -2,15 +2,19 @@
 
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowLeftIcon, FileXIcon } from "lucide-react";
+import { ArrowLeftIcon, CircleAlertIcon, FileXIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { DocumentPreview, type PreviewZone, type ZoneTone } from "@/features/document-preview";
 import {
+  FillProgress,
   originalFileUrl,
   SaveIndicator,
+  useFillRun,
   useFillState,
   useFormDetail,
   useSaveAnswer,
+  type Answer,
+  type FillRun,
   type FillState,
   type FormDetail,
 } from "@/features/fill-session";
@@ -21,12 +25,13 @@ import { isNotFound } from "@/shared/api";
 import { EmptyState, LoadError } from "@/shared/components/LoadStates";
 import { useHandleKeyDown } from "@/shared/lib/hooks/useHandleKeyDown";
 import { routes } from "@/shared/lib/routes";
+import { Alert, AlertTitle } from "@/shared/ui/alert";
 import { buttonVariants } from "@/shared/ui/button";
 import { Skeleton } from "@/shared/ui/skeleton";
 
 /**
  * Live fill (docs/USER_FLOW.md §3.4): the fields on the left, the original form on the right,
- * kept in sync. Step 4.5: the user types every value; the AI fills them from step 5.
+ * kept in sync. While the form fills itself, both follow the run field by field.
  */
 export function LiveFillScreen({ formId }: { formId: number }) {
   const form = useFormDetail(formId);
@@ -75,6 +80,9 @@ function FormLoadFailed({ error, onRetry }: { error: unknown; onRetry: () => voi
 function FillWorkspace({ form, fill }: { form: FormDetail; fill: FillState }) {
   const t = useTranslations("liveFill");
   const { data: tender } = useTender(form.tender_id);
+  // Also right after Setup: starting the fill refetches the answers, whose run is then running.
+  const run = useFillRun(form.id, { follow: fill.ai_run?.status === "running" });
+  const filling = fill.ai_run?.status === "running" && run.outcome === null;
   // Values the back refused: kept in their input (and on the document) until saved.
   const [unsaved, setUnsaved] = useState<ReadonlyMap<number, string>>(new Map());
   const save = useSaveAnswer(form.id, {
@@ -89,16 +97,21 @@ function FillWorkspace({ form, fill }: { form: FormDetail; fill: FillState }) {
   const [drafts, setDrafts] = useState<ReadonlyMap<number, string>>(new Map());
   const setDraft = (fieldId: number, text: string | null) =>
     setDrafts((previous) => withEntry(previous, fieldId, text));
-  const fields: QueueField[] = form.fields.map((field) => ({
-    id: field.id,
-    label: field.label,
-    fillable: field.kind !== "signature",
-    value: answers.get(field.id)?.value ?? null,
-    unsaved: unsaved.get(field.id) ?? null,
-    enteredAt: answers.get(field.id)?.resolved_at ?? null,
-  }));
+  const fields: QueueField[] = form.fields.map((field) => {
+    const answer = answers.get(field.id);
+    return {
+      id: field.id,
+      label: field.label,
+      fillable: field.kind !== "signature",
+      value: answer?.value ?? null,
+      unsaved: unsaved.get(field.id) ?? null,
+      enteredAt: answer?.resolved_by === "user" ? answer.resolved_at : null,
+      state: fieldState(run, field.id),
+    };
+  });
   const zones: PreviewZone[] = form.fields.map((field, index) => {
-    const value = (drafts.get(field.id) ?? fields[index].value ?? "").trim() || null;
+    const draft = drafts.get(field.id);
+    const value = (draft ?? fields[index].value ?? "").trim() || null;
     return {
       id: field.id,
       label: field.label,
@@ -107,16 +120,17 @@ function FillWorkspace({ form, fill }: { form: FormDetail; fill: FillState }) {
       fontSize: field.locator.font_size,
       placeholders: field.locator.erase,
       value,
-      tone: zoneTone(fields[index], value),
+      tone: zoneTone(fields[index], value, draft === undefined ? answers.get(field.id) : undefined),
     };
   });
   const fillable = fields.filter((field) => field.fillable);
 
   const [chosenId, setChosenId] = useState<number | null>(null);
   const [focusRequest, setFocusRequest] = useState<FocusRequest | null>(null);
-  // Until the user picks one, the first field without a value is selected.
-  const selectedId =
-    chosenId ?? (fillable.find((field) => !field.value) ?? fillable[0] ?? fields[0])?.id ?? null;
+  // Until the user picks one, the first field without a value is selected (once the fill is over:
+  // meanwhile the selection would jump at every answer).
+  const firstOpen = (fillable.find((field) => !field.value) ?? fillable[0] ?? fields[0])?.id;
+  const selectedId = chosenId ?? (filling ? null : (firstOpen ?? null));
 
   const focusField = (fieldId: number) => {
     setChosenId(fieldId);
@@ -169,18 +183,20 @@ function FillWorkspace({ form, fill }: { form: FormDetail; fill: FillState }) {
             formTitle={form.title}
             fileFormat={form.file_format}
             savePending={save.isPending}
+            filling={filling}
           />
         </>
       }
     >
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(320px,420px)_minmax(0,1fr)]">
         <div className="flex min-h-0 flex-col gap-4 overflow-y-auto border-r bg-card/50 p-5">
-          <header className="flex flex-col gap-1">
-            <h2 className="text-[15px] font-semibold">
-              {counts.empty === 0 ? t("allFilled") : t("fieldsToFill", { count: counts.empty })}
-            </h2>
-            <p className="text-xs text-muted-foreground">{t("instructions")}</p>
-          </header>
+          <FillHeader
+            run={run}
+            filling={filling}
+            emptyCount={counts.empty}
+            estimatedSeconds={form.estimated_fill_seconds}
+            startedAt={fill.ai_run?.started_at ?? null}
+          />
           <FieldList
             fields={fields}
             selectedId={selectedId}
@@ -209,6 +225,63 @@ function FillWorkspace({ form, fill }: { form: FormDetail; fill: FillState }) {
         </div>
       </div>
     </Frame>
+  );
+}
+
+/** The top of the left column: the fill under way, or what is left to fill (after its outcome). */
+function FillHeader({
+  run,
+  filling,
+  emptyCount,
+  estimatedSeconds,
+  startedAt,
+}: {
+  run: FillRun;
+  filling: boolean;
+  emptyCount: number;
+  estimatedSeconds: number | null;
+  startedAt: string | null;
+}) {
+  const t = useTranslations("liveFill");
+  if (filling && startedAt) {
+    return (
+      <header className="flex flex-col gap-2">
+        <h2 className="text-[15px] font-semibold">{t("filling")}</h2>
+        <p className="flex justify-between gap-2 text-xs text-muted-foreground">
+          <span>{t(`phase.${run.phase ?? "reading_form"}`)}</span>
+          {run.toAnswer !== null && (
+            <span className="tabular-nums">
+              {t("answeredOfTotal", { answered: run.answered.size, total: run.toAnswer })}
+            </span>
+          )}
+        </p>
+        <FillProgress run={run} estimatedSeconds={estimatedSeconds} startedAt={startedAt} />
+      </header>
+    );
+  }
+  const { outcome } = run;
+  return (
+    <header className="flex flex-col gap-1">
+      {outcome?.kind === "error" && (
+        <Alert variant="destructive" className="mb-2">
+          <CircleAlertIcon />
+          <AlertTitle>{t("fillStopped", { message: outcome.message })}</AlertTitle>
+        </Alert>
+      )}
+      {outcome?.kind === "done" && (
+        <p className="text-xs font-medium text-success">
+          {t("fillDone", {
+            filled: outcome.filled,
+            fillable: outcome.fillable,
+            seconds: outcome.seconds,
+          })}
+        </p>
+      )}
+      <h2 className="text-[15px] font-semibold">
+        {emptyCount === 0 ? t("allFilled") : t("fieldsToFill", { count: emptyCount })}
+      </h2>
+      <p className="text-xs text-muted-foreground">{t("instructions")}</p>
+    </header>
   );
 }
 
@@ -280,8 +353,23 @@ function withEntry(map: ReadonlyMap<number, string>, id: number, text: string | 
   return next;
 }
 
-/** How a field shows on the document: to sign by hand, entered, or still empty. */
-function zoneTone(field: QueueField, value: string | null): ZoneTone {
+function fieldState(run: FillRun, fieldId: number): QueueField["state"] {
+  if (run.answered.has(fieldId)) return "answered";
+  if (run.searching.has(fieldId)) return "searching";
+  return "pending";
+}
+
+/**
+ * How a field shows on the document. `answer` is the saved answer, or undefined while the user is
+ * typing (what is typed is theirs).
+ */
+function zoneTone(field: QueueField, value: string | null, answer: Answer | undefined): ZoneTone {
   if (!field.fillable) return "signature";
-  return value ? "entered" : "empty";
+  if (field.state === "searching") return "searching";
+  if (!value) return "empty";
+  if (!answer || answer.resolved_by === "user") return "entered";
+  if (answer.type === "conflict" || answer.type === "outdated" || answer.type === "manual") {
+    return "toCheck";
+  }
+  return "auto";
 }

@@ -16,8 +16,10 @@ export type QueueField = {
   value: string | null;
   /** What the user typed but could not be saved: kept in the input so they can try again. */
   unsaved: string | null;
-  /** When the user entered the value (ISO timestamp). */
+  /** When the user entered the value (ISO timestamp); null when it was filled automatically. */
   enteredAt: string | null;
+  /** Where the automatic fill is for this field: not reached yet, being searched, answered. */
+  state: "pending" | "searching" | "answered";
 };
 
 /** Ask the list to move the keyboard focus to a field's input (changes on every request). */
@@ -107,24 +109,29 @@ function FieldInput({
   onNext: () => void;
   onDraft: (text: string) => void;
 }) {
-  const t = useTranslations("fieldList");
   const inputId = `field-${field.id}`;
+  const input = useRef<HTMLInputElement | null>(null);
   // The last value sent (or saved), so Enter then leaving the input saves once. Back to the saved
   // value when a save fails, so the kept text is sent again.
   const lastSent = useRef(field.value ?? "");
+  const shown = field.unsaved ?? field.value ?? "";
   useEffect(() => {
+    // A new value (saved, trimmed by the back, or found automatically) replaces the text only if
+    // the user is not typing something else: text typed and not sent yet stays.
+    const element = input.current;
+    if (element && element.value.trim() === lastSent.current) element.value = shown;
     lastSent.current = field.value ?? "";
-  }, [field.value, field.unsaved]);
-  const saveIfChanged = (input: HTMLInputElement) => {
-    const value = input.value.trim();
+  }, [shown, field.value]);
+  const saveIfChanged = (element: HTMLInputElement) => {
+    const value = element.value.trim();
     if (value === lastSent.current) return;
     lastSent.current = value;
     onSave(value || null);
   };
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const input = event.currentTarget.elements.namedItem("value");
-    if (input instanceof HTMLInputElement) saveIfChanged(input);
+    const element = event.currentTarget.elements.namedItem("value");
+    if (element instanceof HTMLInputElement) saveIfChanged(element);
     onNext();
   };
 
@@ -134,26 +141,40 @@ function FieldInput({
         {field.label}
       </label>
       <Input
-        // Remounts with the saved value (trimmed by the back) once saved, or with what could not be.
-        key={field.unsaved ?? field.value ?? ""}
-        ref={inputRef}
+        ref={(element) => {
+          input.current = element;
+          inputRef(element);
+        }}
         id={inputId}
         name="value"
-        defaultValue={field.unsaved ?? field.value ?? ""}
+        defaultValue={shown}
         autoComplete="off"
         onFocus={onFocus}
         onChange={(event) => onDraft(event.currentTarget.value)}
         onBlur={(event) => saveIfChanged(event.currentTarget)}
       />
-      {field.unsaved !== null ? (
-        <p className="text-xs text-destructive">{t("notSaved")}</p>
-      ) : (
-        <p className="text-xs text-muted-foreground">
-          {field.value && field.enteredAt
-            ? t("enteredByYou", { time: formatTime(field.enteredAt) })
-            : t("empty")}
-        </p>
-      )}
+      <FieldStatus field={field} />
     </form>
+  );
+}
+
+/** The line under the input: what the field's value is, or where its search is. */
+function FieldStatus({ field }: { field: QueueField }) {
+  const t = useTranslations("fieldList");
+  if (field.unsaved !== null) {
+    return <p className="text-xs text-destructive">{t("notSaved")}</p>;
+  }
+  if (field.state === "searching") {
+    return <p className="animate-pulse text-xs text-primary">{t("searching")}</p>;
+  }
+  if (!field.value) {
+    return <p className="text-xs text-muted-foreground">{t("empty")}</p>;
+  }
+  return (
+    <p className="text-xs text-muted-foreground">
+      {field.enteredAt
+        ? t("enteredByYou", { time: formatTime(field.enteredAt) })
+        : t("filledAutomatically")}
+    </p>
   );
 }

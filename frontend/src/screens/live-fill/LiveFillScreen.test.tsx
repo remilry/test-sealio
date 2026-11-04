@@ -2,12 +2,16 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { handlers, renderScreen, server } from "@/shared/test";
 import {
+  aiAnswer,
+  aiRun,
   annex7,
+  annex7Fields,
   answer,
   exportSummary,
   fillState,
   form as formSummary,
   tender,
+  type Answer,
   type FillState,
 } from "@/shared/test/fixtures";
 import { LiveFillScreen } from "./LiveFillScreen";
@@ -111,7 +115,7 @@ describe("Live fill (manual)", () => {
     expect(
       await breadcrumb.findByText("Cloud Platform Services – Canton of Zurich"),
     ).toBeInTheDocument();
-    expect(screen.getByText("2 / 9 filled · 7 empty")).toBeInTheDocument();
+    expect(screen.getByText("2 / 9 filled · 7 empty · 0 doubts")).toBeInTheDocument();
     expect(fieldList().getByRole("textbox", { name: "Name and legal form" })).toHaveValue(
       "Alpenlogic AG",
     );
@@ -136,7 +140,7 @@ describe("Live fill (manual)", () => {
       expect(saved.requests).toEqual([{ fieldId: 6, value: "+41 44 512 38 00" }]),
     );
     expect(await within(await findZone(6)).findByText("+41 44 512 38 00")).toBeInTheDocument();
-    expect(await screen.findByText("1 / 9 filled · 8 empty")).toBeInTheDocument();
+    expect(await screen.findByText("1 / 9 filled · 8 empty · 0 doubts")).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("Saved");
     const card = within(fieldList().getByRole("listitem", { name: "Telephone" }));
     expect(card.getByText("Entered by you · 14:45")).toBeInTheDocument();
@@ -223,7 +227,7 @@ describe("Live fill (manual)", () => {
     // Then the back is told the field is empty, and the document shows it empty again
     await waitFor(() => expect(saved.requests).toEqual([{ fieldId: 7, value: null }]));
     await waitFor(() => expect(within(zone(7)).queryByText("info@alpenlogic.ch")).toBeNull());
-    expect(await screen.findByText("0 / 9 filled · 9 empty")).toBeInTheDocument();
+    expect(await screen.findByText("0 / 9 filled · 9 empty · 0 doubts")).toBeInTheDocument();
   });
 
   it("clicking a field on the document puts me in its input", async () => {
@@ -281,7 +285,7 @@ describe("Live fill (manual)", () => {
     expect(await screen.findByRole("status")).toHaveTextContent(
       "Couldn't save — press Enter in the field to try again",
     );
-    expect(screen.getByText("0 / 9 filled · 9 empty")).toBeInTheDocument();
+    expect(screen.getByText("0 / 9 filled · 9 empty · 0 doubts")).toBeInTheDocument();
     // But what I typed is still there, on the form too
     const card = within(fieldList().getByRole("listitem", { name: "Telephone" }));
     expect(card.getByRole("textbox")).toHaveValue("044");
@@ -292,7 +296,7 @@ describe("Live fill (manual)", () => {
     server.use(saved.handler);
     await user.type(card.getByRole("textbox"), "{Enter}");
     await waitFor(() => expect(saved.requests).toEqual([{ fieldId: 6, value: "044" }]));
-    expect(await screen.findByText("1 / 9 filled · 8 empty")).toBeInTheDocument();
+    expect(await screen.findByText("1 / 9 filled · 8 empty · 0 doubts")).toBeInTheDocument();
     expect(card.queryByText(/Not saved/)).not.toBeInTheDocument();
   });
 
@@ -338,6 +342,272 @@ describe("Live fill (manual)", () => {
 
     // Then the form shows
     expect(await screen.findByRole("textbox", { name: "Telephone" })).toBeInTheDocument();
+  });
+});
+
+/**
+ * A back running the automatic fill of Annex 7: the answers follow the stream (as the back
+ * persists each answer before publishing it), and the user's saves are kept too.
+ */
+function fillingBack() {
+  let state = fillState([], annex7Fields, aiRun("running"));
+  let nextId = 1;
+  const stream = handlers.fillEvents(2);
+  const withAnswer = (entry: Answer) => {
+    const others = state.answers.filter((a) => a.field_id !== entry.field_id);
+    state = fillState([...others, entry], annex7Fields, state.ai_run);
+  };
+  const saved = handlers.saveField(2, (fieldId, { value }) => {
+    withAnswer(answer(fieldId, value?.trim() || null, "2026-11-04T10:00:12Z"));
+    return state;
+  });
+  server.use(
+    handlers.form(annex7()),
+    handlers.tender(tender()),
+    handlers.answers(2, () => state),
+    saved.handler,
+    stream.handler,
+  );
+  const send = (event: Record<string, unknown> & { type: string }) =>
+    stream.send({ id: nextId++, ...event });
+  return {
+    saved,
+    stream,
+    phase: (phase: string, extra: Record<string, unknown> = {}) =>
+      send({ type: "phase", phase, ...extra }),
+    searching: (...fieldIds: number[]) =>
+      fieldIds.forEach((fieldId) => send({ type: "field", field_id: fieldId, state: "searching" })),
+    answered: (fieldId: number, value: string, type: Answer["type"] = "auto") => {
+      const entry = aiAnswer(fieldId, value, type ?? "auto");
+      // The back keeps the user's value: it only publishes the answer.
+      if (state.answers.find((a) => a.field_id === fieldId)?.resolved_by !== "user") {
+        withAnswer(entry);
+      }
+      send({
+        type: "field",
+        field_id: fieldId,
+        state: "answered",
+        answer: entry,
+        counts: state.counts,
+      });
+    },
+    done: (summary: { filled: number; fillable: number; doubts: number; seconds: number }) => {
+      state = { ...state, ai_run: aiRun("done") };
+      send({ type: "done", ...summary });
+      stream.close();
+    },
+    error: (message: string) => {
+      state = { ...state, ai_run: aiRun("failed") };
+      send({ type: "error", message });
+      stream.close();
+    },
+  };
+}
+
+function watchFill() {
+  const back = fillingBack();
+  const user = userEvent.setup();
+  const view = renderScreen(<LiveFillScreen formId={2} />);
+  return { back, user, view };
+}
+
+/** The phases before the search, as the back sends them for Annex 7 (9 fields to answer). */
+function startSearch(back: ReturnType<typeof fillingBack>) {
+  back.phase("reading_form");
+  back.phase("detecting_fields", { to_answer: 9 });
+  back.phase("searching");
+}
+
+describe("Live fill (watching the automatic fill)", () => {
+  it("tells me the form is filling, how far it is, and that the export waits", async () => {
+    // Given a fill that is reading the form
+    const { back } = watchFill();
+    back.phase("reading_form");
+
+    // Then the left column says so, with a progress bar
+    expect(await screen.findByRole("heading", { name: "Filling the form…" })).toBeInTheDocument();
+    expect(await screen.findByText("Reading the form")).toBeInTheDocument();
+    expect(screen.getByRole("progressbar", { name: "Fill progress" })).toBeInTheDocument();
+    // And the export waits for the end of the fill
+    expect(screen.getByRole("button", { name: "Filling…" })).toBeDisabled();
+
+    // And the phase follows the run
+    back.phase("detecting_fields", { to_answer: 9 });
+    expect(await screen.findByText("Detecting fields")).toBeInTheDocument();
+    back.phase("searching");
+    expect(await screen.findByText("Searching your documents")).toBeInTheDocument();
+    expect(screen.getByText("0 / 9")).toBeInTheDocument();
+    back.stream.close();
+  });
+
+  it("shows each answer in the list and on the form as soon as it is found", async () => {
+    // Given the fill searching three fields
+    const { back } = watchFill();
+    startSearch(back);
+    back.searching(3, 4, 6);
+
+    // Then they show as searched
+    await screen.findByRole("list", { name: "Fields" });
+    const card = (label: string) => within(fieldList().getByRole("listitem", { name: label }));
+    expect(
+      await card("Name and legal form").findByText("Searching your documents…"),
+    ).toBeInTheDocument();
+    expect(card("Telephone").getByText("Searching your documents…")).toBeInTheDocument();
+    expect(card("E-mail").queryByText("Searching your documents…")).not.toBeInTheDocument();
+
+    // When the name is found
+    back.answered(3, "Alpenlogic AG");
+
+    // Then it shows in its input and on the form, the others still searched
+    await waitFor(() =>
+      expect(card("Name and legal form").getByRole("textbox")).toHaveValue("Alpenlogic AG"),
+    );
+    expect(card("Name and legal form").queryByText("Searching your documents…")).toBeNull();
+    expect(within(await findZone(3)).getByText("Alpenlogic AG")).toBeInTheDocument();
+    const legend = within(within(preview()).getByRole("list", { name: "Legend" }));
+    expect(legend.getAllByRole("listitem").map((item) => item.textContent)).toEqual([
+      "Filled automatically",
+      "To check",
+      "Empty",
+      "Entered by you",
+      "Sign by hand",
+    ]);
+    expect(card("Telephone").getByText("Searching your documents…")).toBeInTheDocument();
+    expect(card("Business address").getByText("Searching your documents…")).toBeInTheDocument();
+    expect(zone(3)).toHaveAttribute("data-tone", "auto");
+    expect(zone(4)).toHaveAttribute("data-tone", "searching");
+    // And the counters follow
+    expect(screen.getByText("1 / 9 filled · 8 empty · 0 doubts")).toBeInTheDocument();
+    expect(screen.getByText("1 / 9")).toBeInTheDocument();
+    back.stream.close();
+  });
+
+  it("sums up the fill at the end, enables the export and selects the first open field", async () => {
+    // Given a fill that found 8 of the 9 values (not the business address)
+    const { back } = watchFill();
+    startSearch(back);
+    const values: [number, string][] = [
+      [1, "ZH-2026-0412"],
+      [2, "Canton of Zurich"],
+      [3, "Alpenlogic AG"],
+      [5, "Marc Keller"],
+      [6, "+41 44 512 38 00"],
+      [7, "info@alpenlogic.ch"],
+      [8, "Zurich, 04.11.2026"],
+      [9, "Marc Keller"],
+    ];
+    values.forEach(([fieldId, value]) => back.answered(fieldId, value));
+    back.phase("cross_checking");
+    back.phase("preparing_review");
+    expect(await screen.findByText("Preparing your review")).toBeInTheDocument();
+
+    // When it ends
+    back.done({ filled: 8, fillable: 9, doubts: 0, seconds: 23 });
+
+    // Then it is summed up, and the export is ready
+    expect(await screen.findByText("8 of 9 fields filled in 23 seconds")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Export PDF" })).toBeEnabled();
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "1 field to fill" })).toBeInTheDocument();
+    // And the field left open is selected
+    expect(fieldList().getByRole("listitem", { name: "Business address" })).toHaveAttribute(
+      "aria-current",
+      "true",
+    );
+    expect(screen.getByText("8 / 9 filled · 1 empty · 0 doubts")).toBeInTheDocument();
+  });
+
+  it("tells me when the fill stopped, and keeps the answers already found", async () => {
+    // Given a fill that found the name
+    const { back } = watchFill();
+    startSearch(back);
+    back.answered(3, "Alpenlogic AG");
+    expect(await screen.findByText("1 / 9")).toBeInTheDocument();
+
+    // When it fails
+    back.error("the documents could not be read");
+
+    // Then I am told, the bar gives way to the message, and the name stays
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Auto-fill stopped: the documents could not be read",
+    );
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+    expect(fieldList().getByRole("textbox", { name: "Name and legal form" })).toHaveValue(
+      "Alpenlogic AG",
+    );
+    expect(await screen.findByRole("button", { name: "Export PDF" })).toBeEnabled();
+  });
+
+  it("keeps what I am typing when the fill answers the same field, and saves it", async () => {
+    // Given the fill searching the telephone, which I start typing
+    const { back, user } = watchFill();
+    startSearch(back);
+    back.searching(6);
+    const telephone = await screen.findByRole("textbox", { name: "Telephone" });
+    await user.type(telephone, "044 000");
+
+    // When the fill answers that field while I type
+    back.answered(6, "+41 44 512 38 00");
+    await waitFor(() =>
+      expect(
+        within(fieldList().getByRole("listitem", { name: "Telephone" })).queryByText(
+          "Searching your documents…",
+        ),
+      ).toBeNull(),
+    );
+
+    // Then my text is still in the input
+    expect(telephone).toHaveValue("044 000");
+    await user.type(telephone, " 11");
+    expect(telephone).toHaveValue("044 000 11");
+
+    // And leaving the field saves what I typed
+    await user.tab();
+    await waitFor(() => expect(back.saved.requests).toEqual([{ fieldId: 6, value: "044 000 11" }]));
+    expect(within(await findZone(6)).getByText("044 000 11")).toBeInTheDocument();
+    back.stream.close();
+  });
+
+  it("picks up where the fill was when I reload the page", async () => {
+    // Given a fill that already found two values and is searching a third
+    const { back, view } = watchFill();
+    startSearch(back);
+    back.answered(3, "Alpenlogic AG");
+    back.answered(6, "+41 44 512 38 00");
+    back.searching(7);
+    expect(await screen.findByText("2 / 9")).toBeInTheDocument();
+
+    // When I reload the page (the back replays the run, which goes on)
+    view.unmount();
+    renderScreen(<LiveFillScreen formId={2} />);
+
+    // Then the same answers, phase and counts show, nothing counted twice
+    expect(await screen.findByText("2 / 9")).toBeInTheDocument();
+    expect(screen.getByText("Searching your documents")).toBeInTheDocument();
+    expect(screen.getByText("2 / 9 filled · 7 empty · 0 doubts")).toBeInTheDocument();
+    expect(fieldList().getByRole("textbox", { name: "Name and legal form" })).toHaveValue(
+      "Alpenlogic AG",
+    );
+    expect(fieldList().getByRole("textbox", { name: "Telephone" })).toHaveValue("+41 44 512 38 00");
+    expect(
+      within(fieldList().getByRole("listitem", { name: "E-mail" })).getByText(
+        "Searching your documents…",
+      ),
+    ).toBeInTheDocument();
+    expect(back.stream.connections()).toBe(2);
+    back.stream.close();
+  });
+
+  it("does not follow any fill when none is running", async () => {
+    // Given a form with no fill running
+    const stream = handlers.fillEvents(2);
+    server.use(stream.handler);
+    given();
+
+    // When it opens, then the usual header shows and no stream is read
+    expect(await screen.findByRole("heading", { name: "9 fields to fill" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Export PDF" })).toBeEnabled();
+    expect(stream.connections()).toBe(0);
   });
 });
 

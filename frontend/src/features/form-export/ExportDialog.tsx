@@ -28,15 +28,26 @@ export function ExportDialog({
   formTitle,
   fileFormat,
   savePending,
+  filling,
 }: {
   formId: number;
   formTitle: string;
   fileFormat: string;
   /** A value is being saved: the summary waits for it, so it counts every answer. */
   savePending: boolean;
+  /** The form is being filled automatically: the export waits for the end. */
+  filling: boolean;
 }) {
   const t = useTranslations("export");
   const format = fileFormat.toUpperCase();
+  if (filling) {
+    return (
+      <Button disabled>
+        <DownloadIcon data-icon="inline-start" />
+        {t("filling")}
+      </Button>
+    );
+  }
   return (
     <Dialog>
       <DialogTrigger render={<Button />}>

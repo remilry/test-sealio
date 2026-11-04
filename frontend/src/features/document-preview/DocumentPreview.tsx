@@ -13,7 +13,10 @@ const PdfPages = dynamic(() => import("./PdfPages"), {
   loading: () => <Skeleton className="aspect-[595/842] w-full" />,
 });
 
-export type ZoneTone = "entered" | "empty" | "signature";
+export type ZoneTone = "auto" | "toCheck" | "empty" | "entered" | "signature" | "searching";
+
+/** The tones explained under the document, in this order (a searched zone explains itself). */
+const LEGEND = ["auto", "toCheck", "empty", "entered", "signature"] as const;
 
 /** A field drawn on the document: generic, the preview knows nothing of answers or rules. */
 export type PreviewZone = {
@@ -29,6 +32,14 @@ export type PreviewZone = {
 };
 
 const TONES: Record<ZoneTone, { zone: string; swatch: string }> = {
+  auto: {
+    zone: "bg-primary/10 ring-primary/45",
+    swatch: "bg-primary/30",
+  },
+  toCheck: {
+    zone: "bg-warning/12 ring-warning/55",
+    swatch: "bg-warning/35",
+  },
   entered: {
     zone: "bg-success/12 ring-success/50",
     swatch: "bg-success/30",
@@ -40,6 +51,10 @@ const TONES: Record<ZoneTone, { zone: string; swatch: string }> = {
   signature: {
     zone: "border border-dashed border-muted-foreground/60 bg-muted/40 ring-transparent",
     swatch: "bg-muted-foreground/25",
+  },
+  searching: {
+    zone: "animate-pulse bg-primary/8 ring-primary/30",
+    swatch: "bg-primary/15",
   },
 };
 
@@ -61,7 +76,7 @@ export function DocumentPreview({
   return (
     <section aria-label={t("label")} className="flex flex-col gap-3">
       <ul aria-label={t("legend")} className="flex flex-wrap gap-4 text-xs text-muted-foreground">
-        {(Object.keys(TONES) as ZoneTone[]).map((tone) => (
+        {LEGEND.map((tone) => (
           <li key={tone} className="flex items-center gap-1.5">
             <span aria-hidden className={cn("h-2 w-3.5 rounded-xs", TONES[tone].swatch)} />
             {t(`tone.${tone}`)}
@@ -130,6 +145,7 @@ function Zone({
       ref={ref}
       type="button"
       data-field-id={zone.id}
+      data-tone={zone.tone}
       aria-label={zone.label}
       aria-pressed={selected}
       onClick={() => onSelect(zone.id)}
