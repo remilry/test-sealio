@@ -9,9 +9,12 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 from datetime import date
+from typing import Any
+
+from pydantic import ValidationError
 
 from app.llm.facade import LLM, LLMRequest, LLMUsage
-from app.modules.filling.llm_schema import LLMSectionAnswer
+from app.modules.filling.llm_schema import LLMFieldAnswer, LLMSectionAnswer
 from app.modules.filling.validator import SourcePassage, ValidatedField, validate_field
 from app.modules.forms.parsing.schema import FieldKind
 
@@ -71,6 +74,8 @@ class FieldToAnswer:
 
 
 Search = Callable[[str, int], list[SourcePassage]]
+# Called with a field's id and its verified evidence, as soon as the field is complete.
+OnField = Callable[[int, ValidatedField], None]
 
 
 @dataclass(frozen=True)
@@ -105,6 +110,7 @@ def answer_section(
     search: Search,
     tender_details: str,
     today: date,
+    on_field: OnField | None = None,
 ) -> SectionResult:
     """The verified evidence of each field of the section, with what finding it cost."""
     started = time.monotonic()
@@ -124,20 +130,53 @@ def answer_section(
         ),
         schema=LLMSectionAnswer,
     )
-    result = llm.generate_structured(request)
-    # By key, as asked; models sometimes echo the label instead.
-    answers = {_match_key(a.field): a for a in result.output.fields}
+    evidence: dict[int, ValidatedField] = {}
+
+    def publish(answer: LLMFieldAnswer) -> None:
+        # By key, as asked; models sometimes echo the label instead.
+        match = _match_key(answer.field)
+        field = next((f for f in fields if _match_key(f.key) == match), None) or next(
+            (f for f in fields if _match_key(f.label) == match), None
+        )
+        if field is None or field.id in evidence:
+            return
+        evidence[field.id] = validate_field(field.kind, answer, passages)
+        if on_field is not None:
+            on_field(field.id, evidence[field.id])
+
+    def on_partial(partial: dict[str, Any]) -> None:
+        for item in complete_items(partial, "fields"):
+            try:
+                publish(LLMFieldAnswer.model_validate(item))
+            except ValidationError:
+                continue
+
+    result = (
+        llm.generate_structured(request)
+        if on_field is None
+        else llm.generate_structured(request, on_partial)
+    )
+    for answer in result.output.fields:
+        publish(answer)
+    for field in fields:
+        if field.id not in evidence:
+            evidence[field.id] = validate_field(field.kind, None, passages)
+            if on_field is not None:
+                on_field(field.id, evidence[field.id])
     return SectionResult(
-        evidence={
-            f.id: validate_field(
-                f.kind, answers.get(_match_key(f.key)) or answers.get(_match_key(f.label)), passages
-            )
-            for f in fields
-        },
+        evidence={f.id: evidence[f.id] for f in fields},
         passages=len(passages),
         search_seconds=search_seconds,
         usage=result.usage,
     )
+
+
+def complete_items(partial: dict[str, Any], key: str) -> list[dict[str, Any]]:
+    """The items of `partial[key]` the model has finished writing: all but the last."""
+    items = partial.get(key)
+    if not isinstance(items, list):
+        return []
+    return [item for item in items[:-1] if isinstance(item, dict)]
 
 
 def _passages(
