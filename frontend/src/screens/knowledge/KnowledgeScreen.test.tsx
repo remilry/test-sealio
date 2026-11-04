@@ -475,6 +475,10 @@ describe("Company knowledge", () => {
       expect(removal.deleted).toEqual([1]);
       expect(screen.getByRole("row", { name: "Annual report 2024" })).toBeInTheDocument();
       expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+      // And no error: the back answers 204 with no body, which is a success
+      await waitFor(() => expect(removal.deleted).toHaveLength(1));
+      expect(screen.queryByText(/could not be deleted/)).not.toBeInTheDocument();
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     });
 
     it("keeps the document when I cancel", async () => {
