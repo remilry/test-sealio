@@ -60,7 +60,7 @@ test("I auto-fill Annex 7 from my documents, correct a field and download it in 
 
   // The form fills itself field by field; the recorded run answers all 9 fillable fields.
   const fields = page.getByRole("list", { name: "Fields" });
-  await expect(fields.locator(":scope > li")).toHaveCount(10);
+  await expect(fields.getByRole("listitem", { name: /./ })).toHaveCount(10);
   // (The "9 of 9 fields filled in N seconds" line only shows to a page watching the stream live; the
   // recorded fill ends in milliseconds, so the stable check is the review summary.)
   await expect(page.getByText("9 / 9 filled · 0 empty · 0 doubts")).toBeVisible({
@@ -68,6 +68,7 @@ test("I auto-fill Annex 7 from my documents, correct a field and download it in 
   });
   const preview = page.getByRole("region", { name: "Form preview" });
   await expect(preview.locator("canvas")).toBeVisible();
+  await expect(preview.locator("[data-field-id]")).toHaveCount(10);
 
   // An automatic answer shows its source: document name, page and quote.
   const address = fields.getByRole("textbox", { name: "Business address" });
@@ -75,8 +76,10 @@ test("I auto-fill Annex 7 from my documents, correct a field and download it in 
   await address.click();
   const addressCard = fields.getByRole("listitem", { name: "Business address" });
   await expect(addressCard.getByText("Filled automatically")).toBeVisible();
-  await expect(addressCard.getByText(/, page \d+$/)).toBeVisible();
-  await expect(addressCard.getByText(/Pfingstweidstrasse 31, 8005 Zurich”?$/).last()).toBeVisible();
+  await expect(addressCard.getByText(/^Commercial register extract, page \d+$/)).toBeVisible();
+  await expect(addressCard.locator("blockquote")).toContainText(
+    "Pfingstweidstrasse 31, 8005 Zurich",
+  );
 
   // Correct one field by hand: it is saved and shown on the form.
   await address.clear();
@@ -105,10 +108,8 @@ test("I auto-fill Annex 7 from my documents, correct a field and download it in 
   expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
 
   // Discard the answers from the tender: the card is back to "Not started".
-  await dialog
-    .getByRole("button", { name: "Close" })
-    .click()
-    .catch(() => page.keyboard.press("Escape"));
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
   await page.goto("/");
   const started = page
     .getByRole("list", { name: "Forms to complete" })
@@ -117,11 +118,7 @@ test("I auto-fill Annex 7 from my documents, correct a field and download it in 
   await expect(started.getByRole("link", { name: "Continue review" })).toBeVisible();
   await started.getByRole("button", { name: "More actions" }).click();
   await page.getByRole("menuitem", { name: "Discard answers" }).click();
-  await page
-    .getByRole("alertdialog")
-    .or(page.getByRole("dialog"))
-    .getByRole("button", { name: "Discard" })
-    .click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Discard", exact: true }).click();
   await expect(started).toContainText("Not started");
   await expect(started.getByRole("button", { name: "Auto-fill" })).toBeVisible();
 });
