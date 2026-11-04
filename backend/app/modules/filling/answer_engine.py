@@ -146,10 +146,12 @@ def answer_section(
 
     def on_partial(partial: dict[str, Any]) -> None:
         for item in complete_items(partial, "fields"):
+            # Only a malformed item is skipped: an error raised by `on_field` propagates.
             try:
-                publish(LLMFieldAnswer.model_validate(item))
+                answer = LLMFieldAnswer.model_validate(item)
             except ValidationError:
                 continue
+            publish(answer)
 
     result = (
         llm.generate_structured(request)

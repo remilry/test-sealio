@@ -3,9 +3,13 @@
 from datetime import date
 from typing import Any
 
+import pytest
+from pydantic import ValidationError
+
 from app.llm.fake_adapter import CHUNKS, FakeLLM
 from app.modules.filling.answer_engine import (
     FieldToAnswer,
+    LLMFieldAnswer,
     SectionResult,
     answer_section,
     complete_items,
@@ -144,3 +148,14 @@ def test_published_evidence_equals_the_final_evidence() -> None:
     )
     assert published == result.evidence
     assert set(published) == {1, 2, 3}
+
+
+def test_an_error_raised_while_publishing_a_field_is_not_swallowed() -> None:
+    # Only a malformed model item is skipped; a ValidationError from the caller propagates.
+    def on_field(field_id: int, _: ValidatedField) -> None:
+        if field_id == 1:  # published while the model writes
+            LLMFieldAnswer.model_validate({})
+
+    answers = [_answer("name", "Alpenlogic AG"), _answer("city", "Zurich"), _answer("uid", "x")]
+    with pytest.raises(ValidationError):
+        _run(answers, on_field)
