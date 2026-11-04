@@ -6,9 +6,16 @@ from app.core.config import get_settings
 from app.core.db import SessionLocal
 from app.modules.knowledge import service
 from app.modules.tenants import service as tenants_service
+from tests.modules.helpers import demo_document
 
 
-def test_the_seeded_company_documents_are_listed_and_indexed(client: TestClient) -> None:
+def test_the_knowledge_base_starts_empty(empty_client: TestClient) -> None:
+    knowledge = empty_client.get("/knowledge").json()
+
+    assert knowledge == {"company_name": "Alpenlogic AG", "documents": [], "last_indexed_at": None}
+
+
+def test_added_company_documents_are_listed_and_indexed(client: TestClient) -> None:
     knowledge = client.get("/knowledge").json()
 
     assert knowledge["company_name"] == "Alpenlogic AG"
@@ -26,7 +33,7 @@ def test_the_seeded_company_documents_are_listed_and_indexed(client: TestClient)
     assert annual_report["pages"] is None
 
 
-def test_restarting_does_not_index_the_documents_twice(client: TestClient) -> None:
+def test_documents_are_kept_across_a_restart(client: TestClient) -> None:
     with TestClient(client.app):
         pass
 
@@ -56,7 +63,7 @@ def test_a_document_file_is_served_as_uploaded(client: TestClient) -> None:
     response = client.get(f"/knowledge/documents/{document['id']}/file")
 
     assert response.status_code == 200
-    source = get_settings().seed_knowledge_dir / document["file_name"]
+    source = demo_document(document["file_name"])
     assert response.content == source.read_bytes()
 
 

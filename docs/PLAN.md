@@ -84,7 +84,7 @@ Chaque étape à partir de la 4 livre une **fonctionnalité utilisable de bout e
 - Découpage pur en passages : une page et une section par passage, ~800 caractères max, sans couper un bloc ; contexte = titre du document + titre de section (cherché, jamais cité).
 - Embeddings : `fastembed` (`bge-small-en-v1.5`, cache `~/.cache/fastembed`) ; embedder factice déterministe (`FORMPILOT_EMBEDDER=hash`) pour les tests rapides.
 - `search()` : vecteurs (cosinus) + plein texte (n'importe quel mot de la requête, `ts_rank_cd`), fusion RRF, filtrée par tenant et documents indexés.
-- Seed : les 11 documents de `knowledge-base/documents/` indexés au démarrage (idempotent). API `GET /knowledge`, `GET /knowledge/documents/{id}/file`.
+- Seed : les 11 documents de `knowledge-base/documents/` indexés au démarrage (idempotent). _Retiré le 2026-11-04 : la base de connaissances démarre vide, voir le journal._ API `GET /knowledge`, `GET /knowledge/documents/{id}/file`.
 - Front : écran *Company knowledge* (entreprise, nombre de documents, dernière indexation, tableau type / nom / pages / date d'ajout / statut, erreur affichée, téléchargement par ligne) ; clic sur un document → aperçu en modale (pages du PDF via `PdfViewer` de `document-preview`, bouton *Download* ; DOCX : message « pas encore d'aperçu » + téléchargement), entrée dans la barre latérale, carte *Company knowledge* sur l'écran *Tender* (nombre de documents, *Manage*).
 - Tests : extraction et découpage (vrais documents + cas synthétiques), API, recherche (identifiant, tri, isolation des tenants), écran *Knowledge* et carte (Vitest), scénario Playwright étendu. Test `slow` de rappel avec le vrai modèle : pour chaque section des formulaires, les passages trouvés pour ses champs contiennent chaque valeur attendue de `GROUND_TRUTH.md` (mesure par section car l'IA répond section par section ; deux libellés seuls, « Legal form since » et « Main activity », ne trouvent pas leur passage en top 8).
 
@@ -199,3 +199,4 @@ UI (relecture)  ──►  API locale
 | 2026-11-04 | Glisser-déposer de fichiers sur toute la page *Company knowledge* ; `fireEvent` autorisé dans les tests d'écran uniquement pour glisser des fichiers (skill `screen-tests`) | validé |
 | 2026-11-04 | Suppression d'un document depuis *Company knowledge* (corbeille, confirmation, suppression définitive du fichier et des passages) ; zone de dépôt sous la liste | validé |
 | 2026-11-04 | Étape 5b validée et mergée dans `main` | validé |
+| 2026-11-04 | Plus de seed de la base de connaissances (ni au démarrage, ni pour la démo, ni pour l'e2e) : l'utilisateur ajoute les documents ; le scénario Playwright dépose les 11 documents de démo au début ; les tests back qui en ont besoin les ajoutent via une fixture | validé |

@@ -1,13 +1,16 @@
-import { readFileSync } from "node:fs";
+import { readdirSync } from "node:fs";
+import path from "node:path";
 import { expect, test } from "@playwright/test";
 
-// The main scenario, grown slice by slice (docs/PLAN.md): today it checks the company knowledge
-// (preview, adding a document), fills Annex 7 by hand and downloads the filled PDF. The back may be
-// a dev server with data already entered: the scenario accepts a form already in review and
-// overwrites the values it types.
+// The main scenario, grown slice by slice (docs/PLAN.md): today it adds the company's documents
+// (the knowledge base is not seeded), previews one, fills Annex 7 by hand and downloads the filled
+// PDF. The back may be a dev server with data already entered: documents added again under the
+// same name replace themselves, a form already in review is accepted and its values overwritten.
 
-// Added again under its own name, it replaces itself: the knowledge base keeps its 11 documents.
-const REPLACED_DOCUMENT = "08_pension_fund_confirmation.pdf";
+// The demo company's documents (Alpenlogic AG, knowledge-base/GROUND_TRUTH.md).
+const DEMO_DIR = path.resolve("../knowledge-base/documents");
+const DEMO_FILES = readdirSync(DEMO_DIR).filter((name) => /\.(pdf|docx)$/.test(name));
+
 test("I fill Annex 7 by hand and download it in its original PDF layout", async ({ page }) => {
   await page.goto("/");
 
@@ -22,15 +25,22 @@ test("I fill Annex 7 by hand and download it in its original PDF layout", async 
   await expect(annex7).toContainText("Annex 7");
   await expect(annex7).toContainText("10 fields detected · 1 signature");
 
-  // What the AI answers from: the company's 11 documents, all indexed at startup.
+  // What the AI answers from: the user adds the company's documents.
   const knowledge = page.getByRole("region", { name: "Company knowledge" });
-  await expect(knowledge).toContainText("11documents");
   await knowledge.getByRole("link", { name: "Manage" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Alpenlogic AG" })).toBeVisible();
+  expect(DEMO_FILES).toHaveLength(11);
+  await page
+    .getByLabel("Choose PDF or Word documents")
+    .setInputFiles(DEMO_FILES.map((name) => path.join(DEMO_DIR, name)));
+  // Listed at once while processed, then indexed one by one, without reloading the page.
   const documents = page.getByRole("table", { name: "Documents" }).getByRole("row");
-  // 11 documents and the header row.
-  await expect(documents).toHaveCount(12);
-  await expect(documents.filter({ hasText: "Indexed" })).toHaveCount(11);
+  const added = (name: string) => documents.filter({ hasText: name });
+  await expect(added(DEMO_FILES[0])).toContainText(/Processing|Indexed/);
+  for (const name of DEMO_FILES) {
+    await expect(added(name)).toContainText("Indexed", { timeout: 60_000 });
+  }
+
   // A document opens in place, its pages rendered.
   await page.getByRole("button", { name: "Preview Commercial register extract" }).click();
   const viewer = page.getByRole("dialog", { name: "Commercial register extract" });
@@ -38,16 +48,6 @@ test("I fill Annex 7 by hand and download it in its original PDF layout", async 
   await expect(viewer.getByRole("link", { name: "Download" })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(viewer).toBeHidden();
-  // Adding a document: listed while processed, then indexed, without reloading the page.
-  await page.getByLabel("Choose PDF or Word documents").setInputFiles({
-    name: REPLACED_DOCUMENT,
-    mimeType: "application/pdf",
-    buffer: readFileSync(`../knowledge-base/documents/${REPLACED_DOCUMENT}`),
-  });
-  const replaced = page.getByRole("row", { name: "Pension fund confirmation" });
-  await expect(replaced).toContainText("Processing");
-  await expect(replaced).toContainText("Indexed");
-  await expect(documents).toHaveCount(12);
   await page.getByRole("list", { name: "Main" }).getByRole("link", { name: "Tenders" }).click();
 
   // Open Annex 7: its detected fields are listed and drawn on the original form.

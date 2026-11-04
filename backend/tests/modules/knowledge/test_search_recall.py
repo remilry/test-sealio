@@ -16,6 +16,7 @@ from app.main import app
 from app.modules.knowledge import service
 from app.modules.knowledge.embedding import FastEmbedder
 from app.modules.tenants import service as tenants_service
+from tests.modules.helpers import add_demo_documents
 
 pytestmark = pytest.mark.slow
 
@@ -63,23 +64,23 @@ SECTIONS = {
 
 
 @pytest.fixture
-def real_model_client(monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
-    """The app, its seed indexed with the real model."""
-    embedder = FastEmbedder()
-    monkeypatch.setattr(service, "get_embedder", lambda: embedder)
+def real_model_client() -> Iterator[TestClient]:
+    """The app with the demo documents indexed by the real model."""
     with TestClient(app) as client:
+        add_demo_documents(FastEmbedder())
         yield client
 
 
 def test_each_sections_passages_hold_every_expected_value(real_model_client: TestClient) -> None:
     misses = []
+    embedder = FastEmbedder()
     with SessionLocal() as session:
         tenant_id = tenants_service.get_current_tenant_id(session)
         for section, fields in SECTIONS.items():
             found = [
                 passage.text.lower()
                 for label, _ in fields
-                for passage in service.search(session, tenant_id, label, k=K)
+                for passage in service.search(session, tenant_id, label, k=K, embedder=embedder)
             ]
             misses += [
                 (section, label, expected)

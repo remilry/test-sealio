@@ -171,7 +171,7 @@ def import_document(
     data_dir: Path,
     embedder: Embedder | None = None,
 ) -> Document:
-    """Store and index a company document from disk, at once (the seed).
+    """Store and index a company document from disk, at once (tests and scripts).
 
     Idempotent on (tenant, file name): a document already indexed is left as is. An unreadable
     file is kept with status "error" and a message for the user.

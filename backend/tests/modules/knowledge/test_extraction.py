@@ -6,12 +6,12 @@ import docx
 import pymupdf
 import pytest
 
-from app.core.config import get_settings
 from app.modules.knowledge.extraction import UnreadableDocumentError, extract_docx, extract_pdf
+from tests.modules.helpers import demo_document
 
 
 def _read(file_name: str) -> bytes:
-    return (get_settings().seed_knowledge_dir / file_name).read_bytes()
+    return (demo_document(file_name)).read_bytes()
 
 
 def test_a_pdf_gives_its_pages_and_each_block_where_it_sits() -> None:

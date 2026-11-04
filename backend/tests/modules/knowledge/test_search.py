@@ -8,6 +8,7 @@ from app.core.config import get_settings
 from app.core.db import SessionLocal
 from app.modules.knowledge import service
 from app.modules.tenants import service as tenants_service
+from tests.modules.helpers import demo_document
 
 
 def _search(query: str, tenant_id: int | None = None, k: int = 8):
@@ -53,7 +54,7 @@ def test_another_tenant_never_sees_these_documents(client: TestClient, tmp_path:
     assert _search("CHE-123.456.789", tenant_id=other_id) == []
 
     own = tmp_path / "other_register.pdf"
-    own.write_bytes((get_settings().seed_knowledge_dir / "06_tax_attestation.pdf").read_bytes())
+    own.write_bytes(demo_document("06_tax_attestation.pdf").read_bytes())
     with SessionLocal() as session:
         service.import_document(session, other_id, own, get_settings().data_dir)
         session.commit()

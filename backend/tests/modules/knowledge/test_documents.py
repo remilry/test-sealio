@@ -18,6 +18,7 @@ from app.main import app
 from app.modules.knowledge import service
 from app.modules.knowledge.models import Document, DocumentStatus
 from app.modules.tenants import service as tenants_service
+from tests.modules.helpers import demo_document
 
 PDF = "application/pdf"
 DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -63,7 +64,7 @@ def test_an_added_document_is_returned_processing_then_indexed(client: TestClien
 
 
 def test_several_documents_can_be_added_at_once(client: TestClient) -> None:
-    pdf = (get_settings().seed_knowledge_dir / "06_tax_attestation.pdf").read_bytes()
+    pdf = demo_document("06_tax_attestation.pdf").read_bytes()
 
     response = client.post(
         "/knowledge/documents",
