@@ -19,8 +19,11 @@ export const handlers = {
   answers: (formId: number, state: FillState) =>
     http.get(url(`/forms/${formId}/answers`), () => HttpResponse.json(state)),
 
-  exportSummary: (formId: number, summary: ExportSummary) =>
-    http.get(url(`/forms/${formId}/export`), () => HttpResponse.json(summary)),
+  /** `GET /forms/{id}/export`; a function is called at each request (the summary follows saves). */
+  exportSummary: (formId: number, summary: ExportSummary | (() => ExportSummary)) =>
+    http.get(url(`/forms/${formId}/export`), () =>
+      HttpResponse.json(typeof summary === "function" ? summary() : summary),
+    ),
 
   /**
    * `PATCH /forms/{id}/fields/{fieldId}`: records every request and answers with `respond`

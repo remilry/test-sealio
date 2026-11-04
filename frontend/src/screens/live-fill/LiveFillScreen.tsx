@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeftIcon, DownloadIcon, FileQuestionIcon, FileXIcon } from "lucide-react";
+import { ArrowLeftIcon, FileQuestionIcon, FileXIcon } from "lucide-react";
 import { DocumentPreview, type PreviewZone } from "@/features/document-preview";
 import {
   fillQueries,
@@ -13,6 +13,7 @@ import {
   type FillState,
   type FormDetail,
 } from "@/features/fill-session";
+import { ExportDialog } from "@/features/form-export";
 import { FieldList, type FocusRequest, type QueueField } from "@/features/review-queue";
 import { tenderQueries } from "@/features/tender";
 import { isNotFound } from "@/shared/api";
@@ -160,10 +161,12 @@ function FillWorkspace({ form, fill }: { form: FormDetail; fill: FillState }) {
           <span className="text-xs whitespace-nowrap text-muted-foreground">
             {counts.filled} / {counts.fillable} filled · {counts.empty} empty
           </span>
-          <Link href={routes.exportForm(form.id)} className={buttonVariants()}>
-            <DownloadIcon data-icon="inline-start" />
-            Export {form.file_format.toUpperCase()}
-          </Link>
+          <ExportDialog
+            formId={form.id}
+            formTitle={form.title}
+            fileFormat={form.file_format}
+            savePending={save.isPending}
+          />
         </>
       }
     >

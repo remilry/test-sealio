@@ -40,13 +40,13 @@ test("I fill Annex 7 by hand and download it in its original PDF layout", async 
   await expect(page.getByRole("status")).toHaveText(/saved/i);
   await expect(preview.getByText("Pfingstweidstrasse 31, 8005 Zürich")).toBeVisible();
 
-  // Export: the download is the filled PDF, under the original file name.
-  await page.getByRole("link", { name: "Export PDF" }).click();
-  await expect(page).toHaveURL(/\/forms\/\d+\/export$/);
-  await expect(page.getByText("Sign by hand: Signature(s)")).toBeVisible();
+  // Export, over the form: the download is the filled PDF, under the original file name.
+  await page.getByRole("button", { name: "Export PDF" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByText("Sign by hand: Signature(s)")).toBeVisible();
   const [download] = await Promise.all([
     page.waitForEvent("download"),
-    page.getByRole("link", { name: "Download PDF" }).click(),
+    dialog.getByRole("link", { name: "Download PDF" }).click(),
   ]);
   expect(download.suggestedFilename()).toBe(
     "Annex_7_Self-Declaration_Art29c_Ukraine_Ordinance.pdf",

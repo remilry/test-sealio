@@ -53,13 +53,12 @@ frontend/src/
 │  ├─ layout.tsx                 # providers (QueryClient) + shell
 │  ├─ knowledge/page.tsx
 │  ├─ tenders/[tenderId]/page.tsx
-│  └─ forms/[formId]/{fill,export}/page.tsx
+│  └─ forms/[formId]/fill/page.tsx
 │
 ├─ screens/                      # composition des features ; unité des tests d'intégration
 │  ├─ knowledge/   KnowledgeScreen.tsx · KnowledgeScreen.test.tsx
 │  ├─ tender/      TenderScreen.tsx    · TenderScreen.test.tsx
-│  ├─ live-fill/   LiveFillScreen.tsx  · LiveFillProvider.tsx · LiveFillScreen.test.tsx
-│  └─ export/      ExportScreen.tsx    · ExportScreen.test.tsx
+│  └─ live-fill/   LiveFillScreen.tsx  · LiveFillProvider.tsx · LiveFillScreen.test.tsx (export en modale inclus)
 │
 ├─ features/                     # modules autonomes ; API publique = index.ts
 │  ├─ knowledge-base/    api.ts · DocumentTable · UploadDocuments · useDocuments
@@ -69,7 +68,7 @@ frontend/src/
 │  │                     Outdated,Conflict,Declaration} · useReviewKeyboard
 │  ├─ document-preview/  DocumentPreview · renderers/{pdf,docx} · FieldOverlay · locator.ts
 │  ├─ source-viewer/     api.ts · SourceView
-│  └─ form-export/       api.ts · ExportSummary · ExportWarnings · DownloadButton
+│  └─ form-export/       api.ts · ExportDialog (résumé, champs vides, téléchargement)
 │
 ├─ shared/
 │  ├─ api/               client.ts (initialisation du client HTTP typé) · schema.gen.ts (généré)

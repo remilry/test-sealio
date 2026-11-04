@@ -4,6 +4,7 @@ import { handlers, renderScreen, server } from "@/shared/test";
 import {
   annex7,
   answer,
+  exportSummary,
   fillState,
   form as formSummary,
   tender,
@@ -270,17 +271,6 @@ describe("Live fill (manual)", () => {
     expect(screen.getByText("0 / 9 filled · 9 empty")).toBeInTheDocument();
   });
 
-  it("leads to the export in the original format", async () => {
-    // Given the form is open
-    given();
-
-    // Then the export action names the original format
-    expect(await screen.findByRole("link", { name: "Export PDF" })).toHaveAttribute(
-      "href",
-      "/forms/2/export",
-    );
-  });
-
   it("tells me when a form cannot be filled yet (format not supported)", async () => {
     // Given the Word form, not parsed yet
     const docx = formSummary();
@@ -319,5 +309,108 @@ describe("Live fill (manual)", () => {
 
     // Then the form shows
     expect(await screen.findByRole("textbox", { name: "Telephone" })).toBeInTheDocument();
+  });
+});
+
+const ALL_FILLED = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+
+/** Opens the export over the form, the back answering with the given summary. */
+async function openExport(summary = exportSummary(ALL_FILLED), answers = fillState()) {
+  server.use(handlers.exportSummary(2, summary));
+  const { saved, user } = given(annex7(), answers);
+  await user.click(await screen.findByRole("button", { name: "Export PDF" }));
+  return { dialog: await screen.findByRole("dialog"), saved, user };
+}
+
+describe("Export (dialog over the form)", () => {
+  it("says the form is ready when every field is filled", async () => {
+    // Given every fillable field has a value, when I open the export
+    const { dialog } = await openExport();
+
+    // Then it is ready, with no warning
+    const panel = within(dialog);
+    expect(await panel.findByRole("heading", { name: "Ready to submit" })).toBeInTheDocument();
+    expect(
+      panel.getByText("Annex 7 — Sanctions self-declaration (Art. 29c) · 9 of 9 fields filled"),
+    ).toBeInTheDocument();
+    expect(panel.queryByRole("list", { name: "Empty fields" })).not.toBeInTheDocument();
+  });
+
+  it("warns that empty fields will be exported blank, and lets me go back to them", async () => {
+    // Given two fields are filled, when I open the export
+    const { dialog, user } = await openExport(exportSummary([3, 6]));
+
+    // Then I see which fields will be blank, and can still download
+    const panel = within(dialog);
+    expect(await panel.findByRole("heading", { name: "7 fields still empty" })).toBeInTheDocument();
+    expect(panel.getByText("7 fields still empty — they will be exported blank")).toBeVisible();
+    const empty = within(panel.getByRole("list", { name: "Empty fields" }));
+    expect(empty.getAllByRole("listitem").map((item) => item.textContent)).toEqual([
+      "Project number/project title/project name",
+      "Name of the contracting authority",
+      "Business address",
+      "Contact person",
+      "E-mail",
+      "Place and date",
+      "First name(s) and surname(s)",
+    ]);
+    expect(panel.getByRole("link", { name: "Download PDF" })).toBeInTheDocument();
+
+    // And going back closes it, the form still there
+    await user.click(panel.getByRole("button", { name: "Back to review" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(screen.getByRole("textbox", { name: "Telephone" })).toBeInTheDocument();
+  });
+
+  it("downloads the filled form in its original format, and reminds me to sign by hand", async () => {
+    // Given the form, when I open the export
+    const { dialog } = await openExport();
+
+    // Then the download is the filled PDF from the back
+    const panel = within(dialog);
+    const download = await panel.findByRole("link", { name: "Download PDF" });
+    expect(download).toHaveAttribute("href", "http://localhost:8000/forms/2/export/file");
+    expect(
+      panel.getByText(
+        "Buyer's original layout preserved · answers written into the existing fields",
+      ),
+    ).toBeInTheDocument();
+    // And the signature is listed before submitting
+    const section = panel.getByRole("region", { name: "Before you submit" });
+    expect(within(section).getByText("Sign by hand: Signature(s)")).toBeInTheDocument();
+  });
+
+  it("counts the value I was typing when I opened it", async () => {
+    // Given the back's summary counts the values it has received
+    const { user, saved } = given();
+    server.use(
+      handlers.exportSummary(2, () =>
+        exportSummary(saved.requests.filter((r) => r.value).map((r) => r.fieldId)),
+      ),
+    );
+
+    // When I type a value and open the export straight away
+    await user.type(await screen.findByRole("textbox", { name: "Telephone" }), "044");
+    await user.click(screen.getByRole("button", { name: "Export PDF" }));
+
+    // Then the value is saved first, and the export counts it
+    const panel = within(await screen.findByRole("dialog"));
+    expect(await panel.findByText(/1 of 9 fields filled/)).toBeInTheDocument();
+    expect(saved.requests).toEqual([{ fieldId: 6, value: "044" }]);
+  });
+
+  it("lets me retry when the export could not be prepared", async () => {
+    // Given the back fails once
+    server.use(handlers.error("/forms/2/export", 500));
+    const { user } = given();
+    await user.click(await screen.findByRole("button", { name: "Export PDF" }));
+    const alert = await within(await screen.findByRole("dialog")).findByRole("alert");
+
+    // When it is back and I retry
+    server.use(handlers.exportSummary(2, exportSummary(ALL_FILLED)));
+    await user.click(within(alert).getByRole("button", { name: "Try again" }));
+
+    // Then the export shows
+    expect(await screen.findByRole("heading", { name: "Ready to submit" })).toBeInTheDocument();
   });
 });

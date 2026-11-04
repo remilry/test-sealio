@@ -19,7 +19,7 @@ L'utilisateur (responsable des appels d'offres chez Alpenlogic AG) doit rendre d
 ```
 Company knowledge ──(alertes)──┐
                                ▼
-Tender (offre fictive) ──► Setup (modale) ──► Live fill ──► Export ──► Tender (formulaire « Ready »)
+Tender (offre fictive) ──► Setup (modale) ──► Live fill ──► Export (modale) ──► Tender (formulaire « Ready »)
                                                  │  ▲
                                    repli technique▼  │
                                   AI filling ──► Review
@@ -112,12 +112,13 @@ L'utilisateur peut corriger un champ signalé **pendant** le remplissage.
 
 ### 3.5 Export
 
+Modale ouverte par `⤓ Export …` au-dessus de *Live fill* (pas de page séparée, pour alléger le flux ; une page pourra revenir si nécessaire). *Back to review* la ferme.
+
 - Titre : « Annex 4 is ready to submit » ou « Annex 4 — n fields still empty ».
 - Résumé : `x of y fields filled · n automatically from your documents · n reviewed by you`.
 - Bandeau si des champs restent ouverts : « n fields still empty — they will be exported blank » / « n doubts not reviewed — the AI's best answer will be used » + *Back to review*.
 - `⤓ Download DOCX` (Annex 4) ou `⤓ Download PDF` (Annex 7) : **format d'origine uniquement**. Mention « Buyer's original layout preserved · answers written into the existing fields ».
 - **Before you submit** : « Sign and stamp page n by hand — Signatory: … » ; si des valeurs d'un document périmé ont été gardées : « You kept n values from an expired certificate — attach a valid one » + *Upload new*.
-- Miniature du document rempli à droite.
 
 ### 3.6 Écrans de repli : AI filling + Review
 
