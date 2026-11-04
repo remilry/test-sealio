@@ -6,9 +6,10 @@ passages the search returned that time (the prompt itself depends on the embedde
 comes with what it cost (tokens, dollars) and how long it took, for the logs.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Protocol
+from typing import Any, Protocol
 
 from pydantic import BaseModel
 
@@ -82,8 +83,16 @@ class LLMError(Exception):
     """The model could not give an answer (provider error, refusal, missing recording)."""
 
 
+# Receives the output parsed so far (a JSON object, possibly incomplete).
+OnPartial = Callable[[dict[str, Any]], None]
+
+
 class LLM(Protocol):
-    def generate_structured[T: BaseModel](self, request: LLMRequest[T]) -> LLMResult[T]: ...
+    def generate_structured[T: BaseModel](
+        self, request: LLMRequest[T], on_partial: OnPartial | None = None
+    ) -> LLMResult[T]:
+        """`on_partial` is called several times, in order, with the output so far."""
+        ...
 
 
 @lru_cache
@@ -102,4 +111,4 @@ def get_llm() -> LLM:
         )
     from app.llm.fake_adapter import FakeLLM
 
-    return FakeLLM.from_dir(settings.llm_recordings_dir)
+    return FakeLLM.from_dir(settings.llm_recordings_dir, latency=settings.fake_llm_latency)

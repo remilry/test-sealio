@@ -35,6 +35,7 @@ export default defineConfig({
         FORMPILOT_DATABASE_URL: DATABASE_URL,
         FORMPILOT_DATA_DIR: DATA_DIR,
         FORMPILOT_CORS_ORIGINS: JSON.stringify([FRONT_URL]),
+        FORMPILOT_FAKE_LLM_LATENCY: "none",
       },
       url: `${API_URL}/health`,
       // Never reuse a server: it could be one with data, or the dev one.

@@ -28,6 +28,8 @@ class Settings(BaseSettings):
 
     # "fake": replays recorded answers (llm_recordings_dir), no key and no network (tests, e2e).
     llm_provider: Literal["openai", "fake"] = "fake"
+    # "recorded": a replay takes the time of the recorded call; "none": instant (tests, e2e).
+    fake_llm_latency: Literal["recorded", "none"] = "recorded"
     llm_model: str = "gpt-5-mini"
     llm_reasoning_effort: Literal["minimal", "low", "medium", "high"] = "low"
     llm_recordings_dir: Path = REPO_ROOT / "backend" / "llm_recordings"

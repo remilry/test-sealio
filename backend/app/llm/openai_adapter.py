@@ -1,13 +1,14 @@
 """OpenAI adapter: Responses API with a strict JSON schema derived from the Pydantic model."""
 
 import time
-from typing import Literal
+from typing import Any, Literal
 
 import openai
 from openai.types.responses import ResponseUsage
 from pydantic import BaseModel
+from pydantic_core import from_json
 
-from app.llm.facade import LLMError, LLMPrices, LLMRequest, LLMResult, LLMUsage
+from app.llm.facade import LLMError, LLMPrices, LLMRequest, LLMResult, LLMUsage, OnPartial
 
 
 class OpenAILLM:
@@ -24,10 +25,12 @@ class OpenAILLM:
         self._effort: Literal["minimal", "low", "medium", "high"] = reasoning_effort
         self._prices = prices
 
-    def generate_structured[T: BaseModel](self, request: LLMRequest[T]) -> LLMResult[T]:
+    def generate_structured[T: BaseModel](
+        self, request: LLMRequest[T], on_partial: OnPartial | None = None
+    ) -> LLMResult[T]:
         started = time.monotonic()
         try:
-            response = self._client.responses.parse(
+            with self._client.responses.stream(
                 model=self._model,
                 instructions=request.instructions,
                 input=request.prompt,
@@ -35,7 +38,17 @@ class OpenAILLM:
                 reasoning={"effort": self._effort},
                 # Nothing is kept on OpenAI's side: every call is self-contained.
                 store=False,
-            )
+            ) as stream:
+                text = ""
+                for event in stream:
+                    if event.type != "response.output_text.delta":
+                        continue
+                    text += event.delta
+                    if on_partial is not None:
+                        partial = _parse_partial(text)
+                        if partial:
+                            on_partial(partial)
+                response = stream.get_final_response()
         except openai.APIError as error:
             raise LLMError(f"The language model failed: {error}") from error
         parsed = response.output_parsed
@@ -61,3 +74,11 @@ class OpenAILLM:
             ),
             seconds=seconds,
         )
+
+
+def _parse_partial(text: str) -> dict[str, Any] | None:
+    try:
+        value = from_json(text, allow_partial=True)
+    except ValueError:
+        return None
+    return value if isinstance(value, dict) else None

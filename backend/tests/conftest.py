@@ -20,6 +20,7 @@ TEST_DATABASE_URL = _base_url.set(database=TEST_DB).render_as_string(hide_passwo
 os.environ["FORMPILOT_DATABASE_URL"] = TEST_DATABASE_URL
 # Deterministic embeddings: only the tests marked `slow` load the real model.
 os.environ["FORMPILOT_EMBEDDER"] = "hash"
+os.environ["FORMPILOT_FAKE_LLM_LATENCY"] = "none"
 
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import text  # noqa: E402
