@@ -2,7 +2,7 @@
 
 > Document vivant. Chaque étape y est cochée et détaillée au fur et à mesure.
 > Contexte produit et priorités : voir `CLAUDE.md`. Échéance : jeudi 5 novembre.
-> Statut : étapes 0 à 4.5 faites ; étape 5 découpée en 5a–5d, 5a et 5b mergées ; 5c (moteur IA back) implémentée sur sa branche, à valider. Parcours détaillé : `docs/USER_FLOW.md`. Les choix techniques marqués _proposition_ restent à confirmer à l'étape 3.
+> Statut : étapes 0 à 4.5 faites ; étape 5 découpée en 5a–5d, 5a, 5b et 5c mergées ; prochaine : 5d (remplissage IA dans l'UI). Parcours détaillé : `docs/USER_FLOW.md`. Les choix techniques marqués _proposition_ restent à confirmer à l'étape 3.
 
 ## 1. Ce qu'on a appris des deux formulaires
 
@@ -94,7 +94,7 @@ Chaque étape à partir de la 4 livre une **fonctionnalité utilisable de bout e
 - Tests : API d'ajout et de suppression (succès, plusieurs fichiers, illisible, remplacement, refus, taille, échec inattendu, reprise au démarrage, suppression, 404 / autre tenant, suppression pendant l'indexation) ; écran *Knowledge* (Processing → Indexed, → Error, plusieurs fichiers, refus, échec serveur, sélecteur, suppression : confirmer, annuler, échec ; glisser-déposer : zone sous la liste, zone = écran vide, dépôt, sortie sans dépôt, texte ignoré — seul usage permis de `fireEvent`, user-event ne sachant pas glisser des fichiers) ; e2e : ré-ajout d'un document existant sous son nom (remplacement, Processing → Indexed).
 - Limite des tests front : sous jsdom + Vitest, un handler MSW ne peut pas lire un corps multipart construit avec des `File` jsdom (le fetch échoue) ; le handler vérifie donc le type de contenu, et les fichiers eux-mêmes sont vérifiés par les tests back et l'e2e.
 
-#### 5c — Moteur de réponse IA (back) 🟦 (implémentée, en attente de validation)
+#### 5c — Moteur de réponse IA (back) ✅ (mergée le 2026-11-04)
 - **Façade LLM** (`app/llm/`) : `generate_structured(LLMRequest[T]) -> T` (modèle Pydantic en sortie). Adaptateur **OpenAI** (`gpt-5-mini`, Responses API `responses.parse`, schéma strict, effort de raisonnement `low`, `store=False`) ; `FakeLLM` qui rejoue des réponses par **clé stable** (`<formulaire>--<section>`, pas le prompt, qui dépend de l'embedder) depuis `backend/llm_recordings/*.json` ; `RecordingLLM` + `scripts/record_llm.py` pour enregistrer les vraies réponses (base de dev, vrai modèle d'embeddings). Seul `app/llm/` importe le SDK `openai` ; le SDK Anthropic est retiré. Sans clé : 503 clair au lancement.
 - **Moteur** (`filling/answer_engine.py`) : un appel par section ; pour chaque champ (hors signature et hors champs déjà fixés par l'utilisateur), recherche hybride top 8 sur son libellé, passages dédoublonnés et étiquetés `P1…`, « Tender details » (titre, référence, autorité, procédure, échéance) en `P1`. Le modèle renvoie par champ : candidats (valeur, une ou plusieurs citations exactes, date de la source et fin de validité avec citation), ou `user_only` + raison + valeur suggérée, ou rien.
 - **Validateur** (pur) : citation cherchée dans le passage étiqueté puis dans les autres passages envoyés (lettres et chiffres seulement : casse, accents, espaces, ponctuation, césures tolérés) ; chaque mot et nombre significatif de la valeur doit figurer dans ses citations vérifiées (normalisation `100'000` = `100,000`, dates écrites de toutes les façons usuelles, accents) ; Oui/Non seulement avec citation de preuve ; une date n'est gardée que si sa citation l'énonce ; même valeur de plusieurs sources = un candidat avec toutes ses preuves.
@@ -216,4 +216,5 @@ UI (relecture)  ──►  API locale
 | 2026-11-04 | 5c : un nouveau remplissage IA ne remplace jamais une valeur fixée par l'utilisateur (avant ou pendant le remplissage) ; le reste est recalculé | validé |
 | 2026-11-04 | 5c : le LLM cite par texte exact, l'étiquette du passage n'est qu'un indice (citation cherchée dans tous les passages envoyés) ; enregistrements rejoués par clé formulaire + section ; date de la source par candidat (présélection du plus récent en conflit) ; SSE par lecture de la base toutes les 250 ms (pas d'`asyncio.Queue`) | proposé |
 | 2026-11-04 | Durée du remplissage : sections appelées en parallèle, prévu à l'étape 7 (mesurable avec l'Annex 4) ; plafond de taille de section, effort `minimal` et sortie allégée gardés en pistes | validé |
+| 2026-11-04 | Étape 5c validée et mergée dans `main` | validé |
 | 2026-11-04 | e2e dans un environnement dédié et propre : base `formpilot_e2e` supprimée et recréée à chaque lancement (script `scripts/reset_e2e.py`, refuse toute base dont le nom ne finit pas par `_e2e`), dossier `data-e2e/` vidé, back :8100 et front :3100 jamais réutilisés, build Next dans `.next-e2e` (le serveur de dev n'est pas touché) | validé |
