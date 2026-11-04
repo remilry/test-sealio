@@ -1,10 +1,13 @@
 from datetime import datetime
 from enum import StrEnum
+from typing import Any
 
 from sqlalchemy import BigInteger, DateTime, ForeignKey, UniqueConstraint
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import Base, TimestampMixin, id_column, str_enum
+from app.modules.filling.rules import AnswerType
 
 
 class FillStatus(StrEnum):
@@ -16,6 +19,19 @@ class FillStatus(StrEnum):
 class ResolvedBy(StrEnum):
     AI = "ai"
     USER = "user"
+
+
+class AiStatus(StrEnum):
+    RUNNING = "running"
+    DONE = "done"
+    FAILED = "failed"
+
+
+class FillEventType(StrEnum):
+    PHASE = "phase"
+    FIELD = "field"
+    DONE = "done"
+    ERROR = "error"
 
 
 class FormFill(TimestampMixin, Base):
@@ -39,10 +55,14 @@ class FormFill(TimestampMixin, Base):
     status: Mapped[FillStatus] = mapped_column(
         str_enum(FillStatus), default=FillStatus.NOT_STARTED, server_default=FillStatus.NOT_STARTED
     )
+    # The last AI fill of the form; null when the AI never ran on it.
+    ai_status: Mapped[AiStatus | None] = mapped_column(str_enum(AiStatus))
+    ai_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    ai_finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class Answer(TimestampMixin, Base):
-    """The current answer of a field, in a fill. Step 4.5: entered by hand; AI columns at step 5."""
+    """The current answer of a field, in a fill: proposed by the AI or entered by the user."""
 
     __tablename__ = "answer"
     __table_args__ = (
@@ -62,3 +82,27 @@ class Answer(TimestampMixin, Base):
     value: Mapped[str | None]
     resolved_by: Mapped[ResolvedBy] = mapped_column(str_enum(ResolvedBy))
     resolved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    # What the AI found (rules.py); null when the AI never answered this field.
+    type: Mapped[AnswerType | None] = mapped_column(str_enum(AnswerType))
+    # Verified candidates, the selected one first: [{value, citations, source_date, valid_until}].
+    candidates: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, default=list, server_default="[]"
+    )
+    # Why only the user can fill the field (type "manual").
+    user_only_reason: Mapped[str | None]
+    # The user still has to look at it (missing, manual, conflict, outdated).
+    needs_review: Mapped[bool] = mapped_column(default=False, server_default="false")
+
+
+class FillEvent(TimestampMixin, Base):
+    """What the last AI fill of a form did, in order: replayed to the screen (SSE, reload)."""
+
+    __tablename__ = "fill_event"
+
+    # Increasing: also the SSE event id a client resumes from (Last-Event-ID).
+    id: Mapped[int] = id_column()
+    form_fill_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("form_fill.id", ondelete="CASCADE"), index=True
+    )
+    type: Mapped[FillEventType] = mapped_column(str_enum(FillEventType))
+    data: Mapped[dict[str, Any]] = mapped_column(JSONB)

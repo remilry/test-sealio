@@ -12,6 +12,7 @@ from app.core.db import SessionDep, SessionLocal
 from app.core.errors import register_error_handlers
 from app.core.migrations import upgrade_to_head
 from app.modules.export.router import router as export_router
+from app.modules.filling import service as filling_service
 from app.modules.filling.router import router as filling_router
 from app.modules.forms.router import router as forms_router
 from app.modules.knowledge import service as knowledge_service
@@ -27,6 +28,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     settings.data_dir.mkdir(parents=True, exist_ok=True)
     with SessionLocal() as session:
         seed(session, settings)
+        filling_service.fail_interrupted_fills(session)
         pending = knowledge_service.pending_document_ids(session)
     # Documents the server stopped indexing: indexed again without delaying startup.
     resume = asyncio.create_task(

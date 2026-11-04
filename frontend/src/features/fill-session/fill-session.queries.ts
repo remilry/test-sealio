@@ -71,16 +71,22 @@ export function useSaveAnswer(
 }
 
 function withAnswer(state: FillState, fieldId: number, value: string | null): FillState {
+  const existing = state.answers.find((a) => a.field_id === fieldId);
+  // The user's value replaces the AI's, whose evidence (type, candidates) stays shown.
   const answer: Answer = {
+    type: null,
+    candidates: [],
+    user_only_reason: null,
+    ...existing,
     field_id: fieldId,
     value: value?.trim() || null,
     resolved_by: "user",
     resolved_at: now().toISOString(),
+    needs_review: false,
   };
-  const exists = state.answers.some((a) => a.field_id === fieldId);
   return {
     ...state,
-    answers: exists
+    answers: existing
       ? state.answers.map((a) => (a.field_id === fieldId ? answer : a))
       : [...state.answers, answer],
   };

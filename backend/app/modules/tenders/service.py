@@ -31,6 +31,23 @@ def get_tender(session: Session, tenant_id: int, tender_id: int) -> TenderDetail
     )
 
 
+def tender_details(session: Session, tender_id: int) -> str:
+    """The tender's own information as a text the AI can quote ("Tender details" source)."""
+    tender = session.get(Tender, tender_id)
+    if tender is None:
+        raise NotFoundError(f"Tender {tender_id} not found")
+    return "\n".join(
+        [
+            f"Project title: {tender.title}",
+            f"Project number (reference): {tender.reference}",
+            f"Contracting authority: {tender.authority}",
+            f"Procedure: {tender.procedure}",
+            f"Scope: {tender.summary}",
+            f"Submission deadline: {tender.submission_deadline:%d %B %Y}",
+        ]
+    )
+
+
 def _forms_with_status(session: Session, tenant_id: int, tender_id: int) -> list[FormSummary]:
     forms = forms_service.list_forms(session, tender_id)
     statuses = filling_service.fill_statuses(session, tenant_id, [form.id for form in forms])

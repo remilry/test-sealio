@@ -23,10 +23,14 @@ class Settings(BaseSettings):
     # Slug of the tenant every request acts for, until real authentication (tenants/service.py).
     current_tenant: str = "alpenlogic"
 
-    llm_provider: Literal["anthropic", "fake"] = "fake"
-    anthropic_api_key: SecretStr | None = Field(
+    # "fake": replays recorded answers (llm_recordings_dir), no key and no network (tests, e2e).
+    llm_provider: Literal["openai", "fake"] = "fake"
+    llm_model: str = "gpt-5-mini"
+    llm_reasoning_effort: Literal["minimal", "low", "medium", "high"] = "low"
+    llm_recordings_dir: Path = REPO_ROOT / "backend" / "llm_recordings"
+    openai_api_key: SecretStr | None = Field(
         default=None,
-        validation_alias=AliasChoices("ANTHROPIC_API_KEY", "FORMPILOT_ANTHROPIC_API_KEY"),
+        validation_alias=AliasChoices("OPENAI_API_KEY", "FORMPILOT_OPENAI_API_KEY"),
     )
 
 

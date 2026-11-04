@@ -111,8 +111,55 @@ export interface paths {
         /**
          * Update Field
          * @description Save the value the user entered. Returns the whole fill state (counts change).
+         *     Allowed while the AI is filling: the user's value is never replaced by the AI.
          */
         patch: operations["update_field_forms__form_id__fields__field_id__patch"];
+        trace?: never;
+    };
+    "/forms/{form_id}/fill": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Fill
+         * @description Start the AI fill of the form, in the background: follow it on `GET …/fill/events`.
+         *
+         *     Every field the user has not set is answered again; the user's values are kept.
+         */
+        post: operations["start_fill_forms__form_id__fill_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/forms/{form_id}/fill/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Fill Events
+         * @description The events of the last AI fill, from the start or after `Last-Event-ID`, then the new
+         *     ones as they happen. Ends with the run ("done" or "error"); empty when the AI never ran.
+         *
+         *     Event types: `phase` ({phase, …}), `field` ({field_id, state: "searching" | "answered",
+         *     answer, counts}), `done` ({filled, fillable, doubts, seconds}), `error` ({message}).
+         */
+        get: operations["fill_events_forms__form_id__fill_events_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/forms/{form_id}/export": {
@@ -248,6 +295,25 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AiRun
+         * @description The last AI fill of the form.
+         */
+        AiRun: {
+            status: components["schemas"]["AiStatus"];
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /** Finished At */
+            finished_at: string | null;
+        };
+        /**
+         * AiStatus
+         * @enum {string}
+         */
+        AiStatus: "running" | "done" | "failed";
         /** AnswerOut */
         AnswerOut: {
             /** Field Id */
@@ -260,7 +326,19 @@ export interface components {
              * Format: date-time
              */
             resolved_at: string;
+            type: components["schemas"]["AnswerType"] | null;
+            /** Candidates */
+            candidates: components["schemas"]["Candidate"][];
+            /** User Only Reason */
+            user_only_reason: string | null;
+            /** Needs Review */
+            needs_review: boolean;
         };
+        /**
+         * AnswerType
+         * @enum {string}
+         */
+        AnswerType: "auto" | "missing" | "manual" | "outdated" | "conflict" | "declaration";
         /**
          * AnswerUpdate
          * @description A value entered by the user; null or blank leaves the field empty.
@@ -290,6 +368,43 @@ export interface components {
             x1: number;
             /** Y1 */
             y1: number;
+        };
+        /**
+         * Candidate
+         * @description A value read from the passages, with its verified evidence.
+         */
+        Candidate: {
+            /** Value */
+            value: string;
+            /** Citations */
+            citations: components["schemas"]["Citation"][];
+            source_date?: components["schemas"]["DatedCitation"] | null;
+            valid_until?: components["schemas"]["DatedCitation"] | null;
+        };
+        /**
+         * Citation
+         * @description A verified quote and where it comes from.
+         */
+        Citation: {
+            /** Quote */
+            quote: string;
+            /** Document Name */
+            document_name: string;
+            /** Document Id */
+            document_id: number | null;
+            /** Chunk Id */
+            chunk_id: number | null;
+            /** Page */
+            page: number | null;
+        };
+        /** DatedCitation */
+        DatedCitation: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            citation: components["schemas"]["Citation"];
         };
         /**
          * DocumentFormat
@@ -382,7 +497,7 @@ export interface components {
         FileFormat: "pdf" | "docx";
         /**
          * FillCounts
-         * @description Fields the user can fill (signatures excluded), and how many have a value.
+         * @description Fields the user can fill (signatures excluded), how many have a value, how many doubts.
          */
         FillCounts: {
             /** Fillable */
@@ -391,6 +506,8 @@ export interface components {
             filled: number;
             /** Empty */
             empty: number;
+            /** Doubts */
+            doubts: number;
         };
         /**
          * FillState
@@ -400,6 +517,7 @@ export interface components {
             counts: components["schemas"]["FillCounts"];
             /** Answers */
             answers: components["schemas"]["AnswerOut"][];
+            ai_run: components["schemas"]["AiRun"] | null;
         };
         /**
          * FillStatus
@@ -757,6 +875,96 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    start_fill_forms__form_id__fill_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                form_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiRun"];
+                };
+            };
+            /** @description Unknown form */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The AI is already filling this form */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The form cannot be filled with AI (format not read) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The AI is not available (no API key) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    fill_events_forms__form_id__fill_events_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "last-event-id"?: number | null;
+            };
+            path: {
+                form_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": unknown;
+                };
+            };
+            /** @description Unknown form */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
         };
     };
