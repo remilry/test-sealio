@@ -1,11 +1,14 @@
 import type { ReactNode } from "react";
 import { renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { delay, http, HttpResponse } from "msw";
+import { API_URL } from "@/shared/api";
+import { act } from "@testing-library/react";
 import { handlers, server } from "@/shared/test";
 import { answer, fillState } from "@/shared/test/fixtures";
 import type { FillEvent } from "./fill-events";
 import type { FillState } from "./fill-session.api";
-import { fillKeys, useFillRun } from "./fill-session.queries";
+import { fillKeys, useFillRun, useSaveAnswer } from "./fill-session.queries";
 
 const counts = { fillable: 3, filled: 1, empty: 2, doubts: 0 };
 const answered = (id: number, value: string, resolved_by: "ai" | "user" = "ai"): FillEvent => ({
@@ -90,5 +93,98 @@ describe("useFillRun", () => {
     await waitFor(() => expect(result.current.outcome?.kind).toBe("done"));
     expect(queryClient.getQueryState(["tenders", 1])?.isInvalidated).toBe(true);
     expect(queryClient.getQueryState(fillKeys.answers(1))?.isInvalidated).toBe(true);
+  });
+});
+
+describe("useFillRun when the stream stops early", () => {
+  it("refetches and reconnects when the stream closes without done", async () => {
+    // Given a stream that ends at once, without done (e.g. discarded from another tab)
+    let connections = 0;
+    server.use(
+      http.get(`${API_URL}/forms/1/fill/events`, () => {
+        connections += 1;
+        return new HttpResponse("", { headers: { "content-type": "text/event-stream" } });
+      }),
+    );
+    const { queryClient, wrapper } = setup();
+    queryClient.setQueryData(fillKeys.answers(1), fillState([]));
+    queryClient.setQueryData(["tenders", 1], { id: 1 });
+
+    renderHook(() => useFillRun(1, { follow: true }), { wrapper });
+
+    await waitFor(() =>
+      expect(queryClient.getQueryState(["tenders", 1])?.isInvalidated).toBe(true),
+    );
+    expect(queryClient.getQueryState(fillKeys.answers(1))?.isInvalidated).toBe(true);
+    await waitFor(() => expect(connections).toBeGreaterThan(1), { timeout: 2000 });
+  });
+
+  it("refetches without an unhandled rejection when the stream answers an error", async () => {
+    server.use(handlers.error("/forms/1/fill/events", 500));
+    const { queryClient, wrapper } = setup();
+    queryClient.setQueryData(fillKeys.answers(1), fillState([]));
+    queryClient.setQueryData(["tenders", 1], { id: 1 });
+
+    renderHook(() => useFillRun(1, { follow: true }), { wrapper });
+
+    await waitFor(() =>
+      expect(queryClient.getQueryState(["tenders", 1])?.isInvalidated).toBe(true),
+    );
+    expect(queryClient.getQueryState(fillKeys.answers(1))?.isInvalidated).toBe(true);
+  });
+});
+
+describe("useSaveAnswer with streamed answers", () => {
+  it("keeps an answer streamed in meanwhile when the save fails", async () => {
+    server.use(
+      http.patch(`${API_URL}/forms/1/fields/2`, async () => {
+        await delay(100);
+        return HttpResponse.json({ detail: "nope" }, { status: 500 });
+      }),
+    );
+    const { queryClient, wrapper } = setup();
+    queryClient.setQueryData(fillKeys.answers(1), fillState([]));
+    const { result } = renderHook(() => useSaveAnswer(1), { wrapper });
+
+    act(() => result.current.mutate({ fieldId: 2, value: "mine" }));
+    await waitFor(() =>
+      expect(queryClient.getQueryData<FillState>(fillKeys.answers(1))?.answers).toHaveLength(1),
+    );
+    queryClient.setQueryData<FillState>(fillKeys.answers(1), (state) => ({
+      ...state!,
+      answers: [...state!.answers, answer(3, "streamed")],
+    }));
+    await waitFor(() => expect(result.current.isError).toBe(true));
+
+    const values = queryClient
+      .getQueryData<FillState>(fillKeys.answers(1))
+      ?.answers.map((a) => [a.field_id, a.value]);
+    expect(values).toEqual([[3, "streamed"]]);
+  });
+
+  it("keeps an answer streamed in meanwhile when the save succeeds", async () => {
+    server.use(
+      http.patch(`${API_URL}/forms/1/fields/2`, async () => {
+        await delay(100);
+        return HttpResponse.json(fillState([answer(2, "mine")]));
+      }),
+    );
+    const { queryClient, wrapper } = setup();
+    queryClient.setQueryData(fillKeys.answers(1), fillState([]));
+    const { result } = renderHook(() => useSaveAnswer(1), { wrapper });
+
+    act(() => result.current.mutate({ fieldId: 2, value: "mine" }));
+    queryClient.setQueryData<FillState>(fillKeys.answers(1), (state) => ({
+      ...state!,
+      answers: [...state!.answers, answer(3, "streamed")],
+    }));
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    const values = queryClient
+      .getQueryData<FillState>(fillKeys.answers(1))
+      ?.answers.map((a) => [a.field_id, a.value]);
+    expect(values).toHaveLength(2);
+    expect(values).toContainEqual([2, "mine"]);
+    expect(values).toContainEqual([3, "streamed"]);
   });
 });

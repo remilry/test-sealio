@@ -13,6 +13,17 @@ import { fillApi, type Answer, type FillState } from "./fill-session.api";
 
 // The tender's key prefix (tender.queries.ts): features can't import each other.
 const TENDERS_KEY = ["tenders"] as const;
+const RECONNECT_MS = 300;
+const RECONNECT_MAX_MS = 5000;
+
+const sleep = (ms: number, signal: AbortSignal) =>
+  new Promise<void>((resolve) => {
+    const timer = setTimeout(resolve, ms);
+    signal.addEventListener("abort", () => {
+      clearTimeout(timer);
+      resolve();
+    });
+  });
 
 export const fillKeys = {
   form: (formId: number) => ["forms", formId] as const,
@@ -61,18 +72,48 @@ export function useSaveAnswer(
     mutationFn: ({ fieldId, value }: SaveVariables) => fillApi.saveAnswer(formId, fieldId, value),
     onMutate: async ({ fieldId, value }) => {
       await queryClient.cancelQueries({ queryKey: answersKey });
-      const previous = queryClient.getQueryData(answersKey);
+      const previous = queryClient
+        .getQueryData(answersKey)
+        ?.answers.find((a) => a.field_id === fieldId);
       queryClient.setQueryData(answersKey, (state) =>
         state ? withAnswer(state, fieldId, value) : state,
       );
       return { previous };
     },
-    onSuccess: (state) => queryClient.setQueryData(answersKey, state),
+    // Only the edited field (and the counts) come from the back: answers streamed in meanwhile stay.
+    onSuccess: (saved, { fieldId }) =>
+      queryClient.setQueryData(answersKey, (state) =>
+        state
+          ? {
+              ...replaceEntry(
+                state,
+                fieldId,
+                saved.answers.find((a) => a.field_id === fieldId),
+              ),
+              counts: saved.counts,
+            }
+          : saved,
+      ),
     onError: (_error, variables, context) => {
-      if (context?.previous) queryClient.setQueryData(answersKey, context.previous);
+      queryClient.setQueryData(answersKey, (state) =>
+        state ? replaceEntry(state, variables.fieldId, context?.previous) : state,
+      );
       onFailed?.(variables);
     },
   });
+}
+
+/** Sets (or, when `entry` is undefined, removes) the answer of one field, leaving the others. */
+function replaceEntry(state: FillState, fieldId: number, entry: Answer | undefined): FillState {
+  const others = state.answers.filter((a) => a.field_id !== fieldId);
+  if (!entry) return { ...state, answers: others };
+  const exists = others.length !== state.answers.length;
+  return {
+    ...state,
+    answers: exists
+      ? state.answers.map((a) => (a.field_id === fieldId ? entry : a))
+      : [...state.answers, entry],
+  };
 }
 
 function withAnswer(state: FillState, fieldId: number, value: string | null): FillState {
@@ -148,6 +189,7 @@ export function useFillRun(formId: number, { follow }: { follow: boolean }): Fil
   useEffect(() => {
     if (!follow) return;
     const controller = new AbortController();
+    const { signal } = controller;
     const answersKey = fillQueries.answers(formId).queryKey;
 
     const apply = (event: FillEvent) => {
@@ -158,15 +200,37 @@ export function useFillRun(formId: number, { follow }: { follow: boolean }): Fil
           state ? withAiAnswer(state, answer, counts) : state,
         );
       }
-      if (event.type === "done" || event.type === "error") {
-        void queryClient.invalidateQueries({ queryKey: answersKey });
-        void queryClient.invalidateQueries({ queryKey: TENDERS_KEY });
-      }
+      if (event.type === "done" || event.type === "error") refresh();
+    };
+    const refresh = () => {
+      void queryClient.invalidateQueries({ queryKey: answersKey });
+      void queryClient.invalidateQueries({ queryKey: TENDERS_KEY });
     };
 
-    fillApi.streamEvents(formId, { signal: controller.signal, onEvent: apply }).catch(() => {
-      // Aborted on unmount, or the connection dropped: the next visit replays the run.
-    });
+    // The stream is replayed from the start at each connection, so reconnecting is idempotent.
+    // It ends without `done`/`error` when the connection drops, the back errors, or the fill is
+    // discarded elsewhere: refetch (the screen stops following if the run is over), then retry.
+    const follow_ = async () => {
+      for (let attempt = 0; !signal.aborted; attempt++) {
+        let ended = false;
+        setRun(initialRun);
+        try {
+          await fillApi.streamEvents(formId, {
+            signal,
+            onEvent: (event) => {
+              if (event.type === "done" || event.type === "error") ended = true;
+              apply(event);
+            },
+          });
+        } catch {
+          // Handled below like a stream that stopped early.
+        }
+        if (signal.aborted || ended) return;
+        refresh();
+        await sleep(Math.min(RECONNECT_MS * 2 ** attempt, RECONNECT_MAX_MS), signal);
+      }
+    };
+    void follow_();
     return () => controller.abort();
   }, [formId, follow, queryClient]);
 
