@@ -2,10 +2,12 @@
 
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowLeftIcon, CircleAlertIcon, FileXIcon } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowLeftIcon, CircleAlertIcon, FileXIcon, MoreHorizontalIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { DocumentPreview, type PreviewZone, type ZoneTone } from "@/features/document-preview";
 import {
+  DiscardFillDialog,
   FillProgress,
   originalFileUrl,
   SaveIndicator,
@@ -19,6 +21,7 @@ import {
   type FormDetail,
 } from "@/features/fill-session";
 import { ExportDialog } from "@/features/form-export";
+import { useKnowledgeBase } from "@/features/knowledge-base";
 import { FieldList, type FocusRequest, type QueueField } from "@/features/review-queue";
 import { useTender } from "@/features/tender";
 import { isNotFound } from "@/shared/api";
@@ -26,7 +29,13 @@ import { EmptyState, LoadError } from "@/shared/components/LoadStates";
 import { useHandleKeyDown } from "@/shared/lib/hooks/useHandleKeyDown";
 import { routes } from "@/shared/lib/routes";
 import { Alert, AlertTitle } from "@/shared/ui/alert";
-import { buttonVariants } from "@/shared/ui/button";
+import { Button, buttonVariants } from "@/shared/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/shared/ui/dropdown-menu";
 import { Skeleton } from "@/shared/ui/skeleton";
 
 /**
@@ -80,6 +89,9 @@ function FormLoadFailed({ error, onRetry }: { error: unknown; onRetry: () => voi
 function FillWorkspace({ form, fill }: { form: FormDetail; fill: FillState }) {
   const t = useTranslations("liveFill");
   const { data: tender } = useTender(form.tender_id);
+  const { data: knowledge } = useKnowledgeBase();
+  const router = useRouter();
+  const [discarding, setDiscarding] = useState(false);
   // Also right after Setup: starting the fill refetches the answers, whose run is then running.
   const run = useFillRun(form.id, { follow: fill.ai_run?.status === "running" });
   const filling = fill.ai_run?.status === "running" && run.outcome === null;
@@ -107,6 +119,10 @@ function FillWorkspace({ form, fill }: { form: FormDetail; fill: FillState }) {
       unsaved: unsaved.get(field.id) ?? null,
       enteredAt: answer?.resolved_by === "user" ? answer.resolved_at : null,
       state: fieldState(run, field.id),
+      type: answer?.type ?? null,
+      resolvedBy: answer?.resolved_by ?? null,
+      candidates: answer?.candidates ?? [],
+      userOnlyReason: answer?.user_only_reason ?? null,
     };
   });
   const zones: PreviewZone[] = form.fields.map((field, index) => {
@@ -174,6 +190,25 @@ function FillWorkspace({ form, fill }: { form: FormDetail; fill: FillState }) {
       tenderTitle={tender?.title}
       status={
         <>
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={<Button variant="ghost" size="icon-sm" aria-label={t("moreActions")} />}
+            >
+              <MoreHorizontalIcon />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-auto">
+              <DropdownMenuItem onClick={() => setDiscarding(true)}>
+                {t("discardAnswers")}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <DiscardFillDialog
+            formId={form.id}
+            formTitle={form.title}
+            open={discarding}
+            onOpenChange={setDiscarding}
+            onDiscarded={() => router.push(routes.tender(form.tender_id))}
+          />
           <SaveIndicator formId={form.id} />
           <span className="text-xs whitespace-nowrap text-muted-foreground">
             {t("progress", counts)}
@@ -201,6 +236,10 @@ function FillWorkspace({ form, fill }: { form: FormDetail; fill: FillState }) {
             fields={fields}
             selectedId={selectedId}
             focusRequest={focusRequest}
+            context={{
+              companyName: knowledge?.company_name ?? "",
+              documentCount: knowledge?.documents.length ?? 0,
+            }}
             onSelect={setChosenId}
             onSave={(fieldId, value) => {
               // The saved answer takes over from the draft (and comes back if the save fails).

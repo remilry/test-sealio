@@ -4,8 +4,9 @@ import { useEffect, useRef, type FormEvent } from "react";
 import { PenLineIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { cn } from "@/shared/lib/utils";
+import type { Schema } from "@/shared/api";
 import { Input } from "@/shared/ui/input";
-import { formatTime } from "@/shared/utils/date";
+import { formatDate, formatTime } from "@/shared/utils/date";
 
 /** A field as the list shows it: what the user sees and edits, nothing of the file layout. */
 export type QueueField = {
@@ -20,7 +21,17 @@ export type QueueField = {
   enteredAt: string | null;
   /** Where the automatic fill is for this field: not reached yet, being searched, answered. */
   state: "pending" | "searching" | "answered";
+  /** How sure the answer is (null for the user's own value or no answer). */
+  type: Schema<"AnswerOut">["type"];
+  resolvedBy: "ai" | "user" | null;
+  /** The values found and the quotes supporting them; the selected one is the first. */
+  candidates: Schema<"Candidate">[];
+  /** Why only the user can fill this field. */
+  userOnlyReason: string | null;
 };
+
+/** What the status lines name: the bidder and how many documents were searched. */
+export type FieldContext = { companyName: string; documentCount: number };
 
 /** Ask the list to move the keyboard focus to a field's input (changes on every request). */
 export type FocusRequest = { fieldId: number; at: number };
@@ -34,11 +45,13 @@ export function FieldList({
   fields,
   selectedId,
   focusRequest,
+  context,
   onSelect,
   onSave,
   onNext,
   onDraft,
 }: {
+  context: FieldContext;
   fields: QueueField[];
   selectedId: number | null;
   focusRequest: FocusRequest | null;
@@ -70,6 +83,8 @@ export function FieldList({
           {field.fillable ? (
             <FieldInput
               field={field}
+              selected={field.id === selectedId}
+              context={context}
               inputRef={(input) => {
                 if (input) inputs.current.set(field.id, input);
                 else inputs.current.delete(field.id);
@@ -96,6 +111,8 @@ export function FieldList({
 
 function FieldInput({
   field,
+  selected,
+  context,
   inputRef,
   onFocus,
   onSave,
@@ -103,6 +120,8 @@ function FieldInput({
   onDraft,
 }: {
   field: QueueField;
+  selected: boolean;
+  context: FieldContext;
   inputRef: (input: HTMLInputElement | null) => void;
   onFocus: () => void;
   onSave: (value: string | null) => void;
@@ -153,13 +172,14 @@ function FieldInput({
         onChange={(event) => onDraft(event.currentTarget.value)}
         onBlur={(event) => saveIfChanged(event.currentTarget)}
       />
-      <FieldStatus field={field} />
+      <FieldStatus field={field} context={context} />
+      <FieldSources field={field} expanded={selected} />
     </form>
   );
 }
 
 /** The line under the input: what the field's value is, or where its search is. */
-function FieldStatus({ field }: { field: QueueField }) {
+function FieldStatus({ field, context }: { field: QueueField; context: FieldContext }) {
   const t = useTranslations("fieldList");
   if (field.unsaved !== null) {
     return <p className="text-xs text-destructive">{t("notSaved")}</p>;
@@ -167,14 +187,91 @@ function FieldStatus({ field }: { field: QueueField }) {
   if (field.state === "searching") {
     return <p className="animate-pulse text-xs text-primary">{t("searching")}</p>;
   }
+  if (field.resolvedBy === "user" && field.enteredAt) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        {t("enteredByYou", { time: formatTime(field.enteredAt) })}
+      </p>
+    );
+  }
+  if (field.type === "manual") {
+    return (
+      <div className="flex flex-col gap-0.5 text-xs">
+        <p className="font-medium text-warning">{t("manual")}</p>
+        {field.userOnlyReason && <p className="text-muted-foreground">{field.userOnlyReason}</p>}
+      </div>
+    );
+  }
+  if (field.type === "missing" && !field.value) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        {t("missing", { count: context.documentCount })}
+      </p>
+    );
+  }
   if (!field.value) {
     return <p className="text-xs text-muted-foreground">{t("empty")}</p>;
   }
+  if (field.type === "conflict") {
+    return (
+      <p className="text-xs font-medium text-warning">
+        {t("conflict", { count: field.candidates.length })}
+      </p>
+    );
+  }
+  if (field.type === "outdated") {
+    const validUntil = field.candidates[0]?.valid_until?.date;
+    if (validUntil) {
+      return (
+        <p className="text-xs font-medium text-warning">
+          {t("outdated", { date: formatDate(validUntil) })}
+        </p>
+      );
+    }
+  }
+  if (field.type === "declaration") {
+    return (
+      <p className="text-xs text-muted-foreground">
+        {t("declaration", { company: context.companyName })}
+      </p>
+    );
+  }
+  return <p className="text-xs text-muted-foreground">{t("filledAutomatically")}</p>;
+}
+
+/**
+ * Where the value comes from: every source when they disagree, else the selected one. Open for
+ * the selected field; the others show a count (clicking the card selects it).
+ */
+function FieldSources({ field, expanded }: { field: QueueField; expanded: boolean }) {
+  const t = useTranslations("fieldList");
+  const candidates = field.type === "conflict" ? field.candidates : field.candidates.slice(0, 1);
+  const citations = candidates.flatMap((candidate) => candidate.citations);
+  if (citations.length === 0) return null;
+  if (!expanded) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        {t("sourceCount", { count: citations.length })}
+      </p>
+    );
+  }
   return (
-    <p className="text-xs text-muted-foreground">
-      {field.enteredAt
-        ? t("enteredByYou", { time: formatTime(field.enteredAt) })
-        : t("filledAutomatically")}
-    </p>
+    <ul aria-label={t("sources")} className="flex flex-col gap-1.5 border-t pt-2">
+      {citations.map((citation, index) => (
+        <li key={index} className="text-xs">
+          <p className="font-medium">
+            <SourceName citation={citation} />
+          </p>
+          <blockquote className="text-muted-foreground">{t("quote", { quote: citation.quote })}</blockquote>
+        </li>
+      ))}
+    </ul>
   );
+}
+
+function SourceName({ citation }: { citation: Schema<"Citation"> }) {
+  const t = useTranslations("fieldList");
+  if (citation.document_id === null) return t("tenderDetails");
+  if (citation.page === null) return t("sourceNoPage", { document: citation.document_name });
+  return t("source", { document: citation.document_name, page: citation.page });
 }

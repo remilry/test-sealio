@@ -3,6 +3,9 @@ import userEvent from "@testing-library/user-event";
 import { handlers, renderScreen, server } from "@/shared/test";
 import {
   aiAnswer,
+  candidate,
+  citation,
+  knowledgeBase,
   aiRun,
   annex7,
   annex7Fields,
@@ -15,6 +18,14 @@ import {
   type FillState,
 } from "@/shared/test/fixtures";
 import { LiveFillScreen } from "./LiveFillScreen";
+
+const push = vi.fn();
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
+
+beforeEach(() => {
+  push.mockClear();
+  server.use(handlers.knowledge(knowledgeBase()));
+});
 
 const fieldList = () => within(screen.getByRole("list", { name: "Fields" }));
 const preview = () => screen.getByRole("region", { name: "Form preview" });
@@ -718,5 +729,225 @@ describe("Export (dialog over the form)", () => {
 
     // Then the export shows
     expect(await screen.findByRole("heading", { name: "Ready to submit" })).toBeInTheDocument();
+  });
+});
+
+describe("Live fill (status and source of each answer)", () => {
+  const card = (label: string) => within(fieldList().getByRole("listitem", { name: label }));
+  const findCard = async (label: string) => {
+    await screen.findByRole("list", { name: "Fields" });
+    return card(label);
+  };
+
+  it("shows where an automatic answer comes from: document, page and quote", async () => {
+    // Given a name found in the commercial register, page 2
+    const found = aiAnswer(3, "Alpenlogic AG", "auto", undefined, {
+      candidates: [
+        candidate("Alpenlogic AG", [
+          citation({
+            quote: "Alpenlogic AG, Zurich",
+            document_name: "Commercial register extract",
+            page: 2,
+          }),
+        ]),
+      ],
+    });
+    const { user } = given(annex7(), fillState([found]));
+
+    // When I open that field
+    await user.click(await screen.findByRole("textbox", { name: "Name and legal form" }));
+
+    // Then it says it was filled automatically, with its source
+    expect(card("Name and legal form").getByText("Filled automatically")).toBeInTheDocument();
+    expect(
+      card("Name and legal form").getByText("Commercial register extract, page 2"),
+    ).toBeInTheDocument();
+    expect(card("Name and legal form").getByText(/“?Alpenlogic AG, Zurich”?/)).toBeInTheDocument();
+  });
+
+  it("shows the source of the selected field only, the others are collapsed", async () => {
+    // Given two automatic answers with a source each
+    const withSource = (id: number, value: string, document_name: string) =>
+      aiAnswer(id, value, "auto", undefined, {
+        candidates: [candidate(value, [citation({ document_name, quote: `q-${id}` })])],
+      });
+    const { user } = given(
+      annex7(),
+      fillState([
+        withSource(3, "Alpenlogic AG", "Register A"),
+        withSource(4, "Bahnhofstrasse 1", "Register B"),
+      ]),
+    );
+    await screen.findByRole("textbox", { name: "Name and legal form" });
+
+    // When I select the name
+    await user.click(screen.getByRole("textbox", { name: "Name and legal form" }));
+
+    // Then only its source shows
+    expect(card("Name and legal form").getByText("Register A, page 1")).toBeInTheDocument();
+    expect(card("Business address").queryByText("Register B, page 1")).not.toBeInTheDocument();
+    expect(card("Business address").getByText("1 source")).toBeInTheDocument();
+  });
+
+  it("calls the tender documents by their name when the source is the tender", async () => {
+    // Given an answer found in the tender details
+    const found = aiAnswer(2, "Canton of Zurich", "auto", undefined, {
+      candidates: [
+        candidate("Canton of Zurich", [
+          citation({ document_id: null, document_name: "Tender", page: null }),
+        ]),
+      ],
+    });
+    const { user } = given(annex7(), fillState([found]));
+
+    // When I open that field
+    await user.click(
+      await screen.findByRole("textbox", { name: "Name of the contracting authority" }),
+    );
+
+    // Then the source is "Tender details"
+    expect(
+      card("Name of the contracting authority").getByText("Tender details"),
+    ).toBeInTheDocument();
+  });
+
+  it("tells me I declare on behalf of the company for a declaration", async () => {
+    // Given a ticked declaration
+    const declared = aiAnswer(3, "Yes", "declaration", undefined, {
+      candidates: [candidate("Yes")],
+    });
+    given(annex7(), fillState([declared]));
+
+    // Then the status names the company
+    expect(
+      await (
+        await findCard("Name and legal form")
+      ).findByText("Filled automatically · you declare this on behalf of Alpenlogic AG"),
+    ).toBeInTheDocument();
+  });
+
+  it("says nothing was found, and in how many documents it looked", async () => {
+    // Given a field the search found nothing for, with 2 documents in the company knowledge
+    given(annex7(), fillState([aiAnswer(4, null, "missing")]));
+
+    // Then the status says so
+    expect(
+      await (
+        await findCard("Business address")
+      ).findByText("Not found in the passages searched in your 2 documents"),
+    ).toBeInTheDocument();
+  });
+
+  it("says when only I can fill a field, why, and keeps the suggestion in the input", async () => {
+    // Given a field only the user can fill, with a suggestion
+    const manual = aiAnswer(5, "Marc Keller", "manual", undefined, {
+      user_only_reason: "The contact person is chosen by the company.",
+    });
+    given(annex7(), fillState([manual]));
+
+    // Then the status and the reason show, the suggestion is in the input
+    const contact = await findCard("Contact person");
+    expect(await contact.findByText("Only you can fill this")).toBeInTheDocument();
+    expect(contact.getByText("The contact person is chosen by the company.")).toBeInTheDocument();
+    expect(contact.getByRole("textbox")).toHaveValue("Marc Keller");
+  });
+
+  it("lists every source when sources disagree", async () => {
+    // Given two sources that disagree on the address
+    const conflict = aiAnswer(4, "Bahnhofstrasse 1", "conflict", undefined, {
+      candidates: [
+        candidate("Bahnhofstrasse 1", [
+          citation({ document_name: "Register extract", quote: "Bahnhofstrasse 1" }),
+        ]),
+        candidate("Seestrasse 9", [
+          citation({ document_name: "Annual report", quote: "Seestrasse 9" }),
+        ]),
+      ],
+    });
+    const { user } = given(annex7(), fillState([conflict]));
+
+    // When I open the field
+    await user.click(await screen.findByRole("textbox", { name: "Business address" }));
+
+    // Then the status counts the sources and all are shown; the selected value is in the input
+    const address = card("Business address");
+    expect(address.getByText("2 sources disagree")).toBeInTheDocument();
+    expect(address.getByText("Register extract, page 1")).toBeInTheDocument();
+    expect(address.getByText("Annual report, page 1")).toBeInTheDocument();
+    expect(address.getByRole("textbox")).toHaveValue("Bahnhofstrasse 1");
+  });
+
+  it("shows the expiry date of an outdated source in Swiss format", async () => {
+    // Given a value whose source expired
+    const outdated = aiAnswer(6, "+41 44 512 38 00", "outdated", undefined, {
+      candidates: [
+        candidate("+41 44 512 38 00", [citation({ document_name: "Insurance certificate" })], {
+          valid_until: { date: "2026-03-31", citation: citation() },
+        }),
+      ],
+    });
+    given(annex7(), fillState([outdated]));
+
+    // Then the date is shown as dd.mm.yyyy
+    expect(
+      await (await findCard("Telephone")).findByText("Source expired on 31.03.2026"),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps the earlier source visible once I enter my own value", async () => {
+    // Given a user value over a field that had an automatic source
+    const mine = {
+      ...answer(3, "Alpenlogic SA"),
+      candidates: [candidate("Alpenlogic AG", [citation({ document_name: "Register A" })])],
+    };
+    const { user } = given(annex7(), fillState([mine]));
+
+    // When I open it
+    await user.click(await screen.findByRole("textbox", { name: "Name and legal form" }));
+
+    // Then it says I entered it, and the source is still there
+    expect(card("Name and legal form").getByText(/Entered by you/)).toBeInTheDocument();
+    expect(card("Name and legal form").getByText("Register A, page 1")).toBeInTheDocument();
+  });
+
+  describe("discarding the answers", () => {
+    async function openDiscard(user: ReturnType<typeof userEvent.setup>) {
+      await user.click(await screen.findByRole("button", { name: "More actions" }));
+      await user.click(await screen.findByRole("menuitem", { name: "Discard answers" }));
+      return within(await screen.findByRole("alertdialog"));
+    }
+
+    it("discards after confirmation and takes me back to the tender", async () => {
+      // Given a form with an answer
+      const discard = handlers.discardFill(2);
+      server.use(discard.handler);
+      const { user } = given(annex7(), fillState([answer(3, "Alpenlogic AG")]));
+
+      // When I discard from the top bar and confirm
+      const dialog = await openDiscard(user);
+      await user.click(dialog.getByRole("button", { name: "Discard" }));
+
+      // Then the back deleted the answers and I am back on the tender
+      await waitFor(() => expect(push).toHaveBeenCalledWith("/tenders/1"));
+      expect(discard.state.discards).toBe(1);
+    });
+
+    it("works the same while the form is filling", async () => {
+      // Given a fill running
+      const discard = handlers.discardFill(2);
+      server.use(discard.handler);
+      const { back, user } = watchFill();
+      back.phase("reading_form");
+      expect(await screen.findByRole("heading", { name: "Filling the form…" })).toBeInTheDocument();
+
+      // When I discard and confirm
+      const dialog = await openDiscard(user);
+      await user.click(dialog.getByRole("button", { name: "Discard" }));
+
+      // Then I am back on the tender
+      await waitFor(() => expect(push).toHaveBeenCalledWith("/tenders/1"));
+      expect(discard.state.discards).toBe(1);
+      back.stream.close();
+    });
   });
 });

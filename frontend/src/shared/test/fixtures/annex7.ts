@@ -134,8 +134,33 @@ export function aiAnswer(
   value: string | null,
   type: NonNullable<Answer["type"]> = "auto",
   at = "2026-11-04T10:00:10Z",
+  extra: Partial<Answer> = {},
 ): Answer {
-  return { ...answer(fieldId, value, at), resolved_by: "ai", type };
+  return { ...answer(fieldId, value, at), resolved_by: "ai", type, ...extra };
+}
+
+type Citation = Schema<"Citation">;
+type Candidate = Schema<"Candidate">;
+
+/** A verified quote from a company document (page 1 unless told otherwise). */
+export function citation(overrides: Partial<Citation> = {}): Citation {
+  return {
+    quote: "Alpenlogic AG, Zurich",
+    document_name: "Commercial register extract",
+    document_id: 1,
+    chunk_id: 11,
+    page: 1,
+    ...overrides,
+  };
+}
+
+/** A value the search found, with the quotes that support it. */
+export function candidate(
+  value: string,
+  citations: Citation[] = [citation()],
+  extra = {},
+): Candidate {
+  return { value, citations, source_date: null, valid_until: null, ...extra };
 }
 
 /** An automatic fill run in progress (or over), as `FillState.ai_run`. */

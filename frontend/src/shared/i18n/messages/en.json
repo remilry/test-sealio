@@ -77,6 +77,8 @@
   },
   "liveFill": {
     "backToTender": "Back to the tender",
+    "moreActions": "More actions",
+    "discardAnswers": "Discard answers",
     "breadcrumb": "Breadcrumb",
     "loading": "Loading form",
     "notFound": "Form not found",
@@ -109,7 +111,18 @@
     "enteredByYou": "Entered by you · {time}",
     "empty": "Empty — exported blank",
     "searching": "Searching your documents…",
-    "filledAutomatically": "Filled automatically"
+    "filledAutomatically": "Filled automatically",
+    "declaration": "Filled automatically · you declare this on behalf of {company}",
+    "missing": "Not found in the passages searched in your {count, plural, one {# document} other {# documents}}",
+    "manual": "Only you can fill this",
+    "conflict": "{count} sources disagree",
+    "outdated": "Source expired on {date}",
+    "source": "{document}, page {page}",
+    "sourceNoPage": "{document}",
+    "tenderDetails": "Tender details",
+    "sourceCount": "{count, plural, one {# source} other {# sources}}",
+    "sources": "Sources",
+    "quote": "“{quote}”"
   },
   "saveStatus": {
     "idle": "All changes saved",
