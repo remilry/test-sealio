@@ -21,6 +21,8 @@ export type PreviewZone = {
   page: number;
   box: PdfBox;
   fontSize: number;
+  /** The placeholder marks printed in the field (dot leaders), hidden once it has a value. */
+  placeholders: PdfBox[];
   value: string | null;
   tone: ZoneTone;
 };
@@ -70,22 +72,42 @@ export function DocumentPreview({
       <PdfPages
         fileUrl={fileUrl}
         pages={pages}
-        renderOverlay={(pageIndex) =>
-          zones
-            .filter((zone) => zone.page === pageIndex)
-            .map((zone) => (
-              <Zone
-                key={zone.id}
-                zone={zone}
-                page={pages[pageIndex]}
-                selected={zone.id === selectedId}
-                onSelect={onSelect}
-              />
-            ))
-        }
+        renderOverlay={(pageIndex) => {
+          const onPage = zones.filter((zone) => zone.page === pageIndex);
+          return (
+            <>
+              {onPage.map((zone) => (
+                <PlaceholderMasks key={zone.id} zone={zone} page={pages[pageIndex]} />
+              ))}
+              {onPage.map((zone) => (
+                <Zone
+                  key={zone.id}
+                  zone={zone}
+                  page={pages[pageIndex]}
+                  selected={zone.id === selectedId}
+                  onSelect={onSelect}
+                />
+              ))}
+            </>
+          );
+        }}
       />
     </section>
   );
+}
+
+/** Paper over the dot leaders of a filled field, as the export removes them: dots only show while empty. */
+function PlaceholderMasks({ zone, page }: { zone: PreviewZone; page: PageSize }) {
+  if (!zone.value) return null;
+  return zone.placeholders.map((box, index) => (
+    <div
+      key={index}
+      aria-hidden
+      data-placeholder-of={zone.id}
+      style={boxToCss(box, page, 0)}
+      className="pointer-events-none absolute bg-white"
+    />
+  ));
 }
 
 function Zone({
@@ -119,10 +141,7 @@ function Zone({
         selected && "ring-2 ring-primary",
       )}
     >
-      {zone.value && (
-        // Hides the dot leaders under the value, as the export does.
-        <span className="truncate bg-white/90">{zone.value}</span>
-      )}
+      {zone.value && <span className="truncate">{zone.value}</span>}
     </button>
   );
 }

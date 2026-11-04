@@ -150,6 +150,26 @@ describe("Live fill (manual)", () => {
     expect(within(zone(6)).queryByText(/\+4/)).not.toBeInTheDocument();
   });
 
+  it("shows the dot leaders of a field only while it is empty", async () => {
+    // Given the project field, printed with dot leaders, and empty
+    const { user } = given();
+    const project = await screen.findByRole("textbox", {
+      name: "Project number/project title/project name",
+    });
+    const masks = () => preview().querySelectorAll<HTMLElement>('[data-placeholder-of="1"]');
+    expect(masks()).toHaveLength(0);
+
+    // When I type in it, then its dots are covered, exactly where the parser found them
+    await user.type(project, "ZH");
+    expect(masks()).toHaveLength(1);
+    expect(masks()[0].style.left).toBe(`${(270.2 / 595.3) * 100}%`);
+    expect(masks()[0].style.width).toBe(`${((395.7 - 270.2) / 595.3) * 100}%`);
+
+    // And when I erase it, the dots show again
+    await user.clear(project);
+    expect(masks()).toHaveLength(0);
+  });
+
   it("does not save a field I only passed through", async () => {
     // Given a form with a saved telephone number
     const { saved, user } = given(annex7(), fillState([answer(6, "+41 44 512 38 00")]));

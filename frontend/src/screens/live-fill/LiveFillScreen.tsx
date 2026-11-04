@@ -101,6 +101,7 @@ function FillWorkspace({ form, fill }: { form: FormDetail; fill: FillState }) {
       page: field.locator.page,
       box: field.locator.box,
       fontSize: field.locator.font_size,
+      placeholders: field.locator.erase,
       value,
       tone: !fields[index].fillable ? "signature" : value ? "entered" : "empty",
     };
