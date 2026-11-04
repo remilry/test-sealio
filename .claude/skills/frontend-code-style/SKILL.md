@@ -59,4 +59,4 @@ copied variable, or `data` stays possibly undefined after the checks.
 
 `@/shared/components/LoadStates` provides `EmptyState` (nothing to show: not found, none yet) and
 `LoadError` (loading failed, plain words + "Try again"). Error messages are for users: never mention
-the API, the server or a status code (`@/shared/lib/messages`).
+the API, the server or a status code. All text comes from the translations (skill `frontend-i18n`).

@@ -1,0 +1,6 @@
+# pnpm settings (single project, not a workspace).
+# Install scripts are refused unless allowed here. These two come with next-intl (its message
+# extractor, unused): their prebuilt binaries are enough, no native build needed.
+allowBuilds:
+  "@parcel/watcher": false
+  "@swc/core": false

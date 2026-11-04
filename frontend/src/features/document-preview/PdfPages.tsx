@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useTranslations } from "next-intl";
 import { Document, Page, pdfjs } from "react-pdf";
 import type { PageSize } from "./locator";
 
@@ -23,6 +24,7 @@ export default function PdfPages({
   pages: PageSize[];
   renderOverlay: (pageIndex: number) => ReactNode;
 }) {
+  const t = useTranslations("preview");
   return (
     <Document
       file={fileUrl}
@@ -30,7 +32,7 @@ export default function PdfPages({
       loading={null}
       error={
         <p role="alert" className="text-sm text-destructive">
-          We couldn&apos;t load the form preview. Your answers are still saved.
+          {t("loadError")}
         </p>
       }
     >

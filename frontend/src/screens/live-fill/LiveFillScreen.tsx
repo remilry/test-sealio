@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { ArrowLeftIcon, FileXIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { DocumentPreview, type PreviewZone, type ZoneTone } from "@/features/document-preview";
 import {
   originalFileUrl,
@@ -53,23 +54,26 @@ export function LiveFillScreen({ formId }: { formId: number }) {
 }
 
 function FormLoadFailed({ error, onRetry }: { error: unknown; onRetry: () => void }) {
+  const t = useTranslations("liveFill");
+  const tCommon = useTranslations("common");
   if (isNotFound(error)) {
     return (
       <Frame>
-        <EmptyState title="Form not found">It may have been withdrawn by the buyer.</EmptyState>
+        <EmptyState title={t("notFound")}>{tCommon("withdrawnByBuyer")}</EmptyState>
       </Frame>
     );
   }
   return (
     <Frame>
       <div className="mx-auto w-full max-w-xl p-8">
-        <LoadError title="We couldn't load this form." onRetry={onRetry} />
+        <LoadError title={t("loadError")} onRetry={onRetry} />
       </div>
     </Frame>
   );
 }
 
 function FillWorkspace({ form, fill }: { form: FormDetail; fill: FillState }) {
+  const t = useTranslations("liveFill");
   const { data: tender } = useTender(form.tender_id);
   // Values the back refused: kept in their input (and on the document) until saved.
   const [unsaved, setUnsaved] = useState<ReadonlyMap<number, string>>(new Map());
@@ -142,8 +146,8 @@ function FillWorkspace({ form, fill }: { form: FormDetail; fill: FillState }) {
   if (!form.field_counts) {
     return (
       <Frame form={form} tenderTitle={tender?.title}>
-        <EmptyState icon={<FileXIcon />} level={2} title="This form can't be filled yet">
-          Only PDF forms can be filled for now. You can still download the original from the tender.
+        <EmptyState icon={<FileXIcon />} level={2} title={t("cannotFillTitle")}>
+          {t("cannotFillDescription")}
         </EmptyState>
       </Frame>
     );
@@ -158,7 +162,7 @@ function FillWorkspace({ form, fill }: { form: FormDetail; fill: FillState }) {
         <>
           <SaveIndicator formId={form.id} />
           <span className="text-xs whitespace-nowrap text-muted-foreground">
-            {counts.filled} / {counts.fillable} filled · {counts.empty} empty
+            {t("progress", counts)}
           </span>
           <ExportDialog
             formId={form.id}
@@ -173,14 +177,9 @@ function FillWorkspace({ form, fill }: { form: FormDetail; fill: FillState }) {
         <div className="flex min-h-0 flex-col gap-4 overflow-y-auto border-r bg-card/50 p-5">
           <header className="flex flex-col gap-1">
             <h2 className="text-[15px] font-semibold">
-              {counts.empty === 0
-                ? "All fields are filled"
-                : `${counts.empty} ${counts.empty === 1 ? "field" : "fields"} to fill`}
+              {counts.empty === 0 ? t("allFilled") : t("fieldsToFill", { count: counts.empty })}
             </h2>
-            <p className="text-xs text-muted-foreground">
-              Type each answer: it is saved as you go and shown on the form. Press Enter to move to
-              the next field.
-            </p>
+            <p className="text-xs text-muted-foreground">{t("instructions")}</p>
           </header>
           <FieldList
             fields={fields}
@@ -225,22 +224,24 @@ function Frame({
   status?: ReactNode;
   children: ReactNode;
 }) {
+  const t = useTranslations("liveFill");
+  const tCommon = useTranslations("common");
   return (
     <div className="flex h-dvh flex-col">
       <div className="flex h-13 flex-none items-center gap-3 border-b bg-card px-4">
         {form && (
           <Link
             href={routes.tender(form.tender_id)}
-            aria-label="Back to the tender"
+            aria-label={t("backToTender")}
             className={buttonVariants({ variant: "outline", size: "icon-sm" })}
           >
             <ArrowLeftIcon />
           </Link>
         )}
         <span className="grid size-5.5 flex-none place-items-center rounded-md bg-foreground text-[11px] font-bold text-background">
-          F
+          {tCommon("appName").charAt(0)}
         </span>
-        <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-2 text-sm">
+        <nav aria-label={t("breadcrumb")} className="flex min-w-0 items-center gap-2 text-sm">
           {tenderTitle && (
             <>
               <span className="truncate text-muted-foreground">{tenderTitle}</span>
@@ -258,8 +259,9 @@ function Frame({
 }
 
 function LoadingState() {
+  const t = useTranslations("liveFill");
   return (
-    <div aria-label="Loading form" className="grid flex-1 grid-cols-[420px_1fr] gap-6 p-5">
+    <div aria-label={t("loading")} className="grid flex-1 grid-cols-[420px_1fr] gap-6 p-5">
       <div className="flex flex-col gap-2">
         {Array.from({ length: 6 }, (_, index) => (
           <Skeleton key={index} className="h-20 w-full" />

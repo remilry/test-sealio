@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, type FormEvent } from "react";
 import { PenLineIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { cn } from "@/shared/lib/utils";
 import { Input } from "@/shared/ui/input";
 import { formatTime } from "@/shared/utils/date";
@@ -44,6 +45,7 @@ export function FieldList({
   onNext: (fieldId: number) => void;
   onDraft: (fieldId: number, text: string) => void;
 }) {
+  const t = useTranslations("fieldList");
   const inputs = useRef(new Map<number, HTMLInputElement>());
 
   useEffect(() => {
@@ -51,7 +53,7 @@ export function FieldList({
   }, [focusRequest]);
 
   return (
-    <ol aria-label="Fields" className="flex flex-col gap-2">
+    <ol aria-label={t("label")} className="flex flex-col gap-2">
       {fields.map((field) => (
         <li
           key={field.id}
@@ -80,7 +82,7 @@ export function FieldList({
               <span className="text-sm font-medium">{field.label}</span>
               <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <PenLineIcon className="size-3.5" aria-hidden />
-                Sign by hand after export — never filled.
+                {t("signByHand")}
               </p>
             </div>
           )}
@@ -105,6 +107,7 @@ function FieldInput({
   onNext: () => void;
   onDraft: (text: string) => void;
 }) {
+  const t = useTranslations("fieldList");
   const inputId = `field-${field.id}`;
   // The last value sent (or saved), so Enter then leaving the input saves once. Back to the saved
   // value when a save fails, so the kept text is sent again.
@@ -143,12 +146,12 @@ function FieldInput({
         onBlur={(event) => saveIfChanged(event.currentTarget)}
       />
       {field.unsaved !== null ? (
-        <p className="text-xs text-destructive">Not saved — press Enter to try again</p>
+        <p className="text-xs text-destructive">{t("notSaved")}</p>
       ) : (
         <p className="text-xs text-muted-foreground">
           {field.value && field.enteredAt
-            ? `Entered by you · ${formatTime(field.enteredAt)}`
-            : "Empty — exported blank"}
+            ? t("enteredByYou", { time: formatTime(field.enteredAt) })
+            : t("empty")}
         </p>
       )}
     </form>

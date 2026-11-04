@@ -21,4 +21,4 @@ Conventions:
 - Keyboard shortcuts: `useHandleKeyDown(keyMap, { enabled })` from `src/shared/lib/hooks/useHandleKeyDown.ts` (keys like `ArrowDown`, `j`, `Enter`, `Mod+Enter`; plain keys are ignored while typing in a field). No hand-written `keydown` listeners.
 - Dates: never handled by hand. Use the helpers of `src/shared/utils/date.ts` (parse, today, day counts, Swiss formatting `dd.mm.yyyy`); add one there if missing, with a case in `date.test.ts`. ESLint forbids `Date`, `Intl.DateTimeFormat` and `toLocale*String` elsewhere, so swapping in a date library only touches that file.
 
-Skills for this app: `next-dev-loop` (verify at runtime after edits), `frontend-data-layer`, `frontend-code-style`, `shadcn`, `vercel-react-best-practices`, `vercel-composition-patterns`, `screen-tests`.
+Skills for this app: `next-dev-loop` (verify at runtime after edits), `frontend-data-layer`, `frontend-code-style`, `frontend-i18n`, `shadcn`, `vercel-react-best-practices`, `vercel-composition-patterns`, `screen-tests`.

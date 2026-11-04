@@ -1,18 +1,20 @@
 "use client";
 
 import { InboxIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useTenders } from "@/features/tender";
-import { LoadError, EmptyState } from "@/shared/components/LoadStates";
+import { EmptyState, LoadError } from "@/shared/components/LoadStates";
 import { TenderScreen } from "./TenderScreen";
 
 /** Landing page: there is one tender in the MVP, so open the most urgent one directly. */
 export function HomeScreen() {
+  const t = useTranslations("tender");
   const { data: tenders, isError, refetch } = useTenders();
 
   if (isError) {
     return (
       <div className="p-8">
-        <LoadError title="We couldn't load your tenders." onRetry={() => void refetch()} />
+        <LoadError title={t("listLoadError")} onRetry={() => void refetch()} />
       </div>
     );
   }
@@ -20,8 +22,8 @@ export function HomeScreen() {
   if (!tenders) return null;
   if (tenders.length === 0) {
     return (
-      <EmptyState title="No open tenders" icon={<InboxIcon />}>
-        New calls for tenders appear here as soon as they are published.
+      <EmptyState title={t("noneTitle")} icon={<InboxIcon />}>
+        {t("noneDescription")}
       </EmptyState>
     );
   }

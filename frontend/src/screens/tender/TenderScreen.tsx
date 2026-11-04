@@ -1,13 +1,16 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useTranslations } from "next-intl";
 import { FormList, TenderHeader, useTender } from "@/features/tender";
 import { isNotFound } from "@/shared/api";
-import { LoadError, EmptyState } from "@/shared/components/LoadStates";
+import { EmptyState, LoadError } from "@/shared/components/LoadStates";
 import { Skeleton } from "@/shared/ui/skeleton";
 
 /** Tender detail: what is asked, when, and the forms to fill (docs/USER_FLOW.md §3.2). */
 export function TenderScreen({ tenderId }: { tenderId: number }) {
+  const t = useTranslations("tender");
+  const tCommon = useTranslations("common");
   const { data: tender, error, isPending, refetch } = useTender(tenderId);
 
   if (isPending) {
@@ -20,14 +23,14 @@ export function TenderScreen({ tenderId }: { tenderId: number }) {
   if (isNotFound(error)) {
     return (
       <TenderFrame>
-        <EmptyState title="Tender not found">It may have been withdrawn by the buyer.</EmptyState>
+        <EmptyState title={t("notFound")}>{tCommon("withdrawnByBuyer")}</EmptyState>
       </TenderFrame>
     );
   }
   if (error) {
     return (
       <TenderFrame>
-        <LoadError title="We couldn't load this tender." onRetry={() => void refetch()} />
+        <LoadError title={t("loadError")} onRetry={() => void refetch()} />
       </TenderFrame>
     );
   }
@@ -41,10 +44,11 @@ export function TenderScreen({ tenderId }: { tenderId: number }) {
 
 /** The breadcrumb bar and the page column, whatever the state of the tender. */
 function TenderFrame({ title, children }: { title?: string; children: ReactNode }) {
+  const t = useTranslations("tender");
   return (
     <div className="flex flex-1 flex-col">
       <div className="sticky top-0 z-10 flex h-13 items-center gap-2 border-b bg-card px-6">
-        <span className="text-muted-foreground">Tenders</span>
+        <span className="text-muted-foreground">{t("breadcrumbRoot")}</span>
         {title && (
           <>
             <span className="text-border">/</span>
@@ -58,8 +62,9 @@ function TenderFrame({ title, children }: { title?: string; children: ReactNode 
 }
 
 function TenderSkeleton() {
+  const t = useTranslations("tender");
   return (
-    <div aria-label="Loading tender" className="flex flex-col gap-6">
+    <div aria-label={t("loading")} className="flex flex-col gap-6">
       <div className="flex flex-col gap-2">
         <Skeleton className="h-5 w-48" />
         <Skeleton className="h-8 w-2/3" />

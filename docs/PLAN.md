@@ -165,3 +165,4 @@ UI (relecture)  ──►  API locale
 | 2026-11-04 | Multi-tenant anticipé : table `tenant` ; formulaires et champs partagés ; un `form_fill` par (tenant, formulaire) porte le statut et les réponses (les collègues d'un tenant partagent le même) ; tenant courant via la dépendance `CurrentTenantId` (tenant seedé tant qu'il n'y a pas d'authentification) ; données existantes migrées vers le tenant de démo | validé |
 | 2026-11-04 | Schéma de la base généré depuis les modèles SQLAlchemy dans `docs/DB_SCHEMA.md` (Mermaid, `make db-schema`), un test vérifie qu'il est à jour | validé |
 | 2026-11-04 | Étape 4.5 validée et mergée dans `main` | validé |
+| 2026-11-04 | i18n front avec next-intl (sans routage par langue : locale fixe `en`, compatible Cache Components) ; tous les textes dans `shared/i18n/messages/en.json`, clés typées, pluriels ICU ; ESLint `react/jsx-no-literals` ; anglais seulement pour l'instant | à valider |
