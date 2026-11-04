@@ -85,7 +85,7 @@ Chaque étape à partir de la 4 livre une **fonctionnalité utilisable de bout e
 - Embeddings : `fastembed` (`bge-small-en-v1.5`, cache `~/.cache/fastembed`) ; embedder factice déterministe (`FORMPILOT_EMBEDDER=hash`) pour les tests rapides.
 - `search()` : vecteurs (cosinus) + plein texte (n'importe quel mot de la requête, `ts_rank_cd`), fusion RRF, filtrée par tenant et documents indexés.
 - Seed : les 11 documents de `knowledge-base/documents/` indexés au démarrage (idempotent). API `GET /knowledge`, `GET /knowledge/documents/{id}/file`.
-- Front : écran *Company knowledge* (entreprise, nombre de documents, dernière indexation, tableau type / nom / pages / date d'ajout / statut, erreur affichée, lien vers l'original), entrée dans la barre latérale, carte *Company knowledge* sur l'écran *Tender* (nombre de documents, *Manage*).
+- Front : écran *Company knowledge* (entreprise, nombre de documents, dernière indexation, tableau type / nom / pages / date d'ajout / statut, erreur affichée, téléchargement par ligne) ; clic sur un document → aperçu en modale (pages du PDF via `PdfViewer` de `document-preview`, bouton *Download* ; DOCX : message « pas encore d'aperçu » + téléchargement), entrée dans la barre latérale, carte *Company knowledge* sur l'écran *Tender* (nombre de documents, *Manage*).
 - Tests : extraction et découpage (vrais documents + cas synthétiques), API, recherche (identifiant, tri, isolation des tenants), écran *Knowledge* et carte (Vitest), scénario Playwright étendu. Test `slow` de rappel avec le vrai modèle : pour chaque section des formulaires, les passages trouvés pour ses champs contiennent chaque valeur attendue de `GROUND_TRUTH.md` (mesure par section car l'IA répond section par section ; deux libellés seuls, « Legal form since » et « Main activity », ne trouvent pas leur passage en top 8).
 
 #### 5b — Ajout de documents ⬜
@@ -104,6 +104,7 @@ Chaque étape à partir de la 4 livre une **fonctionnalité utilisable de bout e
 
 ### Étape 7 — Annex 4 (DOCX) de bout en bout ⬜ _(critique, testé)_
 - Parsing des tableaux Word (libellés, cellules, types texte / Oui-Non / nombre), export dans les cellules en préservant la mise en page, avec la même UI que l'Annex 7.
+- Aperçu des documents Word de la base de connaissances (`docx-preview`) dans la modale de *Company knowledge* et dans la vue *Source*.
 - Cas difficiles de la base de connaissances : donnée absente, documents contradictoires, extrait périmé, déclarations Oui/Non non documentées.
 - Tests : parseur (schéma attendu), export (réouverture du DOCX, valeurs aux bons endroits, reste intact, comparaison visuelle par rendu), e2e complet.
 
@@ -188,3 +189,5 @@ UI (relecture)  ──►  API locale
 | 2026-11-04 | Étape 5 découpée en 5a (base de connaissances + recherche), 5b (upload), 5c (moteur IA back), 5d (UI de remplissage IA), une branche et une validation par sous-étape ; LLM Claude Sonnet 5.5, réponses réelles enregistrées pour le `FakeLLM` ; règles génériques pures dès 5c, cartes Conflit / Périmé plus tard | validé |
 | 2026-11-04 | i18n front avec next-intl (sans routage par langue : locale fixe `en`, compatible Cache Components) ; tous les textes dans `shared/i18n/messages/en.json`, clés typées, pluriels ICU ; ESLint `react/jsx-no-literals` ; anglais seulement pour l'instant | validé |
 | 2026-11-04 | 5a : passages d'une page et d'une section (~800 car.) avec contexte titre + section ; plein texte en « n'importe quel mot » ; rappel mesuré par section du formulaire ; cache du modèle dans `~/.cache/fastembed` | à valider |
+| 2026-11-04 | Documents de la base gardés tels quels, défauts compris (`&amp;` dans la plaquette, noms tirés des fichiers) : un cas réel en aura aussi | validé |
+| 2026-11-04 | *Company knowledge* : clic sur un document = aperçu en modale (PDF), téléchargement toujours possible ; aperçu DOCX à l'étape 7 | validé |

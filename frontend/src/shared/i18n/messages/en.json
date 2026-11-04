@@ -85,7 +85,10 @@
       "empty": "Empty",
       "signature": "Sign by hand"
     },
-    "loadError": "We couldn't load the form preview. Your answers are still saved."
+    "loadError": "We couldn't load the form preview. Your answers are still saved.",
+    "documentLabel": "Preview of {name}",
+    "page": "Page {number}",
+    "documentLoadError": "We couldn't display this document. You can still download it."
   },
   "export": {
     "open": "Export {format}",
@@ -129,6 +132,11 @@
     "cardHint": "What the AI answers from",
     "cardDocuments": "{count, plural, one {document} other {documents}}",
     "manage": "Manage",
-    "cardUnavailable": "Company knowledge unavailable"
+    "cardUnavailable": "Company knowledge unavailable",
+    "open": "Preview {name}",
+    "download": "Download",
+    "downloadDocument": "Download {name}",
+    "previewDocx": "Word documents can't be previewed yet. Download the file to read it.",
+    "previewDocxTitle": "No preview for Word documents yet"
   }
 }

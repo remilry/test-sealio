@@ -1,12 +1,13 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { LibraryIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { DocumentTable, useKnowledgeBase, type KnowledgeBase } from "@/features/knowledge-base";
 import { EmptyState, LoadError } from "@/shared/components/LoadStates";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { formatDay, formatTime } from "@/shared/utils/date";
+import { DocumentPreviewDialog } from "./DocumentPreviewDialog";
 
 /**
  * Company knowledge (docs/USER_FLOW.md §3.1): the documents the AI answers from, and whether
@@ -60,6 +61,8 @@ function Summary({ knowledge }: { knowledge: KnowledgeBase }) {
 
 function Documents({ knowledge }: { knowledge: KnowledgeBase }) {
   const t = useTranslations("knowledge");
+  const [openedId, setOpenedId] = useState<number | null>(null);
+  const opened = knowledge.documents.find((document) => document.id === openedId) ?? null;
   if (knowledge.documents.length === 0) {
     return (
       <EmptyState icon={<LibraryIcon />} level={2} title={t("noneTitle")}>
@@ -67,7 +70,15 @@ function Documents({ knowledge }: { knowledge: KnowledgeBase }) {
       </EmptyState>
     );
   }
-  return <DocumentTable documents={knowledge.documents} />;
+  return (
+    <>
+      <DocumentTable
+        documents={knowledge.documents}
+        onOpen={(document) => setOpenedId(document.id)}
+      />
+      <DocumentPreviewDialog document={opened} onClose={() => setOpenedId(null)} />
+    </>
+  );
 }
 
 /** The top bar and the page column, whatever the state of the knowledge base. */

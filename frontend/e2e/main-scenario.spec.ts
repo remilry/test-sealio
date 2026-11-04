@@ -26,6 +26,13 @@ test("I fill Annex 7 by hand and download it in its original PDF layout", async 
   // 11 documents and the header row.
   await expect(documents).toHaveCount(12);
   await expect(documents.filter({ hasText: "Indexed" })).toHaveCount(11);
+  // A document opens in place, its pages rendered.
+  await page.getByRole("button", { name: "Preview Commercial register extract" }).click();
+  const viewer = page.getByRole("dialog", { name: "Commercial register extract" });
+  await expect(viewer.getByLabel("Page 2").locator("canvas")).toBeVisible();
+  await expect(viewer.getByRole("link", { name: "Download" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(viewer).toBeHidden();
   await page.getByRole("list", { name: "Main" }).getByRole("link", { name: "Tenders" }).click();
 
   // Open Annex 7: its detected fields are listed and drawn on the original form.

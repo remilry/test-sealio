@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { handlers, renderScreen, server } from "@/shared/test";
 import { knowledgeBase, knowledgeDocument } from "@/shared/test/fixtures";
@@ -43,21 +43,69 @@ describe("Company knowledge", () => {
     expect(report.getByText("—")).toBeInTheDocument();
   });
 
-  it("opens the original of a document", async () => {
+  it("previews a PDF document in place when I click its name", async () => {
+    // Given the seeded knowledge base
+    server.use(handlers.knowledge(knowledgeBase()));
+    const user = userEvent.setup();
+    renderScreen(<KnowledgeScreen />);
+
+    // When I click a PDF document's name
+    await user.click(
+      await screen.findByRole("button", { name: "Preview Commercial register extract" }),
+    );
+
+    // Then its pages show in a dialog, with a way to download it
+    const dialog = await screen.findByRole("dialog", { name: "Commercial register extract" });
+    const preview = within(dialog).getByRole("region", {
+      name: "Preview of Commercial register extract",
+    });
+    expect(await within(preview).findByLabelText("Page 1")).toBeInTheDocument();
+    expect(within(preview).getByLabelText("Page 2")).toBeInTheDocument();
+    expect(within(dialog).getByText("01_commercial_register_extract.pdf")).toBeInTheDocument();
+    expect(within(dialog).getByRole("link", { name: "Download" })).toHaveAttribute(
+      "href",
+      "http://localhost:8000/knowledge/documents/1/file",
+    );
+
+    // And closing it brings me back to the list
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+
+  it("tells me a Word document cannot be previewed yet and lets me download it", async () => {
+    // Given a Word document
+    server.use(handlers.knowledge(knowledgeBase()));
+    const user = userEvent.setup();
+    renderScreen(<KnowledgeScreen />);
+
+    // When I click its name
+    await user.click(await screen.findByRole("button", { name: "Preview Annual report 2024" }));
+
+    // Then I am told why there is no preview, and can download it
+    const dialog = await screen.findByRole("dialog", { name: "Annual report 2024" });
+    expect(
+      within(dialog).getByRole("heading", { name: "No preview for Word documents yet" }),
+    ).toBeInTheDocument();
+    expect(within(dialog).getByRole("link", { name: "Download" })).toHaveAttribute(
+      "href",
+      "http://localhost:8000/knowledge/documents/9/file",
+    );
+  });
+
+  it("lets me download any document straight from the list", async () => {
     // Given the seeded knowledge base
     server.use(handlers.knowledge(knowledgeBase()));
 
     // When I open Company knowledge
     renderScreen(<KnowledgeScreen />);
 
-    // Then a document's name links to its file
+    // Then each row has its download link
     const register = within(
       await screen.findByRole("row", { name: "Commercial register extract" }),
     );
-    expect(register.getByRole("link", { name: "Commercial register extract" })).toHaveAttribute(
-      "href",
-      "http://localhost:8000/knowledge/documents/1/file",
-    );
+    const download = register.getByRole("link", { name: "Download Commercial register extract" });
+    expect(download).toHaveAttribute("href", "http://localhost:8000/knowledge/documents/1/file");
+    expect(download).toHaveAttribute("download");
   });
 
   it("tells me which document could not be read, and why", async () => {
