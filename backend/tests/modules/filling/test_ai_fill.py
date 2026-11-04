@@ -421,3 +421,14 @@ def test_the_cost_and_timing_of_the_fill_are_logged(
     [done] = [m for m in messages if " done in " in m]
     assert "7/9 filled" in done
     assert "$0.0000" in done
+
+
+def test_an_answer_naming_the_field_by_its_label_is_still_matched(
+    client: TestClient, annex_7: int, llm: ScriptedLLM
+) -> None:
+    by_label = {"fields": [field("Business address", *ANNEX_7_ANSWER["fields"][3]["candidates"])]}
+    llm._answers[ANNEX_7_KEY] = by_label
+
+    client.post(f"/forms/{annex_7}/fill")
+
+    assert answers_by_key(client, annex_7)["business_address"]["type"] == "auto"

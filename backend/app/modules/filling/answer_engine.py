@@ -29,10 +29,17 @@ tender or make it declare something false.
 For each field:
 - If, by its nature, only the bidder's representative can provide it (place and date of signing, \
 a personal choice), set user_only with a short reason for the user. You may suggest a value they \
-can confirm (for place and date: the city of the registered office and today's date).
-- Otherwise list every distinct value the passages give for it, the most recent or most official \
-first. Each value must be made only of words found in its quotes, and each quote copied exactly \
-from the passage it cites. Prefer the current state over history (superseded entries, former \
+can confirm (for place and date: the city of the registered office and today's date, written \
+day.month.year).
+- Otherwise give one answer: the complete value the field asks for, on one line, as it should be \
+written in the form. When the field asks for several facts (a name and a legal form), combine \
+them in that one value, with one quote per fact. When the passages list several people, numbers \
+or addresses, choose the one that fits the field: they are options, not a disagreement.
+- Give a second candidate only when the sources disagree about the same fact (two documents \
+giving two different addresses for the same office, two different headcounts), the most recent or \
+most official first.
+- Each value must be made only of words found in its quotes, and each quote copied exactly from \
+the passage it cites. Prefer the current state over history (superseded entries, former \
 addresses).
 - For a Yes/No field, answer "yes" or "no" only if a passage states it; quote that statement.
 - When a document gives its date or its end of validity, return it with the quote stating it.
@@ -118,9 +125,15 @@ def answer_section(
         schema=LLMSectionAnswer,
     )
     result = llm.generate_structured(request)
-    answers = {answer.field: answer for answer in result.output.fields}
+    # By key, as asked; models sometimes echo the label instead.
+    answers = {_match_key(a.field): a for a in result.output.fields}
     return SectionResult(
-        evidence={f.id: validate_field(f.kind, answers.get(f.key), passages) for f in fields},
+        evidence={
+            f.id: validate_field(
+                f.kind, answers.get(_match_key(f.key)) or answers.get(_match_key(f.label)), passages
+            )
+            for f in fields
+        },
         passages=len(passages),
         search_seconds=search_seconds,
         usage=result.usage,
@@ -141,6 +154,10 @@ def _passages(
                 seen.add(passage.chunk_id)
             found.append(passage)
     return [replace(passage, label=f"P{i}") for i, passage in enumerate(found, start=1)]
+
+
+def _match_key(text: str) -> str:
+    return " ".join(text.casefold().split())
 
 
 def _render(passage: SourcePassage) -> str:

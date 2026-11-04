@@ -43,7 +43,7 @@ class LLMCandidate(_Strict):
 
 
 class LLMFieldAnswer(_Strict):
-    field: str = Field(description="Key of the field, as given.")
+    field: str = Field(description='The field\'s key exactly as given after "key:", e.g. "e_mail".')
     user_only: bool = Field(
         description="True when only the user can provide this by nature (place and date of "
         "signing, a personal choice): such fields are not searched in the documents."
@@ -56,8 +56,9 @@ class LLMFieldAnswer(_Strict):
         "registered office and today's date), or null."
     )
     candidates: list[LLMCandidate] = Field(
-        description="Every distinct value the passages give for this field, the most recent or "
-        "most official first. Empty when the passages do not contain the answer: never guess."
+        description="The answer, as one candidate. Several only when sources disagree about the "
+        "same fact, the most recent or most official first. Empty when the passages do not "
+        "contain the answer: never guess."
     )
 
 

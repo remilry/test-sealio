@@ -271,3 +271,66 @@ def test_values_that_differ_only_in_form_normalise_the_same() -> None:
         "hardturmstrasse 120 8005 zurich"
     )
     assert normalize_value("Hardturmstrasse 120") != normalize_value("Röntgenstrasse 17")
+
+
+ADDRESSES = SourcePassage(
+    label="P4",
+    text="Policyholder: Alpenlogic AG, Pfingstweidstrasse 31, 8005 Zurich, Switzerland. "
+    "Previous office: Hardstrasse 201, 8005 Zurich.",
+    document_name="Liability insurance certificate",
+    document_id=3,
+    chunk_id=32,
+    page=0,
+)
+
+
+def test_a_value_that_only_adds_details_to_another_is_the_same_answer() -> None:
+    result = validate_field(
+        FieldKind.TEXT,
+        answer(
+            candidate(
+                "Pfingstweidstrasse 31, 8005 Zurich", ("P1", "Pfingstweidstrasse 31, 8005 Zürich")
+            ),
+            candidate(
+                "Pfingstweidstrasse 31, 8005 Zurich, Switzerland",
+                ("P4", "Pfingstweidstrasse 31, 8005 Zurich, Switzerland"),
+            ),
+        ),
+        [*PASSAGES, ADDRESSES],
+    )
+
+    [merged] = result.candidates
+    # The model's first choice keeps its wording, with the evidence of both.
+    assert merged.value == "Pfingstweidstrasse 31, 8005 Zurich"
+    assert {c.document_name for c in merged.citations} == {
+        "Commercial register extract",
+        "Liability insurance certificate",
+    }
+
+
+def test_two_different_values_for_the_same_fact_stay_two_candidates() -> None:
+    result = validate_field(
+        FieldKind.TEXT,
+        answer(
+            candidate(
+                "Pfingstweidstrasse 31, 8005 Zurich", ("P1", "Pfingstweidstrasse 31, 8005 Zürich")
+            ),
+            candidate("Hardstrasse 201, 8005 Zurich", ("P4", "Hardstrasse 201, 8005 Zurich")),
+        ),
+        [*PASSAGES, ADDRESSES],
+    )
+
+    assert [c.value for c in result.candidates] == [
+        "Pfingstweidstrasse 31, 8005 Zurich",
+        "Hardstrasse 201, 8005 Zurich",
+    ]
+
+
+def test_a_value_is_written_on_one_line() -> None:
+    result = validate_field(
+        FieldKind.TEXT,
+        answer(candidate("Company name\nAlpenlogic  AG", ("P1", "Company name: Alpenlogic AG"))),
+        PASSAGES,
+    )
+
+    assert [c.value for c in result.candidates] == ["Company name Alpenlogic AG"]

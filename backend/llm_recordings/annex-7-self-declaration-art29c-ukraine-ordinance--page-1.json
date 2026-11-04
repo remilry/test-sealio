@@ -1,0 +1,183 @@
+{
+  "fields": [
+    {
+      "field": "Project number/project title/project name",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": [
+        {
+          "value": "ZH-2026-0412 · Cloud Platform Services – Canton of Zurich",
+          "citations": [
+            {
+              "passage": "P1",
+              "quote": "Project title: Cloud Platform Services – Canton of Zurich"
+            },
+            {
+              "passage": "P1",
+              "quote": "Project number (reference): ZH-2026-0412"
+            }
+          ],
+          "source_date": null,
+          "valid_until": null
+        }
+      ]
+    },
+    {
+      "field": "Name of the contracting authority",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": [
+        {
+          "value": "Canton of Zurich, Office for Information Technology",
+          "citations": [
+            {
+              "passage": "P1",
+              "quote": "Contracting authority: Canton of Zurich, Office for Information Technology"
+            }
+          ],
+          "source_date": null,
+          "valid_until": null
+        }
+      ]
+    },
+    {
+      "field": "Name and legal form",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": [
+        {
+          "value": "Alpenlogic AG, Company limited by shares (Aktiengesellschaft, AG)",
+          "citations": [
+            {
+              "passage": "P4",
+              "quote": "Company name\nAlpenlogic AG"
+            },
+            {
+              "passage": "P4",
+              "quote": "Legal form\nCompany limited by shares (Aktiengesellschaft, AG)"
+            }
+          ],
+          "source_date": {
+            "date": "2026-10-20",
+            "citation": {
+              "passage": "P4",
+              "quote": "Issued: 20 October 2026"
+            }
+          },
+          "valid_until": null
+        }
+      ]
+    },
+    {
+      "field": "Business address",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": [
+        {
+          "value": "Pfingstweidstrasse 31, 8005 Zurich",
+          "citations": [
+            {
+              "passage": "P4",
+              "quote": "Address\nPfingstweidstrasse 31, 8005 Zurich"
+            }
+          ],
+          "source_date": {
+            "date": "2026-10-20",
+            "citation": {
+              "passage": "P4",
+              "quote": "Issued: 20 October 2026"
+            }
+          },
+          "valid_until": null
+        }
+      ]
+    },
+    {
+      "field": "Contact person",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": [
+        {
+          "value": "Marc Keller",
+          "citations": [
+            {
+              "passage": "P8",
+              "quote": "Chief Executive Officer\nMarc Keller"
+            }
+          ],
+          "source_date": null,
+          "valid_until": null
+        }
+      ]
+    },
+    {
+      "field": "Telephone",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": [
+        {
+          "value": "+41 44 555 01 20",
+          "citations": [
+            {
+              "passage": "P8",
+              "quote": "+41 44 555 01 20"
+            }
+          ],
+          "source_date": null,
+          "valid_until": null
+        }
+      ]
+    },
+    {
+      "field": "E-mail",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": [
+        {
+          "value": "marc.keller@alpenlogic.example",
+          "citations": [
+            {
+              "passage": "P8",
+              "quote": "marc.keller@alpenlogic.example"
+            }
+          ],
+          "source_date": null,
+          "valid_until": null
+        }
+      ]
+    },
+    {
+      "field": "Place and date",
+      "user_only": true,
+      "user_only_reason": "Place and date of signing must be provided by the bidder's authorised representative.",
+      "suggested_value": "Zurich, 04.11.2026",
+      "candidates": []
+    },
+    {
+      "field": "First name(s) and surname(s)",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": [
+        {
+          "value": "Marc Keller",
+          "citations": [
+            {
+              "passage": "P7",
+              "quote": "Keller, Marc\nChairman of the board and CEO\nZurich\nSole signature"
+            }
+          ],
+          "source_date": null,
+          "valid_until": null
+        }
+      ]
+    }
+  ]
+}

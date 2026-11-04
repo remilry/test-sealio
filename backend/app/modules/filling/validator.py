@@ -3,6 +3,8 @@
 - A quote must be found in its passage (case, accents, spaces, punctuation and line-break
   hyphens tolerated). Not in the labelled passage, it may be in another one sent: the passage is
   then the one that holds it. Nowhere → the citation is dropped.
+- Values are written on one line. Two values of which one only adds details to the other are
+  the same answer.
 - Every meaningful word and number of the value must appear in its verified quotes, after
   normalisation (case, accents, 100'000 = 100,000 = 100000, dates written in any usual way).
 - A Yes/No is accepted only with a verified quote as evidence.
@@ -83,7 +85,7 @@ def validate_field(
     if answer is None:
         return ValidatedField(candidates=[], rejected=["no answer for this field"])
     if answer.user_only:
-        suggestion = (answer.suggested_value or "").strip() or None
+        suggestion = _one_line(answer.suggested_value or "") or None
         return ValidatedField(
             candidates=[],
             user_only=True,
@@ -91,17 +93,16 @@ def validate_field(
             suggested_value=suggestion,
         )
     result = ValidatedField(candidates=[])
-    by_value: dict[str, Candidate] = {}
     for proposed in answer.candidates:
         candidate = _validate_candidate(kind, proposed, passages, result.rejected)
         if candidate is None:
             continue
-        same = by_value.get(_value_key(candidate.value))
+        same = next((c for c in result.candidates if _same_answer(c.value, candidate.value)), None)
         if same is None:
-            by_value[_value_key(candidate.value)] = candidate
             result.candidates.append(candidate)
         else:
-            # The same value from several sources is one candidate with all its evidence.
+            # The same answer from several sources is one candidate with all its evidence; the
+            # model's earlier choice keeps its wording.
             same.citations += [c for c in candidate.citations if c not in same.citations]
             same.source_date = _latest(same.source_date, candidate.source_date)
             same.valid_until = same.valid_until or candidate.valid_until
@@ -147,7 +148,7 @@ def _validate_candidate(
     passages: list[SourcePassage],
     rejected: list[str],
 ) -> Candidate | None:
-    value = proposed.value.strip()
+    value = _one_line(proposed.value)
     citations = []
     for citation in proposed.citations:
         found = find_citation(citation, passages)
@@ -197,8 +198,18 @@ def _latest(a: DatedCitation | None, b: DatedCitation | None) -> DatedCitation |
     return a if a.date >= b.date else b
 
 
-def _value_key(value: str) -> str:
-    return normalize_value(value) or value.casefold()
+def _same_answer(a: str, b: str) -> bool:
+    """Two values say the same when one only adds details to the other ("Pfingstweidstrasse 31,
+    8005 Zurich" and "…, Switzerland"): not a disagreement between sources."""
+    words_a, words_b = _tokens(a) - CONNECTORS, _tokens(b) - CONNECTORS
+    if not words_a or not words_b:
+        return a.casefold() == b.casefold()
+    return words_a <= words_b or words_b <= words_a
+
+
+def _one_line(value: str) -> str:
+    """As written in a form field: on one line, single spaces."""
+    return " ".join(value.split())
 
 
 # --- normalisation ---------------------------------------------------------------------------
