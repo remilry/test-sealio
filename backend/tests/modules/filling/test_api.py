@@ -9,7 +9,11 @@ def test_a_new_form_has_no_answers_and_everything_to_fill(client: TestClient) ->
     state = client.get(f"/forms/{annex_7['id']}/answers").json()
 
     # 10 fields, the signature excluded.
-    assert state == {"counts": {"fillable": 9, "filled": 0, "empty": 9}, "answers": []}
+    assert state == {
+        "counts": {"fillable": 9, "filled": 0, "empty": 9, "doubts": 0},
+        "answers": [],
+        "ai_run": None,
+    }
 
 
 def test_saving_a_value_records_it_as_entered_by_the_user(client: TestClient) -> None:
@@ -22,11 +26,13 @@ def test_saving_a_value_records_it_as_entered_by_the_user(client: TestClient) ->
 
     assert response.status_code == 200
     state = response.json()
-    assert state["counts"] == {"fillable": 9, "filled": 1, "empty": 8}
+    assert state["counts"] == {"fillable": 9, "filled": 1, "empty": 8, "doubts": 0}
     [answer] = state["answers"]
     assert answer["field_id"] == telephone["id"]
     assert answer["value"] == "+41 44 512 38 00"
     assert answer["resolved_by"] == "user"
+    # Entered by hand: no AI evidence, nothing left to review.
+    assert (answer["type"], answer["candidates"], answer["needs_review"]) == (None, [], False)
     assert client.get(f"/forms/{annex_7['id']}/answers").json() == state
 
 

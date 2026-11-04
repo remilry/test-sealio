@@ -114,7 +114,16 @@ export function annex7(overrides: Partial<FormDetail> = {}): FormDetail {
 
 /** A value the user entered for a field. */
 export function answer(fieldId: number, value: string | null, at = "2026-11-03T13:32:00Z"): Answer {
-  return { field_id: fieldId, value, resolved_by: "user", resolved_at: at };
+  return {
+    field_id: fieldId,
+    value,
+    resolved_by: "user",
+    resolved_at: at,
+    type: null,
+    candidates: [],
+    user_only_reason: null,
+    needs_review: false,
+  };
 }
 
 /** `GET /forms/{id}/answers`: counts are the back's, derived here the same way for consistency. */
@@ -124,8 +133,9 @@ export function fillState(answers: Answer[] = [], fields: FormField[] = annex7Fi
     answers.some((a) => a.field_id === field.id && a.value),
   ).length;
   return {
-    counts: { fillable: fillable.length, filled, empty: fillable.length - filled },
+    counts: { fillable: fillable.length, filled, empty: fillable.length - filled, doubts: 0 },
     answers,
+    ai_run: null,
   };
 }
 

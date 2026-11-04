@@ -71,6 +71,18 @@ def search(
     return index.search(session, tenant_id, query, embedder or get_embedder(), k)
 
 
+def count_indexed_documents(session: Session, tenant_id: int) -> int:
+    """How many of the tenant's documents the AI can answer from."""
+    return (
+        session.scalar(
+            select(func.count())
+            .select_from(Document)
+            .where(Document.tenant_id == tenant_id, Document.status == DocumentStatus.INDEXED)
+        )
+        or 0
+    )
+
+
 def get_document_file(
     session: Session, tenant_id: int, document_id: int, data_dir: Path
 ) -> DocumentFile:

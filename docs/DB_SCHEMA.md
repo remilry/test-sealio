@@ -13,6 +13,7 @@ erDiagram
     document ||--o{ chunk : document_id
     tenant ||--o{ document : tenant_id
     form ||--o{ field : form_id
+    form_fill ||--o{ fill_event : form_fill_id
     tender ||--o{ form : tender_id
     form ||--o{ form_fill : form_id
     tenant ||--o{ form_fill : tenant_id
@@ -23,6 +24,10 @@ erDiagram
         text value "nullable"
         text resolved_by "ai | user"
         timestamptz resolved_at
+        text type "auto | missing | manual | outdated | conflict | declaration; nullable"
+        jsonb candidates
+        text user_only_reason "nullable"
+        boolean needs_review
     }
     chunk {
         bigint id PK
@@ -57,6 +62,12 @@ erDiagram
         text kind "text | number | date | yes_no | signature"
         jsonb locator
     }
+    fill_event {
+        bigint id PK
+        bigint form_fill_id FK
+        text type "phase | field | done | error"
+        jsonb data
+    }
     form {
         bigint id PK
         bigint tender_id FK
@@ -73,6 +84,9 @@ erDiagram
         bigint tenant_id FK
         bigint form_id FK
         text status "not_started | in_review | ready"
+        text ai_status "running | done | failed; nullable"
+        timestamptz ai_started_at "nullable"
+        timestamptz ai_finished_at "nullable"
     }
     tenant {
         bigint id PK
@@ -116,6 +130,11 @@ erDiagram
 - FK `form_id` → `form.id`, on delete cascade
 - unique `(form_id, key)`
 - unique `(form_id, position)`
+
+### `fill_event`
+
+- FK `form_fill_id` → `form_fill.id`, on delete cascade
+- index `(form_fill_id)`
 
 ### `form`
 

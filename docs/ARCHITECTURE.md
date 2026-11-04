@@ -20,7 +20,7 @@
 │ rules/          critères génériques : preuve, conflit, péremption,    │
 │                 champ utilisateur, statut/groupe/tri, blocage export  │
 │ exporter/       FormSchema + réponses + original → fichier rempli     │
-│ llm/            façade + adaptateurs (Claude, Fake)                   │
+│ llm/            façade + adaptateurs (OpenAI, Fake)                   │
 │ core/db         PostgreSQL + pgvector ; fichiers sur disque           │
 └──────────────────────────────────────────────────────────────────────┘
 data/ (ignoré par git) : uploads, exports. Seed au démarrage : tenant, offre, 2 formulaires. La base de connaissances n'est pas seedée : l'utilisateur y ajoute les documents (ceux de la démo sont dans `knowledge-base/documents/`)
@@ -34,9 +34,9 @@ data/ (ignoré par git) : uploads, exports. Seed au démarrage : tenant, offre, 
 | Contrat | Modèles Pydantic → OpenAPI → `openapi-typescript` → types TS |
 | Communication | REST + SSE (remplissage). Corrections utilisateur en `PATCH` pendant le flux |
 | Remplissage | Job asyncio côté back, événements persistés → SSE rejouable (rechargement), écrans de repli sur le même modèle |
-| LLM | Claude via une façade `llm/` (`generate_structured`) ; aucun autre module n'importe le SDK. **Un appel par section** du formulaire, événement SSE par champ |
+| LLM | OpenAI `gpt-5-mini` (décision 2026-11-04, Claude auparavant) via une façade `llm/` (`generate_structured`) ; aucun autre module n'importe le SDK. **Un appel par section** du formulaire, événement SSE par champ |
 | Recherche | RAG hybride dans PostgreSQL : vecteurs (`fastembed` local + pgvector) + plein texte (`tsvector`), fusion des rangs (RRF). Passages = document + page + rectangle |
-| Fiabilité | Le LLM renvoie toutes les valeurs candidates avec citation exacte, ou `not_found`. Le code vérifie chaque citation, détecte les conflits (valeurs normalisées divergentes) et la péremption (date de validité renvoyée avec sa citation, comparée à aujourd'hui). Citation non vérifiée → `not_found` |
+| Fiabilité | Le LLM renvoie toutes les valeurs candidates avec leurs citations exactes, ou rien. Le code vérifie chaque citation et chaque valeur, détecte les conflits (valeurs normalisées divergentes) et la péremption (date de validité renvoyée avec sa citation, comparée à aujourd'hui). Plus aucun candidat vérifié → `missing` |
 | Ingestion V1 | Pas d'extraction de faits (coût) : *Company knowledge* liste les documents |
 | Tests | `FakeLLM` rejouant des réponses enregistrées → pytest et Playwright sans clé ni réseau ; script d'évaluation sur le vrai LLM vs `GROUND_TRUTH.md` (étape 8) |
 
@@ -118,7 +118,7 @@ SSE ─► fill-session (reducer) ─► setQueryData(["form", id])
 ## 3. Architecture back
 
 ### Stack
-Python 3.14 · FastAPI (SSE natif `fastapi.sse`) · SQLAlchemy 2.1 + psycopg 3 · Alembic (migrations) · PostgreSQL + pgvector · `fastembed` · SDK Anthropic (dans `llm/` uniquement) · PyMuPDF · python-docx · pytest · uv, ruff, pyright.
+Python 3.14 · FastAPI (SSE natif `fastapi.sse`) · SQLAlchemy 2.1 + psycopg 3 · Alembic (migrations) · PostgreSQL + pgvector · `fastembed` · SDK OpenAI (dans `llm/` uniquement) · PyMuPDF · python-docx · pytest · uv, ruff, pyright.
 
 ### Arborescence (modules métier)
 
@@ -127,9 +127,9 @@ backend/
 ├─ app/
 │  ├─ main.py                 # FastAPI : routers ; au démarrage, migrations + seed (tenant, offre, 2 formulaires)
 │  ├─ core/                   # config (pydantic-settings), db (engine, session, Base + TimestampMixin), erreurs
-│  ├─ llm/                    # façade : Protocol LLM.generate_structured(prompt, schema)
-│  │  ├─ anthropic_adapter.py
-│  │  └─ fake_adapter.py      # rejoue des réponses enregistrées (tests, e2e)
+│  ├─ llm/                    # façade : Protocol LLM.generate_structured(LLMRequest) → modèle Pydantic
+│  │  ├─ openai_adapter.py
+│  │  └─ fake_adapter.py      # FakeLLM rejoue llm_recordings/<clé>.json (tests, e2e) · RecordingLLM
 │  └─ modules/
 │     ├─ knowledge/           router · service · models
 │     │  ├─ extraction/       pdf.py (PyMuPDF : texte + rectangles) · docx.py
@@ -142,8 +142,9 @@ backend/
 │     ├─ filling/             router (lancer, SSE, PATCH champ) · service · models
 │     │  ├─ job.py            orchestration des 5 phases, émet les événements
 │     │  ├─ answer_engine.py  section → retrieve par champ → prompt → appel LLM
-│     │  ├─ validator.py      vérification des citations et du format (pur)
-│     │  └─ rules.py          type, groupe, ordre, compteurs, blocage d'export (pur)
+│     │  ├─ llm_schema.py     sortie structurée attendue du LLM
+│     │  ├─ validator.py      vérification des citations et des valeurs (pur)
+│     │  └─ rules.py          type de réponse ; groupe, ordre, blocage d'export à l'étape 6 (pur)
 │     └─ export/              router · pdf_exporter.py · docx_exporter.py (purs)
 ├─ migrations/                # Alembic
 └─ tests/                     même arborescence que app/ + fixtures
@@ -151,7 +152,7 @@ backend/
 
 **Règles de dépendance**
 - Un module n'expose aux autres que son `service.py`.
-- Seul `answer_engine` importe `llm/` ; seul `llm/` importe le SDK Anthropic.
+- Seul `answer_engine` (et le routeur, pour injecter le modèle) importe `llm/` ; seul `llm/` importe le SDK OpenAI.
 - Les briques critiques sont **pures** (données en entrée, données en sortie, ni base ni réseau) : `parsing/`, `validator`, `rules`, `*_exporter`.
 
 ### Modèle de données (PostgreSQL)
@@ -170,9 +171,9 @@ Toutes les tables héritent d'un `TimestampMixin` : `created_at` (`timestamptz`,
 | `chunk` | document, position, page, rectangle, texte (cité tel quel), contexte (titre du document + section, cherché mais jamais cité), `embedding vector(384)` (index HNSW), `tsv tsvector` (colonne générée sur contexte + texte, index GIN) |
 | `form` | offre, fichier d'origine, format, pages. Partagé par tous les tenants |
 | `field` | formulaire, section, ordre, libellé, nature (`text`/`number`/`date`/`yes_no`/`signature`), localisateur (JSONB) |
-| `form_fill` | tenant, formulaire (unique ensemble), statut (`not_started`/`in_review`/`ready`). Créé à la première réponse |
-| `answer` | remplissage, champ (unique ensemble), valeur, candidats JSONB `[{value, quote, chunk_id, valid_until, valid_until_quote}]`, type (`auto`/`missing`/`manual`/`outdated`/`conflict`/`declaration`), `user_only` + raison, état, `resolved_by`, `resolved_at` |
-| `fill_event` | remplissage, numéro de séquence, type (`phase`/`field`/`done`/`error`), données JSONB |
+| `form_fill` | tenant, formulaire (unique ensemble), statut (`not_started`/`in_review`/`ready`), dernier remplissage IA (`ai_status` `running`/`done`/`failed`, `ai_started_at`, `ai_finished_at`). Créé à la première réponse ou au premier remplissage |
+| `answer` | remplissage, champ (unique ensemble), valeur, candidats JSONB `[{value, citations: [{quote, document_name, document_id, chunk_id, page}], source_date, valid_until}]` (sélectionné en premier ; dates avec leur citation), type (`auto`/`missing`/`manual`/`outdated`/`conflict`/`declaration`, nul si jamais traité par l'IA), raison `user_only`, `needs_review`, `resolved_by`, `resolved_at` |
+| `fill_event` | remplissage, id croissant (= id SSE), type (`phase`/`field`/`done`/`error`), données JSONB. Événements du dernier remplissage seulement |
 
 ### Recherche hybride
 - **Vecteurs** : `fastembed` (`BAAI/bge-small-en-v1.5`, 384 dimensions, local) → pgvector, distance cosinus.
@@ -180,23 +181,24 @@ Toutes les tables héritent d'un `TimestampMixin` : `created_at` (`timestamptz`,
 - **Fusion** : Reciprocal Rank Fusion des deux listes, top k par champ. Le plein texte rattrape les UID, numéros de police et noms propres ; les vecteurs rattrapent les reformulations.
 
 ### Remplissage
-- Tâche asyncio dans le processus, une section à la fois. Chaque champ validé écrit son `answer` puis un `fill_event`.
-- SSE : renvoie les événements depuis `Last-Event-ID`, puis attend les nouveaux (`asyncio.Queue`). Reprise possible après rechargement.
-- **Appel LLM par section** : champs de la section, passages retrouvés par champ (top k, dédoublonnés), « Tender details ». Sortie contrainte par un outil Claude au schéma strict, température 0. Par champ : candidats avec citation, date de validité avec citation, `user_only` + raison, ou `not_found`.
+- Tâche de fond (`BackgroundTasks`, thread) dans le processus, une section à la fois. Chaque champ validé écrit son `answer` puis un `fill_event`, commité aussitôt. Les champs fixés par l'utilisateur ne sont pas redemandés, et l'upsert de l'IA ne remplace jamais une valeur de l'utilisateur, même enregistrée pendant le remplissage.
+- SSE : renvoie les événements depuis `Last-Event-ID`, puis lit la base toutes les 250 ms jusqu'à la fin du run (plus simple qu'une `asyncio.Queue` entre threads, et identique après un rechargement). Un run resté `running` au démarrage du serveur passe `failed`.
+- **Appel LLM par section** : champs de la section, passages retrouvés par champ (top 8, dédoublonnés, étiquetés `P1…`), « Tender details ». Sortie structurée au schéma strict (`responses.parse`), effort de raisonnement bas. Par champ : candidats avec une ou plusieurs citations, date de la source et fin de validité avec citation, `user_only` + raison + valeur suggérée, ou rien.
+- Enregistrement : `scripts/record_llm.py` rejoue le moteur avec le vrai modèle et écrit `backend/llm_recordings/<formulaire>--<section>.json`, que `FakeLLM` rejoue (clé stable : le prompt dépend de l'embedder).
 
 ### Validateur (pur)
-- La citation doit se trouver dans le texte du passage (espaces et césures tolérés).
-- La valeur doit figurer dans la citation après normalisation (nombres `100'000` = `100000`, dates, casse).
-- Un Oui/Non n'est coché qu'avec une citation de preuve vérifiée.
-- Échec → candidat rejeté ; plus aucun candidat → `not_found`.
+- La citation doit se trouver dans le texte d'un passage envoyé, l'étiqueté d'abord (seuls lettres et chiffres comparés : casse, accents, espaces, ponctuation et césures tolérés).
+- Chaque mot et nombre significatif de la valeur doit figurer dans ses citations vérifiées après normalisation (nombres `100'000` = `100,000` = `100000`, dates, accents, casse) : une valeur peut combiner plusieurs citations.
+- Un Oui/Non n'est coché qu'avec une citation de preuve vérifiée. Une date n'est gardée que si sa citation l'énonce.
+- Échec → citation ou candidat rejeté ; plus aucun candidat → `missing`.
 
 ### Règles (pures, dans cet ordre)
 1. Signature ou cachet → jamais rempli.
-2. `user_only` (classé par le LLM avec une raison) → `manual`, valeur pré-écrite possible (ville du siège, date du jour).
+2. `user_only` (classé par le LLM avec une raison) → `manual`, valeur suggérée écrite (ville du siège, date du jour), à revoir.
 3. Au moins deux candidats valides aux valeurs normalisées différentes → `conflict`, le plus récent pré-sélectionné.
 4. Date de validité dépassée → `outdated`.
 5. `yes_no` avec preuve → `declaration` cochée ; sans preuve → `missing`.
-6. Puis groupes, ordre de la file, compteurs et blocage d'export.
+6. Une valeur → `auto` ; aucune → `missing`. Puis (étape 6) groupes, ordre de la file et blocage d'export.
 
 ### Parsing et export
 - **PDF** : parsing des suites de `…`/`.` avec PyMuPDF, libellé à gauche ou au-dessus, une section. Export : effacement des pointillés de la zone, texte dans le rectangle, police réduite si débordement.

@@ -2,7 +2,7 @@
 
 > Document vivant. Chaque étape y est cochée et détaillée au fur et à mesure.
 > Contexte produit et priorités : voir `CLAUDE.md`. Échéance : jeudi 5 novembre.
-> Statut : étapes 0 à 4.5 faites ; étape 5 découpée en 5a–5d, 5a et 5b mergées ; prochaine : 5c (moteur IA back). Parcours détaillé : `docs/USER_FLOW.md`. Les choix techniques marqués _proposition_ restent à confirmer à l'étape 3.
+> Statut : étapes 0 à 4.5 faites ; étape 5 découpée en 5a–5d, 5a, 5b et 5c mergées ; prochaine : 5d (remplissage IA dans l'UI). Parcours détaillé : `docs/USER_FLOW.md`. Les choix techniques marqués _proposition_ restent à confirmer à l'étape 3.
 
 ## 1. Ce qu'on a appris des deux formulaires
 
@@ -94,8 +94,17 @@ Chaque étape à partir de la 4 livre une **fonctionnalité utilisable de bout e
 - Tests : API d'ajout et de suppression (succès, plusieurs fichiers, illisible, remplacement, refus, taille, échec inattendu, reprise au démarrage, suppression, 404 / autre tenant, suppression pendant l'indexation) ; écran *Knowledge* (Processing → Indexed, → Error, plusieurs fichiers, refus, échec serveur, sélecteur, suppression : confirmer, annuler, échec ; glisser-déposer : zone sous la liste, zone = écran vide, dépôt, sortie sans dépôt, texte ignoré — seul usage permis de `fireEvent`, user-event ne sachant pas glisser des fichiers) ; e2e : ré-ajout d'un document existant sous son nom (remplacement, Processing → Indexed).
 - Limite des tests front : sous jsdom + Vitest, un handler MSW ne peut pas lire un corps multipart construit avec des `File` jsdom (le fetch échoue) ; le handler vérifie donc le type de contenu, et les fichiers eux-mêmes sont vérifiés par les tests back et l'e2e.
 
-#### 5c — Moteur de réponse IA (back) ⬜
-- Façade LLM (Claude Sonnet 5.5 + `FakeLLM` rejouant des réponses réelles enregistrées), un appel par section, sortie structurée, validateur (citation vérifiée, format), toutes les règles génériques (auto, missing, manual, conflict, outdated, declaration) testées, job + événements persistés + SSE.
+#### 5c — Moteur de réponse IA (back) ✅ (mergée le 2026-11-04)
+- **Façade LLM** (`app/llm/`) : `generate_structured(LLMRequest[T]) -> T` (modèle Pydantic en sortie). Adaptateur **OpenAI** (`gpt-5-mini`, Responses API `responses.parse`, schéma strict, effort de raisonnement `low`, `store=False`) ; `FakeLLM` qui rejoue des réponses par **clé stable** (`<formulaire>--<section>`, pas le prompt, qui dépend de l'embedder) depuis `backend/llm_recordings/*.json` ; `RecordingLLM` + `scripts/record_llm.py` pour enregistrer les vraies réponses (base de dev, vrai modèle d'embeddings). Seul `app/llm/` importe le SDK `openai` ; le SDK Anthropic est retiré. Sans clé : 503 clair au lancement.
+- **Moteur** (`filling/answer_engine.py`) : un appel par section ; pour chaque champ (hors signature et hors champs déjà fixés par l'utilisateur), recherche hybride top 8 sur son libellé, passages dédoublonnés et étiquetés `P1…`, « Tender details » (titre, référence, autorité, procédure, échéance) en `P1`. Le modèle renvoie par champ : candidats (valeur, une ou plusieurs citations exactes, date de la source et fin de validité avec citation), ou `user_only` + raison + valeur suggérée, ou rien.
+- **Validateur** (pur) : citation cherchée dans le passage étiqueté puis dans les autres passages envoyés (lettres et chiffres seulement : casse, accents, espaces, ponctuation, césures tolérés) ; chaque mot et nombre significatif de la valeur doit figurer dans ses citations vérifiées (normalisation `100'000` = `100,000`, dates écrites de toutes les façons usuelles, accents) ; Oui/Non seulement avec citation de preuve ; une date n'est gardée que si sa citation l'énonce ; même valeur de plusieurs sources = un candidat avec toutes ses preuves.
+- **Règles** (pures) : signature jamais remplie ; `user_only` → `manual` (valeur suggérée écrite, à revoir) ; ≥ 2 valeurs → `conflict`, la plus récente sélectionnée et placée en premier ; fin de validité dépassée → `outdated` ; Oui/Non prouvé → `declaration` cochée ; sinon `auto` ou `missing`. `needs_review` pour missing, manual, conflict, outdated.
+- **Job** (`filling/job.py`, tâche de fond) : `POST /forms/{id}/fill` (202 ; 409 si déjà en cours ; 422 si le formulaire n'est pas lisible) ; 5 phases + un événement `field` par champ (`searching` puis `answered` avec la réponse et les compteurs), `done` ou `error`, persistés dans `fill_event` et commités un par un. `GET /forms/{id}/fill/events` (SSE) rejoue depuis `Last-Event-ID` puis lit la base toutes les 250 ms jusqu'à la fin du run. Une réponse fixée par l'utilisateur, avant ou pendant le remplissage, n'est jamais remplacée (upsert conditionnel). Au démarrage, un run resté `running` passe `failed` avec un message.
+- **Coût et temps** : chaque appel renvoie sa consommation (tokens d'entrée dont cache, de sortie dont raisonnement, coût en $ selon des prix par million de tokens configurables, durée) ; le job journalise par section (temps de recherche, nombre de passages, appel au modèle) et le total du remplissage ; le script d'enregistrement les affiche. Logs `app.*` en INFO activés (`core/logging.py`).
+- Données : `answer` + `type`, `candidates` (JSONB), `user_only_reason`, `needs_review` ; `form_fill` + `ai_status` / `ai_started_at` / `ai_finished_at` ; table `fill_event`. `FillState` expose `ai_run` et `counts.doubts`.
+- Tests : validateur (citations, valeurs composées, normalisation, Oui/Non, dates, fusion) et règles (un cas par règle) sans LLM ; API et job avec un `FakeLLM` scripté sur les vrais documents de démo (réponse sourcée, Tender details, introuvable, citation inventée rejetée, manuel, signature jamais envoyée, prompt, phases et événements, reprise `Last-Event-ID`, flux en direct, valeur utilisateur gardée avant et pendant, double lancement, échec du modèle, panne inattendue, interruption serveur, pas de clé) ; façade (rejeu, enregistrement).
+- **Vraies réponses de l'Annex 7** enregistrées (`llm_recordings/`) et relues : les 9 champs conformes à `GROUND_TRUTH.md` (7 sourcés, signataire proposé depuis le registre, lieu et date pré-écrits en `manual`), 1 appel, ~23 s, ~0,5 centime. Un test les rejoue dans tout le remplissage. Le premier enregistrement a conduit à 3 corrections génériques : le prompt demande une seule réponse complète par champ (plusieurs candidats seulement si des sources se contredisent sur le même fait), le validateur fusionne une valeur qui ne fait qu'en compléter une autre (« …, Switzerland ») et met les valeurs sur une ligne ; le moteur associe une réponse par clé ou, à défaut, par libellé du champ.
+- Limite connue : en mode `fake`, le lieu et la date suggérés sont ceux du jour de l'enregistrement.
 
 #### 5d — Remplissage IA dans l'UI ⬜
 - *Setup* (modale), *Live fill* en flux, source par champ (document, page, citation), état répondu / introuvable, e2e du parcours. Cartes Conflit / Périmé dans l'UI aux étapes 6–7.
@@ -109,6 +118,7 @@ Chaque étape à partir de la 4 livre une **fonctionnalité utilisable de bout e
 - Parsing des tableaux Word (libellés, cellules, types texte / Oui-Non / nombre), export dans les cellules en préservant la mise en page, avec la même UI que l'Annex 7.
 - Aperçu des documents Word de la base de connaissances (`docx-preview`) dans la modale de *Company knowledge* et dans la vue *Source*.
 - Cas difficiles de la base de connaissances : donnée absente, documents contradictoires, extrait périmé, déclarations Oui/Non non documentées.
+- **Sections en parallèle** dans le job de remplissage (pool borné, par exemple 4 à 7 appels simultanés, une session de base par section) : mêmes appels et même prompt, aucun surcoût. Mesuré sur l'Annex 7 : ~23 s par section, presque tout en génération de la sortie (recherche 0,6 s) ; l'Annex 4 (~7 sections) prendrait 2 à 3 min en séquence, et environ la durée de la section la plus lente en parallèle. Événements émis à mesure que chaque section finit ; durée de *Setup* calculée d'après le nombre de sections. À mesurer sur l'Annex 4.
 - Tests : parseur (schéma attendu), export (réouverture du DOCX, valeurs aux bons endroits, reste intact, comparaison visuelle par rendu), e2e complet.
 
 ### Étape 8 — Durcissement ⬜
@@ -137,7 +147,7 @@ Détaillé dans `docs/USER_FLOW.md` (validé le 2026-11-03).
 - **Ordre des étapes** : conservé pour l'instant, révisable.
 
 **Encore ouvert (à traiter à l'étape concernée)**
-- ~~Fournisseur LLM final~~ → Claude (2026-11-03).
+- ~~Fournisseur LLM final~~ → Claude (2026-11-03), puis OpenAI `gpt-5-mini` (2026-11-04).
 - Rigueur de la comparaison visuelle à l'export : seuil d'image ou vérification structurelle seulement (étape 4/7).
 
 ## 6. Pistes d'architecture (_propositions à discuter à l'étape 3_)
@@ -200,4 +210,11 @@ UI (relecture)  ──►  API locale
 | 2026-11-04 | Suppression d'un document depuis *Company knowledge* (corbeille, confirmation, suppression définitive du fichier et des passages) ; zone de dépôt sous la liste | validé |
 | 2026-11-04 | Étape 5b validée et mergée dans `main` | validé |
 | 2026-11-04 | Plus de seed de la base de connaissances (ni au démarrage, ni pour la démo, ni pour l'e2e) : l'utilisateur ajoute les documents ; le scénario Playwright dépose les 11 documents de démo au début ; les tests back qui en ont besoin les ajoutent via une fixture | validé |
+| 2026-11-04 | LLM : **OpenAI `gpt-5-mini`** au lieu de Claude (clé ajoutée par l'utilisateur dans `backend/.env`), toujours derrière la façade ; modèle configurable (`FORMPILOT_LLM_MODEL`) | validé |
+| 2026-11-04 | 5c : un candidat peut avoir plusieurs citations, chaque mot et nombre significatif de la valeur doit figurer dans ses citations vérifiées (valeurs composées comme « Alpenlogic AG, company limited by shares (AG) ») | validé |
+| 2026-11-04 | 5c : champ réservé à l'utilisateur = type `manual`, valeur suggérée écrite dans le formulaire (exportée si gardée) et signalée à revoir | validé |
+| 2026-11-04 | 5c : un nouveau remplissage IA ne remplace jamais une valeur fixée par l'utilisateur (avant ou pendant le remplissage) ; le reste est recalculé | validé |
+| 2026-11-04 | 5c : le LLM cite par texte exact, l'étiquette du passage n'est qu'un indice (citation cherchée dans tous les passages envoyés) ; enregistrements rejoués par clé formulaire + section ; date de la source par candidat (présélection du plus récent en conflit) ; SSE par lecture de la base toutes les 250 ms (pas d'`asyncio.Queue`) | proposé |
+| 2026-11-04 | Durée du remplissage : sections appelées en parallèle, prévu à l'étape 7 (mesurable avec l'Annex 4) ; plafond de taille de section, effort `minimal` et sortie allégée gardés en pistes | validé |
+| 2026-11-04 | Étape 5c validée et mergée dans `main` | validé |
 | 2026-11-04 | e2e dans un environnement dédié et propre : base `formpilot_e2e` supprimée et recréée à chaque lancement (script `scripts/reset_e2e.py`, refuse toute base dont le nom ne finit pas par `_e2e`), dossier `data-e2e/` vidé, back :8100 et front :3100 jamais réutilisés, build Next dans `.next-e2e` (le serveur de dev n'est pas touché) | validé |
