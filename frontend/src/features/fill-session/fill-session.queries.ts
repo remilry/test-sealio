@@ -1,4 +1,5 @@
 /** Data of a form being filled, for components: query keys and hooks (the only useQuery calls). */
+import { useEffect, useState } from "react";
 import {
   queryOptions,
   useMutation,
@@ -7,7 +8,11 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { now } from "@/shared/utils/date";
+import { initialRun, reduceRun, type FillEvent, type FillRun } from "./fill-events";
 import { fillApi, type Answer, type FillState } from "./fill-session.api";
+
+// The tender's key prefix (tender.queries.ts): features can't import each other.
+const TENDERS_KEY = ["tenders"] as const;
 
 export const fillKeys = {
   form: (formId: number) => ["forms", formId] as const,
@@ -104,4 +109,78 @@ export function useSaveStatus(formId: number): SaveStatus {
   if (latest === undefined || latest === "idle") return "idle";
   if (latest === "pending") return "saving";
   return latest === "success" ? "saved" : "failed";
+}
+
+/** Starts the automatic fill; the tender (status) and the answers are then stale. */
+export function useStartFill(formId: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => fillApi.startFill(formId),
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: TENDERS_KEY }),
+        queryClient.invalidateQueries({ queryKey: fillKeys.answers(formId) }),
+      ]),
+  });
+}
+
+/** Discards the form's fill (all answers, the user's too): its cached data goes, the tender refreshes. */
+export function useDiscardFill(formId: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => fillApi.discardFill(formId),
+    onSuccess: () => {
+      queryClient.removeQueries({ queryKey: fillKeys.form(formId) });
+      return queryClient.invalidateQueries({ queryKey: TENDERS_KEY });
+    },
+  });
+}
+
+/**
+ * Follows the form's fill run while `follow`: reads the event stream (replayed from the start, so a
+ * reload resumes), folds it into a `FillRun`, and writes each answer into the cache as it arrives
+ * (an answer the user typed is kept). At the end, the answers and the tender are refetched.
+ */
+export function useFillRun(formId: number, { follow }: { follow: boolean }): FillRun {
+  const queryClient = useQueryClient();
+  const [run, setRun] = useState<FillRun>(initialRun);
+
+  useEffect(() => {
+    if (!follow) return;
+    const controller = new AbortController();
+    const answersKey = fillQueries.answers(formId).queryKey;
+
+    const apply = (event: FillEvent) => {
+      setRun((current) => reduceRun(current, event, now().getTime()));
+      if (event.type === "field" && event.state === "answered") {
+        const { answer, counts } = event;
+        queryClient.setQueryData(answersKey, (state) =>
+          state ? withAiAnswer(state, answer, counts) : state,
+        );
+      }
+      if (event.type === "done" || event.type === "error") {
+        void queryClient.invalidateQueries({ queryKey: answersKey });
+        void queryClient.invalidateQueries({ queryKey: TENDERS_KEY });
+      }
+    };
+
+    fillApi.streamEvents(formId, { signal: controller.signal, onEvent: apply }).catch(() => {
+      // Aborted on unmount, or the connection dropped: the next visit replays the run.
+    });
+    return () => controller.abort();
+  }, [formId, follow, queryClient]);
+
+  return run;
+}
+
+function withAiAnswer(state: FillState, answer: Answer, counts: FillState["counts"]): FillState {
+  const existing = state.answers.find((a) => a.field_id === answer.field_id);
+  if (existing?.resolved_by === "user") return state;
+  return {
+    ...state,
+    counts,
+    answers: existing
+      ? state.answers.map((a) => (a.field_id === answer.field_id ? answer : a))
+      : [...state.answers, answer],
+  };
 }

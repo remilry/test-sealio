@@ -10,6 +10,9 @@ import type {
   TenderSummary,
 } from "./fixtures";
 
+/** An event of the fill stream (the front's `FillEvent` fits; shared code can't import a feature). */
+type StreamEvent = { id: number; type: string } & Record<string, unknown>;
+
 const url = (path: string) => `${API_URL}${path}`;
 
 type SaveBody = { value: string | null };
@@ -69,6 +72,71 @@ export const handlers = {
       },
     );
     return { handler, requests };
+  },
+
+  /** `POST /forms/{id}/fill`: counts the starts, answers 202 with a running `AiRun`. */
+  startFill: (formId: number) => {
+    const state = { starts: 0 };
+    const handler = http.post(url(`/forms/${formId}/fill`), () => {
+      state.starts += 1;
+      return HttpResponse.json(
+        { status: "running", started_at: "2026-11-04T10:00:00Z", finished_at: null },
+        { status: 202 },
+      );
+    });
+    return { handler, state };
+  },
+
+  /** `DELETE /forms/{id}/fill`: counts the discards, answers 204. */
+  discardFill: (formId: number) => {
+    const state = { discards: 0 };
+    const handler = http.delete(url(`/forms/${formId}/fill`), () => {
+      state.discards += 1;
+      return new HttpResponse(null, { status: 204 });
+    });
+    return { handler, state };
+  },
+
+  /**
+   * `GET /forms/{id}/fill/events`: an SSE stream driven by the test. `send(event)` writes an event;
+   * `close()` ends the stream. Every request (a reload) first gets the events already sent, as the
+   * back replays them, then the live ones.
+   */
+  fillEvents: (formId: number) => {
+    const sent: StreamEvent[] = [];
+    const encoder = new TextEncoder();
+    const open = new Set<ReadableStreamDefaultController<Uint8Array>>();
+    let closed = false;
+    const frame = ({ id, type, ...data }: StreamEvent) =>
+      encoder.encode(`id: ${id}\nevent: ${type}\ndata: ${JSON.stringify(data)}\n\n`);
+    const handler = http.get(url(`/forms/${formId}/fill/events`), () => {
+      let mine: ReadableStreamDefaultController<Uint8Array>;
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          mine = controller;
+          for (const event of sent) controller.enqueue(frame(event));
+          if (closed) controller.close();
+          else open.add(controller);
+        },
+        // The reader went away (unmount, abort): stop writing to it.
+        cancel() {
+          open.delete(mine);
+        },
+      });
+      return new HttpResponse(body, { headers: { "content-type": "text/event-stream" } });
+    });
+    return {
+      handler,
+      send(event: StreamEvent) {
+        sent.push(event);
+        for (const controller of open) controller.enqueue(frame(event));
+      },
+      close() {
+        closed = true;
+        for (const controller of open) controller.close();
+        open.clear();
+      },
+    };
   },
 
   /** `DELETE /knowledge/documents/{id}`: records the ids deleted, answers 204. */
