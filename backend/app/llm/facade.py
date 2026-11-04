@@ -2,7 +2,8 @@
 
 A request asks for an answer shaped by a Pydantic model (structured output). Its `key` names the
 call in a stable way (form + section), so a recorded answer can be replayed by `FakeLLM` whatever
-passages the search returned that time (the prompt itself depends on the embedder).
+passages the search returned that time (the prompt itself depends on the embedder). Every answer
+comes with what it cost (tokens, dollars) and how long it took, for the logs.
 """
 
 from dataclasses import dataclass
@@ -22,12 +23,67 @@ class LLMRequest[T: BaseModel]:
     schema: type[T]
 
 
+@dataclass(frozen=True)
+class LLMUsage:
+    """What one or more calls consumed. Cached input tokens are part of the input tokens,
+    reasoning tokens part of the output tokens (as the providers count them)."""
+
+    calls: int = 0
+    input_tokens: int = 0
+    cached_input_tokens: int = 0
+    output_tokens: int = 0
+    reasoning_tokens: int = 0
+    cost_usd: float = 0.0
+    seconds: float = 0.0
+
+    def __add__(self, other: LLMUsage) -> LLMUsage:
+        return LLMUsage(
+            calls=self.calls + other.calls,
+            input_tokens=self.input_tokens + other.input_tokens,
+            cached_input_tokens=self.cached_input_tokens + other.cached_input_tokens,
+            output_tokens=self.output_tokens + other.output_tokens,
+            reasoning_tokens=self.reasoning_tokens + other.reasoning_tokens,
+            cost_usd=self.cost_usd + other.cost_usd,
+            seconds=self.seconds + other.seconds,
+        )
+
+    def describe(self) -> str:
+        return (
+            f"{self.calls} call(s), {self.seconds:.1f}s, ${self.cost_usd:.4f} "
+            f"(input {self.input_tokens} tokens incl. {self.cached_input_tokens} cached, "
+            f"output {self.output_tokens} incl. {self.reasoning_tokens} reasoning)"
+        )
+
+
+@dataclass(frozen=True)
+class LLMResult[T: BaseModel]:
+    output: T
+    usage: LLMUsage
+
+
+@dataclass(frozen=True)
+class LLMPrices:
+    """US dollars per million tokens."""
+
+    input: float
+    cached_input: float
+    output: float
+
+    def cost(self, *, input_tokens: int, cached_input_tokens: int, output_tokens: int) -> float:
+        uncached = input_tokens - cached_input_tokens
+        return (
+            uncached * self.input
+            + cached_input_tokens * self.cached_input
+            + output_tokens * self.output
+        ) / 1_000_000
+
+
 class LLMError(Exception):
     """The model could not give an answer (provider error, refusal, missing recording)."""
 
 
 class LLM(Protocol):
-    def generate_structured[T: BaseModel](self, request: LLMRequest[T]) -> T: ...
+    def generate_structured[T: BaseModel](self, request: LLMRequest[T]) -> LLMResult[T]: ...
 
 
 @lru_cache
@@ -42,6 +98,7 @@ def get_llm() -> LLM:
             api_key=settings.openai_api_key.get_secret_value(),
             model=settings.llm_model,
             reasoning_effort=settings.llm_reasoning_effort,
+            prices=settings.llm_prices(),
         )
     from app.llm.fake_adapter import FakeLLM
 

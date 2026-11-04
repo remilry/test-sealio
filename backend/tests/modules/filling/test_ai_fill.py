@@ -1,6 +1,7 @@
 """AI fill of Annex 7 end to end through the API, with a scripted model (no key, no network)."""
 
 import json
+import logging
 import threading
 import time
 from collections.abc import Callable, Iterator
@@ -10,7 +11,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.core.db import SessionLocal
-from app.llm.facade import LLMError, LLMRequest
+from app.llm.facade import LLMError, LLMRequest, LLMResult
 from app.llm.fake_adapter import FakeLLM
 from app.main import app
 from app.modules.filling import router as filling_router
@@ -96,7 +97,7 @@ class ScriptedLLM(FakeLLM):
         super().__init__(answers)
         self.while_thinking: Callable[[], None] | None = None
 
-    def generate_structured(self, request: LLMRequest[Any]) -> Any:  # type: ignore[override]
+    def generate_structured(self, request: LLMRequest[Any]) -> LLMResult[Any]:  # type: ignore[override]
         if self.while_thinking:
             self.while_thinking()
         return super().generate_structured(request)
@@ -405,3 +406,18 @@ def test_the_events_of_a_running_fill_arrive_live_until_it_ends(
     worker.join()
 
     assert [e["event"] for e in events] == ["phase", "phase", "done"]
+
+
+def test_the_cost_and_timing_of_the_fill_are_logged(
+    client: TestClient, annex_7: int, caplog: pytest.LogCaptureFixture
+) -> None:
+    with caplog.at_level(logging.INFO, logger="app.modules.filling.job"):
+        client.post(f"/forms/{annex_7}/fill")
+
+    messages = [r.getMessage() for r in caplog.records]
+    [section] = [m for m in messages if "section 'Page 1'" in m]
+    assert "search " in section
+    assert "passages) · model 1 call(s)" in section
+    [done] = [m for m in messages if " done in " in m]
+    assert "7/9 filled" in done
+    assert "$0.0000" in done

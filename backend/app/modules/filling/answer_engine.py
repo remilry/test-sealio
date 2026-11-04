@@ -5,11 +5,12 @@ for each of them (deduplicated) and the tender details, and must quote what it a
 """
 
 import re
+import time
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 from datetime import date
 
-from app.llm.facade import LLM, LLMRequest
+from app.llm.facade import LLM, LLMRequest, LLMUsage
 from app.modules.filling.llm_schema import LLMSectionAnswer
 from app.modules.filling.validator import SourcePassage, ValidatedField, validate_field
 from app.modules.forms.parsing.schema import FieldKind
@@ -65,6 +66,22 @@ class FieldToAnswer:
 Search = Callable[[str, int], list[SourcePassage]]
 
 
+@dataclass(frozen=True)
+class SectionResult:
+    # The verified evidence of each field, by field id.
+    evidence: dict[int, ValidatedField]
+    # Passages sent to the model (tender details included).
+    passages: int
+    search_seconds: float
+    usage: LLMUsage
+
+    def describe(self) -> str:
+        return (
+            f"search {self.search_seconds:.1f}s ({self.passages} passages) · "
+            f"model {self.usage.describe()}"
+        )
+
+
 def request_key(form_file_name: str, section: str) -> str:
     """Stable name of a section's call, for recorded answers: "annex-7-…--page-1"."""
     return f"{_slug(form_file_name.rsplit('.', 1)[0])}--{_slug(section)}"
@@ -81,9 +98,11 @@ def answer_section(
     search: Search,
     tender_details: str,
     today: date,
-) -> dict[int, ValidatedField]:
-    """The verified evidence of each field of the section, by field id."""
+) -> SectionResult:
+    """The verified evidence of each field of the section, with what finding it cost."""
+    started = time.monotonic()
     passages = _passages(fields, search, tender_details)
+    search_seconds = time.monotonic() - started
     request = LLMRequest(
         key=request_key(form_file_name, section),
         instructions=INSTRUCTIONS.format(company=company),
@@ -98,8 +117,14 @@ def answer_section(
         ),
         schema=LLMSectionAnswer,
     )
-    answers = {answer.field: answer for answer in llm.generate_structured(request).fields}
-    return {f.id: validate_field(f.kind, answers.get(f.key), passages) for f in fields}
+    result = llm.generate_structured(request)
+    answers = {answer.field: answer for answer in result.output.fields}
+    return SectionResult(
+        evidence={f.id: validate_field(f.kind, answers.get(f.key), passages) for f in fields},
+        passages=len(passages),
+        search_seconds=search_seconds,
+        usage=result.usage,
+    )
 
 
 def _passages(

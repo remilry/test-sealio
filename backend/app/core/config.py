@@ -1,9 +1,12 @@
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from pydantic import AliasChoices, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+if TYPE_CHECKING:
+    from app.llm.facade import LLMPrices
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
@@ -28,10 +31,24 @@ class Settings(BaseSettings):
     llm_model: str = "gpt-5-mini"
     llm_reasoning_effort: Literal["minimal", "low", "medium", "high"] = "low"
     llm_recordings_dir: Path = REPO_ROOT / "backend" / "llm_recordings"
+    # US dollars per million tokens, for the cost in the logs (gpt-5-mini list prices: check
+    # https://openai.com/api/pricing when changing the model).
+    llm_price_input: float = 0.25
+    llm_price_cached_input: float = 0.025
+    llm_price_output: float = 2.0
     openai_api_key: SecretStr | None = Field(
         default=None,
         validation_alias=AliasChoices("OPENAI_API_KEY", "FORMPILOT_OPENAI_API_KEY"),
     )
+
+    def llm_prices(self) -> LLMPrices:
+        from app.llm.facade import LLMPrices
+
+        return LLMPrices(
+            input=self.llm_price_input,
+            cached_input=self.llm_price_cached_input,
+            output=self.llm_price_output,
+        )
 
 
 @lru_cache

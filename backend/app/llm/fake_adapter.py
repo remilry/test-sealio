@@ -10,7 +10,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from app.llm.facade import LLM, LLMError, LLMRequest
+from app.llm.facade import LLM, LLMError, LLMRequest, LLMResult, LLMUsage
 
 
 class FakeLLM:
@@ -23,12 +23,13 @@ class FakeLLM:
     def from_dir(cls, directory: Path) -> FakeLLM:
         return cls({path.stem: json.loads(path.read_text()) for path in directory.glob("*.json")})
 
-    def generate_structured[T: BaseModel](self, request: LLMRequest[T]) -> T:
+    def generate_structured[T: BaseModel](self, request: LLMRequest[T]) -> LLMResult[T]:
         self.requests.append(request)
         answer = self._answers.get(request.key)
         if answer is None:
             raise LLMError(f"No recorded answer for {request.key!r} (scripts/record_llm.py).")
-        return request.schema.model_validate(answer)
+        # A replay costs nothing and takes no time.
+        return LLMResult(output=request.schema.model_validate(answer), usage=LLMUsage(calls=1))
 
 
 class RecordingLLM:
@@ -38,11 +39,12 @@ class RecordingLLM:
         self._llm = llm
         self._directory = directory
 
-    def generate_structured[T: BaseModel](self, request: LLMRequest[T]) -> T:
-        answer = self._llm.generate_structured(request)
+    def generate_structured[T: BaseModel](self, request: LLMRequest[T]) -> LLMResult[T]:
+        result = self._llm.generate_structured(request)
+        answer = result.output
         self._directory.mkdir(parents=True, exist_ok=True)
         path = self._directory / f"{request.key}.json"
         path.write_text(
             json.dumps(answer.model_dump(mode="json"), indent=2, ensure_ascii=False) + "\n"
         )
-        return answer
+        return result

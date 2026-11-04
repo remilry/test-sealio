@@ -17,6 +17,7 @@ from itertools import groupby
 from app.core.config import REPO_ROOT, get_settings
 from app.core.db import SessionLocal
 from app.core.migrations import upgrade_to_head
+from app.llm.facade import LLMUsage
 from app.llm.fake_adapter import RecordingLLM
 from app.llm.openai_adapter import OpenAILLM
 from app.modules.filling.answer_engine import FieldToAnswer, answer_section, request_key
@@ -48,6 +49,7 @@ def main() -> None:
             api_key=settings.openai_api_key.get_secret_value(),
             model=settings.llm_model,
             reasoning_effort=settings.llm_reasoning_effort,
+            prices=settings.llm_prices(),
         ),
         settings.llm_recordings_dir,
     )
@@ -68,6 +70,7 @@ def main() -> None:
         company = tenants_service.get_tenant_name(session, tenant_id)
         search = knowledge_search(session, tenant_id)
         today = date.today()
+        total, search_seconds = LLMUsage(), 0.0
         for tender in tenders_service.list_tenders(session):
             details = tenders_service.tender_details(session, tender.id)
             for summary in forms_service.list_forms(session, tender.id):
@@ -79,7 +82,7 @@ def main() -> None:
                     to_answer = [FieldToAnswer(f.id, f.key, f.label, f.kind) for f in fields]
                     key = request_key(form.file_name, section)
                     print(f"\n{key}")
-                    evidence = answer_section(
+                    result = answer_section(
                         llm,
                         company=company,
                         form_title=form.title,
@@ -90,12 +93,17 @@ def main() -> None:
                         tender_details=details,
                         today=today,
                     )
+                    evidence = result.evidence
+                    total += result.usage
+                    search_seconds += result.search_seconds
+                    print(f"  {result.describe()}")
                     for field in to_answer:
                         decision = decide(field.kind, evidence[field.id], today)
                         if decision is not None:
                             print(f"  {field.key:45} {decision.type:12} {decision.value!r}")
                         for reason in evidence[field.id].rejected:
                             print(f"  {'':45} rejected: {reason}")
+        print(f"\nTotal: search {search_seconds:.1f}s · model {total.describe()}")
 
 
 if __name__ == "__main__":

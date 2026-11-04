@@ -10,6 +10,7 @@ from sqlalchemy import text
 from app.core.config import get_settings
 from app.core.db import SessionDep, SessionLocal
 from app.core.errors import register_error_handlers
+from app.core.logging import configure_logging
 from app.core.migrations import upgrade_to_head
 from app.modules.export.router import router as export_router
 from app.modules.filling import service as filling_service
@@ -19,6 +20,8 @@ from app.modules.knowledge import service as knowledge_service
 from app.modules.knowledge.router import router as knowledge_router
 from app.modules.tenders.router import router as tenders_router
 from app.seed import seed
+
+configure_logging()
 
 
 @asynccontextmanager

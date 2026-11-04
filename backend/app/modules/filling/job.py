@@ -15,7 +15,7 @@ from itertools import groupby
 from sqlalchemy.orm import Session
 
 from app.core.db import SessionLocal
-from app.llm.facade import LLM, LLMError
+from app.llm.facade import LLM, LLMError, LLMUsage
 from app.modules.filling import service
 from app.modules.filling.answer_engine import FieldToAnswer, Search, answer_section
 from app.modules.filling.models import AiStatus, FillEventType, FormFill
@@ -104,13 +104,14 @@ def _run(session: Session, fill_id: int, llm: LLM, today: date) -> None:
     search = knowledge_search(session, tenant_id)
 
     types: Counter[AnswerType] = Counter()
+    usage, search_seconds = LLMUsage(), 0.0
     for section, section_fields in groupby(to_answer, key=lambda f: f.section):
         fields = [FieldToAnswer(f.id, f.key, f.label, f.kind) for f in section_fields]
         for field in fields:
             service.add_event(
                 session, fill_id, FillEventType.FIELD, {"field_id": field.id, "state": "searching"}
             )
-        evidence = answer_section(
+        result = answer_section(
             llm,
             company=company,
             form_title=form.title,
@@ -121,6 +122,9 @@ def _run(session: Session, fill_id: int, llm: LLM, today: date) -> None:
             tender_details=details,
             today=today,
         )
+        evidence = result.evidence
+        usage, search_seconds = usage + result.usage, search_seconds + result.search_seconds
+        logger.info("AI fill %s, section %r: %s", fill_id, section, result.describe())
         for field in fields:
             for reason in evidence[field.id].rejected:
                 logger.info("Field %s (%s): %s", field.key, field.id, reason)
@@ -154,6 +158,16 @@ def _run(session: Session, fill_id: int, llm: LLM, today: date) -> None:
     )
     phase("preparing_review")
     counts = service.get_fill_state(session, tenant_id, form.id).counts
+    logger.info(
+        "AI fill %s of %r done in %.1fs: %s/%s filled · search %.1fs · model %s",
+        fill_id,
+        form.file_name,
+        time.monotonic() - started,
+        counts.filled,
+        counts.fillable,
+        search_seconds,
+        usage.describe(),
+    )
     service.finish_ai_fill(session, fill_id, AiStatus.DONE)
     service.add_event(
         session,
