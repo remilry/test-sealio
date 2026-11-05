@@ -26,6 +26,9 @@ export const fillApi = {
     ),
   startFill: (formId: number) =>
     unwrap(api.POST("/forms/{form_id}/fill", { params: { path: { form_id: formId } } })),
+  /** Fills again only the fields the last fill could not answer (`ai_run.failed_field_ids`). */
+  retryFill: (formId: number) =>
+    unwrap(api.POST("/forms/{form_id}/fill/retry", { params: { path: { form_id: formId } } })),
   discardFill: (formId: number) =>
     unwrap(api.DELETE("/forms/{form_id}/fill", { params: { path: { form_id: formId } } })),
   /**

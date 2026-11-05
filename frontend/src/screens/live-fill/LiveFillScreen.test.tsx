@@ -1838,3 +1838,154 @@ describe("Live fill (layout)", () => {
     expect(screen.queryByText("Nothing left to check")).not.toBeInTheDocument();
   });
 });
+
+/**
+ * A fill that could not answer some fields: the back keeps their ids on the run, and a retry
+ * fills them through the event stream like a fill.
+ */
+function backWithFailedFields({
+  failed,
+  status = "done",
+  error = "Some fields couldn't be filled. Retry them, or enter them yourself.",
+}: {
+  failed: number[];
+  status?: "done" | "failed";
+  error?: string;
+}) {
+  const failedRun = aiRun(status, { failed_field_ids: failed, error });
+  let state = fillState([aiAnswer(3, "Alpenlogic AG")], annex7Fields, failedRun);
+  const stream = handlers.fillEvents(2);
+  let retries = 0;
+  const saved = handlers.saveField(2, (fieldId, { value }) => {
+    const others = state.answers.filter((a) => a.field_id !== fieldId);
+    const entry = answer(fieldId, value?.trim() || null, "2026-11-04T10:00:12Z");
+    state = fillState([...others, entry], annex7Fields, state.ai_run);
+    return state;
+  });
+  server.use(
+    handlers.form(annex7()),
+    handlers.tender(tender()),
+    handlers.answers(2, () => state),
+    saved.handler,
+    stream.handler,
+    http.post(`${API_URL}/forms/2/fill/retry`, () => {
+      retries += 1;
+      state = { ...state, ai_run: aiRun("running", { failed_field_ids: failed }) };
+      return Response.json(state.ai_run, { status: 202 });
+    }),
+  );
+  let nextId = 1;
+  return {
+    retries: () => retries,
+    answerAndFinish(fieldIds: number[]) {
+      for (const fieldId of fieldIds) {
+        // To check: shown in the list (automatic answers are collapsed).
+        const entry = aiAnswer(fieldId, `Value ${fieldId}`, "unsure");
+        state = fillState([...state.answers, entry], annex7Fields, state.ai_run);
+        stream.send({
+          id: nextId++,
+          type: "field",
+          field_id: fieldId,
+          state: "answered",
+          answer: entry,
+          counts: state.counts,
+        });
+      }
+      state = { ...state, ai_run: aiRun("done") };
+      stream.send({ id: nextId++, type: "done", filled: 3, fillable: 9, doubts: 0, failed: 0 });
+      stream.close();
+    },
+  };
+}
+
+describe("Live fill (fields a fill could not answer)", () => {
+  const row = (label: string) => within(fieldList().getByRole("listitem", { name: label }));
+
+  it("shows the fields that couldn't be filled and retries only them", async () => {
+    // Given a fill that could not answer the telephone and the e-mail
+    const back = backWithFailedFields({ failed: [6, 7] });
+    const user = userEvent.setup();
+    renderScreen(<LiveFillScreen formId={2} />);
+
+    // Then a banner above the fields says so, and both rows are marked
+    const banner = await screen.findByRole("alert");
+    expect(banner).toHaveTextContent("2 fields couldn't be filled");
+    expect(banner).toHaveTextContent("Retry them, or enter them yourself.");
+    expect(within(banner).queryByText(/\bAI\b/)).not.toBeInTheDocument();
+    expect(row("Telephone").getByText("Not filled")).toBeInTheDocument();
+    expect(row("E-mail").getByText("Not filled")).toBeInTheDocument();
+    expect(row("Contact person").queryByText("Not filled")).not.toBeInTheDocument();
+
+    // When I retry
+    await user.click(within(banner).getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(back.retries()).toBe(1));
+    back.answerAndFinish([6, 7]);
+
+    // Then the two fields get their answers and the banner goes
+    await waitFor(() => expect(row("Telephone").getByRole("textbox")).toHaveValue("Value 6"));
+    expect(row("E-mail").getByRole("textbox")).toHaveValue("Value 7");
+    await waitFor(() => expect(screen.queryByText(/couldn't be filled/)).not.toBeInTheDocument());
+  });
+
+  it("says filling isn't available when nothing could be answered", async () => {
+    // Given a fill where every field failed (the model out of reach)
+    backWithFailedFields({
+      failed: [1, 2, 4, 5, 6, 7, 8, 9],
+      status: "failed",
+      error:
+        "Automatic filling isn't available right now. Retry in a moment, or fill the form yourself.",
+    });
+    renderScreen(<LiveFillScreen formId={2} />);
+
+    // Then the banner says so, once (no second "stopped" message), with Retry
+    const banner = await screen.findByRole("alert");
+    expect(banner).toHaveTextContent("Automatic filling isn't available right now");
+    expect(within(banner).getByRole("button", { name: "Retry" })).toBeEnabled();
+    expect(screen.queryByText(/Auto-fill stopped/)).not.toBeInTheDocument();
+  });
+
+  it("shows the failed banner after a reload", async () => {
+    // Given the page opened again later: no stream event, only the saved state
+    backWithFailedFields({ failed: [6] });
+    renderScreen(<LiveFillScreen formId={2} />);
+
+    // Then the banner is still there
+    expect(await screen.findByRole("alert")).toHaveTextContent("1 field couldn't be filled");
+  });
+
+  it("shows why an unexpected failure stopped the fill, after a reload", async () => {
+    // Given a fill that crashed (nothing to retry)
+    backWithFailedFields({
+      failed: [],
+      status: "failed",
+      error:
+        "Something went wrong while filling this form. Discard its answers to auto-fill it again.",
+    });
+    renderScreen(<LiveFillScreen formId={2} />);
+
+    // Then its message is shown, without a Retry
+    expect(
+      await screen.findByText(
+        "Auto-fill stopped: Something went wrong while filling this form. Discard its answers to auto-fill it again.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
+  });
+
+  it("drops a failed field from the banner once I fill it", async () => {
+    // Given two fields that couldn't be filled
+    backWithFailedFields({ failed: [6, 7] });
+    const user = userEvent.setup();
+    renderScreen(<LiveFillScreen formId={2} />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("2 fields couldn't be filled");
+
+    // When I enter the telephone myself
+    await user.type(row("Telephone").getByRole("textbox"), "044{Enter}");
+
+    // Then only the e-mail is left to retry
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent("1 field couldn't be filled"),
+    );
+    expect(row("Telephone").queryByText("Not filled")).not.toBeInTheDocument();
+  });
+});

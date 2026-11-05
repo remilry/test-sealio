@@ -19,6 +19,7 @@ import {
 } from "@/features/document-preview";
 import {
   DiscardFillDialog,
+  FailedFieldsBanner,
   FillProgress,
   originalFileUrl,
   SaveIndicator,
@@ -146,6 +147,8 @@ function FillWorkspace({
   });
 
   const answers = new Map(fill.answers.map((answer) => [answer.field_id, answer]));
+  // Fields the last fill could not answer, until it is retried or the user fills them.
+  const failedIds = new Set(filling ? [] : (fill.ai_run?.failed_field_ids ?? []));
   // Text being typed, not saved yet: shown on the document at every keystroke.
   const [drafts, setDrafts] = useState<ReadonlyMap<number, string>>(new Map());
   const setDraft = (fieldId: number, text: string | null) =>
@@ -168,8 +171,11 @@ function FillWorkspace({
       proposedValue: answer?.proposed_value ?? null,
       candidates: answer?.candidates ?? [],
       userOnlyReason: answer?.user_only_reason ?? null,
+      failed: failedIds.has(field.id) && !answer?.value && answer?.resolved_by !== "user",
     };
   });
+  const failedCount = fields.filter((field) => field.failed).length;
+  const fillError = failedCount > 0 ? null : stopMessage(run, fill);
   const zones: PreviewZone[] = form.fields.map((field, index) => {
     const draft = drafts.get(field.id);
     const value = (draft ?? fields[index].value ?? "").trim() || null;
@@ -300,6 +306,7 @@ function FillWorkspace({
             <FillHeader
               run={run}
               filling={filling}
+              error={fillError}
               openCount={counts.open}
               documentCount={knowledge?.documents.length ?? null}
               estimatedSeconds={form.estimated_fill_seconds}
@@ -307,6 +314,13 @@ function FillWorkspace({
             />
             {!filling && counts.open === 0 && (
               <ReadyBanner fillable={counts.fillable} onExport={() => setExporting(true)} />
+            )}
+            {!filling && failedCount > 0 && (
+              <FailedFieldsBanner
+                formId={form.id}
+                count={failedCount}
+                unavailable={fill.ai_run?.status === "failed"}
+              />
             )}
             <FieldList
               fields={fields}
@@ -377,9 +391,17 @@ function FillWorkspace({
 }
 
 /** The top of the left column: the fill under way, or what is left to fill (after its outcome). */
+/** Why the last fill stopped: the stream's message, else the run's (shown again after a reload). */
+function stopMessage(run: FillRun, fill: FillState): string | null {
+  if (run.outcome?.kind === "error") return run.outcome.message;
+  if (fill.ai_run?.status !== "failed") return null;
+  return fill.ai_run.error ?? null;
+}
+
 function FillHeader({
   run,
   filling,
+  error,
   openCount,
   documentCount,
   estimatedSeconds,
@@ -387,6 +409,8 @@ function FillHeader({
 }: {
   run: FillRun;
   filling: boolean;
+  /** Why the last fill stopped, in plain words (null when it did not, or the banner says it). */
+  error: string | null;
   /** Fields nobody settled yet that are empty or have a doubt. */
   openCount: number;
   /** How many company documents the answers come from (null while unknown). */
@@ -414,10 +438,10 @@ function FillHeader({
   const { outcome } = run;
   return (
     <header className="flex flex-col gap-1">
-      {outcome?.kind === "error" && (
+      {error && (
         <Alert variant="destructive" className="mb-2">
           <CircleAlertIcon />
-          <AlertTitle>{t("fillStopped", { message: outcome.message })}</AlertTitle>
+          <AlertTitle>{t("fillStopped", { message: error })}</AlertTitle>
         </Alert>
       )}
       {outcome?.kind === "done" && (

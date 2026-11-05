@@ -37,6 +37,10 @@ export default defineConfig({
         FORMPILOT_CORS_ORIGINS: JSON.stringify([FRONT_URL]),
         FORMPILOT_FAKE_LLM_LATENCY: "none",
         FORMPILOT_LLM_RETRY_BASE_SECONDS: "0",
+        // Annex 7's first auto-fill fails entirely (2 runs × 3 attempts), its Retry works.
+        FORMPILOT_FAKE_LLM_FAILURES: JSON.stringify({
+          "annex-7-self-declaration-art29c-ukraine-ordinance--page-1": 6,
+        }),
       },
       url: `${API_URL}/health`,
       // Never reuse a server: it could be one with data, or the dev one.

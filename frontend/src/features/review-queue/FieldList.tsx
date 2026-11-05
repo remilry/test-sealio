@@ -54,6 +54,8 @@ export type QueueField = {
   candidates: Schema<"Candidate">[];
   /** Why only the user can fill this field. */
   userOnlyReason: string | null;
+  /** The fill could not answer it (its model call kept failing): no value, nobody settled it. */
+  failed: boolean;
 };
 
 /** What the status lines name: the bidder and how many documents were searched (when known). */
@@ -325,7 +327,7 @@ function FieldInput({
 }: CardProps) {
   const t = useTranslations("fieldList");
   const inputId = `field-${field.id}`;
-  const hint = EMPTY_HINT[field.type ?? ""];
+  const hint = field.failed ? "notFilled" : EMPTY_HINT[field.type ?? ""];
   const emptyHint = hint && t(`hint.${hint}`);
   const input = useRef<HTMLInputElement | null>(null);
   // The last value sent (or saved), so Enter then leaving the input saves once. Back to the saved
@@ -437,7 +439,7 @@ function CardHeader({
 }
 
 /** Why a field is empty, shown in its line (the type of its automatic answer). */
-const EMPTY_HINT: Record<string, "notFound" | "manual" | undefined> = {
+const EMPTY_HINT: Record<string, "notFound" | "manual" | "notFilled" | undefined> = {
   missing: "notFound",
   manual: "manual",
 };
@@ -568,6 +570,7 @@ type TagKey =
   | "entered"
   | "leftEmpty"
   | "notSaved"
+  | "notFilled"
   | "signature";
 
 function fieldBadge(field: QueueField): Badge {
@@ -586,6 +589,7 @@ function fieldBadge(field: QueueField): Badge {
   if (field.state === "searching") {
     return badge(LoaderCircleIcon, "auto", field.writing ? "writing" : "searching");
   }
+  if (field.failed) return badge(CircleAlertIcon, "missing", "notFilled");
   if (field.resolvedBy === null && field.value) return badge(CheckIcon, "user", "entered");
   switch (field.type) {
     case "conflict":
@@ -829,6 +833,9 @@ function FieldStatus({ field, context }: { field: QueueField; context: FieldCont
         {field.writing ? t("writing") : t("searching")}
       </p>
     );
+  }
+  if (field.failed) {
+    return <p className="text-xs text-destructive">{t("notFilled")}</p>;
   }
   if (field.type === "manual") {
     return (

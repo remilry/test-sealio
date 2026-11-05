@@ -17,3 +17,4 @@ export { SaveIndicator } from "./SaveIndicator";
 export { FillProgress } from "./FillProgress";
 export { SetupDialog } from "./SetupDialog";
 export { DiscardFillDialog } from "./DiscardFillDialog";
+export { FailedFieldsBanner } from "./FailedFieldsBanner";

@@ -170,6 +170,22 @@ export function useStartFill(formId: number) {
   });
 }
 
+/**
+ * Retries the fields the last fill could not answer. Not retried by itself (it starts a run); once
+ * started, the answers are refetched: the run is "running" again and the screen follows it.
+ */
+export function useRetryFill(formId: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => fillApi.retryFill(formId),
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: TENDERS_KEY }),
+        queryClient.invalidateQueries({ queryKey: fillKeys.answers(formId) }),
+      ]),
+  });
+}
+
 /** Discards the form's fill (all answers, the user's too): its cached data goes, the tender refreshes. */
 export function useDiscardFill(formId: number) {
   const queryClient = useQueryClient();

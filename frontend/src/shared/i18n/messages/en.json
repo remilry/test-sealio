@@ -116,7 +116,12 @@
     },
     "answeredOfTotal": "{answered} / {total}",
     "fillDone": "{filled} of {fillable} fields filled in {seconds, plural, one {# second} other {# seconds}}",
-    "fillStopped": "Auto-fill stopped: {message}"
+    "fillStopped": "Auto-fill stopped: {message}",
+    "failedTitle": "{count, plural, one {# field couldn't be filled} other {# fields couldn't be filled}}",
+    "unavailableTitle": "Automatic filling isn't available right now",
+    "failedDescription": "Retry them, or enter them yourself.",
+    "retry": "Retry",
+    "retrying": "Retrying…"
   },
   "fillProgress": {
     "label": "Fill progress"
@@ -162,9 +167,11 @@
     "writing": "Writing…",
     "hint": {
       "notFound": "Not found in your documents",
-      "manual": "Only you can fill this"
+      "manual": "Only you can fill this",
+      "notFilled": "Couldn't be filled automatically"
     },
     "tag": {
+      "notFilled": "Not filled",
       "source": "{name}",
       "auto": "Auto",
       "declared": "Declared",
@@ -187,6 +194,7 @@
     "declaration": "Filled automatically · you declare this on behalf of {company}",
     "missing": "Not found in the passages searched in your {count, plural, one {# document} other {# documents}}",
     "missingUnknown": "Not found in your documents",
+    "notFilled": "Couldn't be filled automatically. Retry above or enter it yourself.",
     "manual": "Only you can fill this",
     "conflict": "{count} sources disagree",
     "outdated": "Source expired on {date}",

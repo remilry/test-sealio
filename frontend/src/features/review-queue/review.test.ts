@@ -19,6 +19,7 @@ function field(overrides: Partial<QueueField> = {}): QueueField {
     proposedValue: null,
     candidates: [],
     userOnlyReason: null,
+    failed: false,
     ...overrides,
   };
 }

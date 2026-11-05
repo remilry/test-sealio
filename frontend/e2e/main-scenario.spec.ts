@@ -65,6 +65,15 @@ test("I auto-fill Annex 7 from my documents, correct a field and download it in 
   await setup.getByRole("button", { name: "Start filling" }).click();
   await expect(page).toHaveURL(/\/forms\/\d+\/fill$/);
 
+  // The model is out of reach at first (the back simulates its first 6 failures: 2 runs × 3
+  // attempts): nothing could be filled, and Retry fills only what is missing.
+  const unavailable = page.getByRole("alert").filter({
+    hasText: "Automatic filling isn't available right now",
+  });
+  await expect(unavailable).toBeVisible({ timeout: 20_000 });
+  await expect(unavailable).toContainText("9 fields couldn't be filled");
+  await unavailable.getByRole("button", { name: "Retry" }).click();
+
   // The form fills itself field by field; the recorded run answers all 9 fillable fields.
   const fields = page.getByRole("list", { name: "Fields" });
   await expect(fields).toBeVisible();
