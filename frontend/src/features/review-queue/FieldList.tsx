@@ -1,7 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { CheckIcon, PenLineIcon } from "lucide-react";
+import {
+  ArrowLeftRightIcon,
+  CheckIcon,
+  CircleAlertIcon,
+  LoaderCircleIcon,
+  MinusIcon,
+  PenLineIcon,
+  UserIcon,
+  type LucideIcon,
+} from "lucide-react";
 import { useTranslations } from "next-intl";
 import { cn } from "@/shared/lib/utils";
 import type { Schema } from "@/shared/api";
@@ -213,6 +222,10 @@ type CardProps = {
   focusInput: () => void;
 } & CardHandlers;
 
+/**
+ * A field of the list. Selected, it opens: what its value is, its sources and what can be done
+ * with it. Otherwise one line (an icon, the label, the value, a tag), still editable in place.
+ */
 function FieldCard(props: CardProps) {
   const t = useTranslations("fieldList");
   const { field, selected, onSelect } = props;
@@ -222,19 +235,21 @@ function FieldCard(props: CardProps) {
       aria-current={selected ? "true" : undefined}
       onClick={() => onSelect(field.id)}
       className={cn(
-        "rounded-lg border bg-card px-3.5 py-3 transition-colors",
-        selected && "border-primary ring-3 ring-primary/15",
+        "rounded-lg transition-colors",
+        selected
+          ? "my-1 border border-primary bg-card px-3 py-3 shadow-sm ring-3 ring-primary/15"
+          : "cursor-pointer px-2.5 py-2 hover:bg-muted/60",
       )}
     >
       {field.fillable && field.yesNo && <YesNoInput {...props} />}
       {field.fillable && !field.yesNo && <FieldInput {...props} />}
       {!field.fillable && (
-        <div className="flex flex-col gap-1">
-          <span className="text-sm font-medium">{field.label}</span>
-          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <PenLineIcon className="size-3.5" aria-hidden />
-            {t("signByHand")}
-          </p>
+        <div className="flex items-center gap-2.5">
+          <FieldIcon field={field} />
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="truncate text-xs text-muted-foreground">{field.label}</span>
+            <p className="text-xs text-muted-foreground">{t("signByHand")}</p>
+          </div>
         </div>
       )}
     </li>
@@ -283,31 +298,73 @@ function FieldInput({
     onNext(field.id);
   };
 
+  const valueInput = (
+    <Input
+      ref={(element) => {
+        input.current = element;
+        inputRef(element);
+      }}
+      id={inputId}
+      name="value"
+      defaultValue={shown}
+      // A value being written shows greyed in the empty input, until its answer replaces it.
+      placeholder={field.writing ?? undefined}
+      className={cn(
+        field.writing && "placeholder:text-muted-foreground placeholder:italic",
+        // On one line, the value reads as text (still editable in place).
+        !selected &&
+          "h-6 rounded-none border-0 bg-transparent px-0 text-sm font-medium shadow-none focus-visible:ring-0 dark:bg-transparent",
+      )}
+      autoComplete="off"
+      onFocus={() => onSelect(field.id)}
+      onChange={(event) => onDraft(field.id, event.currentTarget.value)}
+      onBlur={(event) => saveIfChanged(event.currentTarget)}
+    />
+  );
+
+  // One tree for both layouts, the input at the same place: opening the card on focus keeps it
+  // (and what is typed in it).
   return (
-    <form onSubmit={submit} className="flex flex-col gap-1.5">
-      <label htmlFor={inputId} className="text-sm font-medium">
-        {field.label}
-      </label>
-      <Input
-        ref={(element) => {
-          input.current = element;
-          inputRef(element);
-        }}
-        id={inputId}
-        name="value"
-        defaultValue={shown}
-        // A value being written shows greyed in the empty input, until its answer replaces it.
-        placeholder={field.writing ?? undefined}
-        className={cn(field.writing && "placeholder:text-muted-foreground placeholder:italic")}
-        autoComplete="off"
-        onFocus={() => onSelect(field.id)}
-        onChange={(event) => onDraft(field.id, event.currentTarget.value)}
-        onBlur={(event) => saveIfChanged(event.currentTarget)}
-      />
-      <FieldStatus field={field} context={context} />
-      <FieldSources field={field} expanded={selected} onOpenSource={onOpenSource} />
-      {selected && <ReviewActions field={field} onSettle={onSettle} focusInput={focusInput} />}
+    <form onSubmit={submit} className={cn("flex", selected ? "flex-col" : "items-center gap-2.5")}>
+      {!selected && <FieldIcon field={field} />}
+      <div className={cn("flex min-w-0 flex-1 flex-col", selected && "gap-2")}>
+        <CardHeader field={field} open={selected}>
+          <label
+            htmlFor={inputId}
+            className={cn(
+              selected
+                ? "text-[13px] leading-snug font-semibold"
+                : "truncate text-xs text-muted-foreground",
+            )}
+          >
+            {field.label}
+          </label>
+        </CardHeader>
+        {selected && <FieldStatus field={field} context={context} />}
+        {valueInput}
+        {selected && <FieldSources field={field} expanded onOpenSource={onOpenSource} />}
+        {selected && <ReviewActions field={field} onSettle={onSettle} focusInput={focusInput} />}
+      </div>
+      {!selected && <FieldTag field={field} />}
     </form>
+  );
+}
+
+/** The top of a card: its label, and its tag once open (on one line, the tag ends the line). */
+function CardHeader({
+  field,
+  open,
+  children,
+}: {
+  field: QueueField;
+  open: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex min-w-0 items-start justify-between gap-2.5">
+      {children}
+      {open && <FieldTag field={field} />}
+    </div>
   );
 }
 
@@ -327,44 +384,182 @@ function YesNoInput({
   const name = `field-${field.id}`;
   // Stored "yes" / "no" (any case from older answers).
   const chosen = (field.unsaved ?? field.value ?? "").toLowerCase();
-  return (
-    <div className="flex flex-col gap-1.5">
-      <fieldset className="flex flex-col gap-1.5">
-        <legend className="mb-1.5 text-sm font-medium">{field.label}</legend>
-        <div className="flex items-center gap-2">
-          {(["yes", "no"] as const).map((option, index) => (
-            <label
-              key={option}
-              className={cn(
-                buttonVariants({ variant: chosen === option ? "default" : "outline", size: "sm" }),
-                // Positioned: the hidden radio stays inside (focusing it scrolls to the card).
-                "relative has-focus-visible:ring-3 has-focus-visible:ring-ring/50",
-              )}
-            >
-              <input
-                ref={index === 0 ? inputRef : undefined}
-                type="radio"
-                name={name}
-                value={option}
-                checked={chosen === option}
-                onFocus={() => onSelect(field.id)}
-                onChange={() => onSave(field.id, option)}
-                className="sr-only"
-              />
-              {t(option)}
-            </label>
-          ))}
-          {chosen && (
-            <Button variant="ghost" size="sm" onClick={() => onSave(field.id, null)}>
-              {t("clearAnswer")}
-            </Button>
+  const choices = (
+    <div className="flex flex-none items-center gap-1.5">
+      {(["yes", "no"] as const).map((option, index) => (
+        <label
+          key={option}
+          className={cn(
+            buttonVariants({
+              variant: chosen === option ? "default" : "outline",
+              size: selected ? "sm" : "xs",
+            }),
+            // Positioned: the hidden radio stays inside (focusing it scrolls to the card).
+            "relative has-focus-visible:ring-3 has-focus-visible:ring-ring/50",
           )}
-        </div>
-      </fieldset>
-      <FieldStatus field={field} context={context} />
-      <FieldSources field={field} expanded={selected} onOpenSource={onOpenSource} />
-      {selected && <ReviewActions field={field} onSettle={onSettle} focusInput={focusInput} />}
+        >
+          <input
+            ref={index === 0 ? inputRef : undefined}
+            type="radio"
+            name={name}
+            value={option}
+            checked={chosen === option}
+            onFocus={() => onSelect(field.id)}
+            onChange={() => onSave(field.id, option)}
+            className="sr-only"
+          />
+          {t(option)}
+        </label>
+      ))}
+      {chosen && selected && (
+        <Button variant="ghost" size="sm" onClick={() => onSave(field.id, null)}>
+          {t("clearAnswer")}
+        </Button>
+      )}
     </div>
+  );
+
+  // One tree for both layouts, the choices at the same place (as for a text field).
+  return (
+    <div className={cn("flex", selected ? "flex-col gap-2" : "items-center gap-2.5")}>
+      {!selected && <FieldIcon field={field} />}
+      <fieldset
+        aria-label={field.label}
+        className={cn(
+          "flex min-w-0 flex-1",
+          selected ? "flex-col gap-2" : "items-center justify-between gap-2",
+        )}
+      >
+        <CardHeader field={field} open={selected}>
+          <span
+            aria-hidden
+            className={cn(
+              selected
+                ? "text-[13px] leading-snug font-semibold"
+                : "truncate text-xs text-muted-foreground",
+            )}
+          >
+            {field.label}
+          </span>
+        </CardHeader>
+        {selected && <FieldStatus field={field} context={context} />}
+        {choices}
+      </fieldset>
+      {selected && <FieldSources field={field} expanded onOpenSource={onOpenSource} />}
+      {selected && <ReviewActions field={field} onSettle={onSettle} focusInput={focusInput} />}
+      {!selected && <FieldTag field={field} />}
+    </div>
+  );
+}
+
+type Badge = { key: TagKey; tone: BadgeTone; values?: Record<string, number> };
+type BadgeTone = "auto" | "doubt" | "missing" | "user" | "progress" | "muted" | "mine";
+type TagKey =
+  | "auto"
+  | "declared"
+  | "conflict"
+  | "outdated"
+  | "unsure"
+  | "onlyYou"
+  | "noValue"
+  | "empty"
+  | "searching"
+  | "writing"
+  | "kept"
+  | "entered"
+  | "leftEmpty"
+  | "notSaved"
+  | "signature";
+
+/** The short word that says where a field is, and its colour (one line, open or not). */
+function fieldBadge(field: QueueField): Badge {
+  if (!field.fillable) return { key: "signature", tone: "muted" };
+  if (field.unsaved !== null) return { key: "notSaved", tone: "missing" };
+  const settled = settledAs(field);
+  if (settled) return { key: settled, tone: settled === "leftEmpty" ? "muted" : "user" };
+  if (field.state === "searching") {
+    return { key: field.writing ? "writing" : "searching", tone: "progress" };
+  }
+  if (field.resolvedBy === null && field.value) return { key: "entered", tone: "user" };
+  switch (field.type) {
+    case "conflict":
+      return { key: "conflict", tone: "doubt", values: { count: field.candidates.length } };
+    case "outdated":
+      return { key: "outdated", tone: "doubt" };
+    case "unsure":
+      return { key: "unsure", tone: "doubt" };
+    case "manual":
+      return { key: "onlyYou", tone: "mine" };
+    case "auto":
+      return field.value ? { key: "auto", tone: "auto" } : { key: "noValue", tone: "missing" };
+    case "declaration":
+      return field.value ? { key: "declared", tone: "auto" } : { key: "noValue", tone: "missing" };
+    case "missing":
+      return { key: "noValue", tone: "missing" };
+    default:
+      return { key: "empty", tone: "muted" };
+  }
+}
+
+const BADGE_TONE: Record<BadgeTone, { tag: string; icon: string }> = {
+  auto: { tag: "bg-primary/10 text-primary", icon: "bg-primary/10 text-primary" },
+  doubt: { tag: "bg-warning/12 text-warning", icon: "bg-warning/15 text-warning" },
+  missing: {
+    tag: "bg-destructive/10 text-destructive",
+    icon: "bg-destructive/10 text-destructive",
+  },
+  user: { tag: "bg-success/12 text-success", icon: "bg-success/12 text-success" },
+  progress: { tag: "bg-primary/8 text-primary", icon: "bg-primary/8 text-primary" },
+  muted: { tag: "bg-muted text-muted-foreground", icon: "bg-muted text-muted-foreground" },
+  mine: { tag: "bg-chart-4/15 text-chart-4", icon: "bg-chart-4/15 text-chart-4" },
+};
+
+const BADGE_ICON: Record<TagKey, LucideIcon> = {
+  auto: CheckIcon,
+  declared: CheckIcon,
+  conflict: ArrowLeftRightIcon,
+  outdated: CircleAlertIcon,
+  unsure: CircleAlertIcon,
+  onlyYou: UserIcon,
+  noValue: MinusIcon,
+  empty: MinusIcon,
+  searching: LoaderCircleIcon,
+  writing: LoaderCircleIcon,
+  kept: CheckIcon,
+  entered: PenLineIcon,
+  leftEmpty: MinusIcon,
+  notSaved: CircleAlertIcon,
+  signature: PenLineIcon,
+};
+
+function FieldTag({ field }: { field: QueueField }) {
+  const t = useTranslations("fieldList.tag");
+  const badge = fieldBadge(field);
+  return (
+    <span
+      className={cn(
+        "flex-none rounded-[5px] px-1.5 py-0.5 text-[10.5px] font-semibold whitespace-nowrap",
+        BADGE_TONE[badge.tone].tag,
+      )}
+    >
+      {t(badge.key, badge.values)}
+    </span>
+  );
+}
+
+function FieldIcon({ field }: { field: QueueField }) {
+  const badge = fieldBadge(field);
+  const Icon = BADGE_ICON[badge.key];
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        "grid size-5 flex-none place-items-center rounded-md",
+        badge ? BADGE_TONE[badge.tone].icon : "bg-muted",
+      )}
+    >
+      {Icon && <Icon className={cn("size-3", badge?.tone === "progress" && "animate-spin")} />}
+    </span>
   );
 }
 

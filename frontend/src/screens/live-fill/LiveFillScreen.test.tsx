@@ -490,11 +490,9 @@ describe("Live fill (watching the automatic fill)", () => {
     // Then they show as searched
     await screen.findByRole("list", { name: "Fields" });
     const card = (label: string) => within(fieldList().getByRole("listitem", { name: label }));
-    expect(
-      await card("Name and legal form").findByText("Searching your documents…"),
-    ).toBeInTheDocument();
-    expect(card("Telephone").getByText("Searching your documents…")).toBeInTheDocument();
-    expect(card("E-mail").queryByText("Searching your documents…")).not.toBeInTheDocument();
+    expect(await card("Name and legal form").findByText("Searching…")).toBeInTheDocument();
+    expect(card("Telephone").getByText("Searching…")).toBeInTheDocument();
+    expect(card("E-mail").queryByText("Searching…")).not.toBeInTheDocument();
 
     // When the name is found
     back.answered(3, "Alpenlogic AG");
@@ -503,7 +501,7 @@ describe("Live fill (watching the automatic fill)", () => {
     await waitFor(() =>
       expect(card("Name and legal form").getByRole("textbox")).toHaveValue("Alpenlogic AG"),
     );
-    expect(card("Name and legal form").queryByText("Searching your documents…")).toBeNull();
+    expect(card("Name and legal form").queryByText("Searching…")).toBeNull();
     expect(within(await findZone(3)).getByText("Alpenlogic AG")).toBeInTheDocument();
     const legend = within(screen.getByRole("list", { name: "Legend" }));
     expect(legend.getAllByRole("listitem").map((item) => item.textContent)).toEqual([
@@ -513,8 +511,8 @@ describe("Live fill (watching the automatic fill)", () => {
       "Entered by you",
       "Sign by hand",
     ]);
-    expect(card("Telephone").getByText("Searching your documents…")).toBeInTheDocument();
-    expect(card("Business address").getByText("Searching your documents…")).toBeInTheDocument();
+    expect(card("Telephone").getByText("Searching…")).toBeInTheDocument();
+    expect(card("Business address").getByText("Searching…")).toBeInTheDocument();
     expect(zone(3)).toHaveAttribute("data-tone", "auto");
     expect(zone(4)).toHaveAttribute("data-tone", "searching");
     // And the counters follow
@@ -614,7 +612,7 @@ describe("Live fill (watching the automatic fill)", () => {
     back.searching(4);
     expect(await screen.findByText("1 / 9")).toBeInTheDocument();
     const address = within(fieldList().getByRole("listitem", { name: "Business address" }));
-    expect(await address.findByText("Searching your documents…")).toBeInTheDocument();
+    expect(await address.findByText("Searching…")).toBeInTheDocument();
 
     // When it fails
     back.error("the documents could not be read");
@@ -632,8 +630,8 @@ describe("Live fill (watching the automatic fill)", () => {
     expect(await screen.findByRole("button", { name: "Export PDF" })).toBeEnabled();
     // And the field it was searching is no longer shown as searched
     const addressNow = within(fieldList().getByRole("listitem", { name: "Business address" }));
-    expect(addressNow.queryByText("Searching your documents…")).not.toBeInTheDocument();
-    expect(addressNow.getByText("Empty — exported blank")).toBeInTheDocument();
+    expect(addressNow.queryByText("Searching…")).not.toBeInTheDocument();
+    expect(addressNow.getByText("Empty")).toBeInTheDocument();
     expect((await findZone(4)).getAttribute("data-tone")).not.toBe("searching");
   });
 
@@ -649,9 +647,7 @@ describe("Live fill (watching the automatic fill)", () => {
     back.answered(6, "+41 44 512 38 00");
     await waitFor(() =>
       expect(
-        within(fieldList().getByRole("listitem", { name: "Telephone" })).queryByText(
-          "Searching your documents…",
-        ),
+        within(fieldList().getByRole("listitem", { name: "Telephone" })).queryByText("Searching…"),
       ).toBeNull(),
     );
 
@@ -673,15 +669,15 @@ describe("Live fill (watching the automatic fill)", () => {
     startSearch(back);
     back.searching(6);
     const card = within(await screen.findByRole("listitem", { name: "Telephone" }));
-    expect(await card.findByText("Searching your documents…")).toBeInTheDocument();
+    expect(await card.findByText("Searching…")).toBeInTheDocument();
 
     // When I type a value and leave the field, before the fill answers it
     await user.type(card.getByRole("textbox"), "044 000 11");
     await user.tab();
 
-    // Then it is shown as entered by me, in the list and on the form
-    expect(await card.findByText(/Entered by you/)).toBeInTheDocument();
-    expect(card.queryByText("Searching your documents…")).not.toBeInTheDocument();
+    // Then it is shown as mine, in the list and on the form
+    expect(await card.findByText("Yours")).toBeInTheDocument();
+    expect(card.queryByText("Searching…")).not.toBeInTheDocument();
     await waitFor(() => expect(zone(6)).toHaveAttribute("data-tone", "entered"));
     back.stream.close();
   });
@@ -708,9 +704,7 @@ describe("Live fill (watching the automatic fill)", () => {
     );
     expect(fieldList().getByRole("textbox", { name: "Telephone" })).toHaveValue("+41 44 512 38 00");
     expect(
-      within(fieldList().getByRole("listitem", { name: "E-mail" })).getByText(
-        "Searching your documents…",
-      ),
+      within(fieldList().getByRole("listitem", { name: "E-mail" })).getByText("Searching…"),
     ).toBeInTheDocument();
     expect(back.stream.connections()).toBe(2);
     back.stream.close();
@@ -842,6 +836,12 @@ describe("Live fill (status and source of each answer)", () => {
     await screen.findByRole("list", { name: "Fields" });
     return card(label);
   };
+  /** A field's card, selected: open, with its status, sources and actions. */
+  const openCard = async (label: string) => {
+    await findCard(label);
+    await userEvent.setup().click(fieldList().getByRole("listitem", { name: label }));
+    return card(label);
+  };
   /** Automatic answers are collapsed in the review queue: open them. */
   const showAutomatic = async () => {
     await userEvent.setup().click(await screen.findByRole("button", { name: "Show" }));
@@ -917,7 +917,8 @@ describe("Live fill (status and source of each answer)", () => {
     // Then only its source shows
     expect(card("Name and legal form").getByText("Register A, page 1")).toBeInTheDocument();
     expect(card("Business address").queryByText("Register B, page 1")).not.toBeInTheDocument();
-    expect(card("Business address").getByText("1 source")).toBeInTheDocument();
+    // (its line only tells it was filled automatically)
+    expect(card("Business address").getByText("Auto")).toBeInTheDocument();
   });
 
   it("calls the tender documents by their name when the source is the tender", async () => {
@@ -951,11 +952,14 @@ describe("Live fill (status and source of each answer)", () => {
     given(annex7(), fillState([declared]));
     await showAutomatic();
 
+    // When I open it
+    const declaration = await openCard("Name and legal form");
+
     // Then the status names the company
     expect(
-      await (
-        await findCard("Name and legal form")
-      ).findByText("Filled automatically · you declare this on behalf of Alpenlogic AG"),
+      await declaration.findByText(
+        "Filled automatically · you declare this on behalf of Alpenlogic AG",
+      ),
     ).toBeInTheDocument();
   });
 
@@ -963,12 +967,16 @@ describe("Live fill (status and source of each answer)", () => {
     // Given a field the search found nothing for, with 2 documents in the company knowledge
     given(annex7(), fillState([aiAnswer(4, null, "missing")]));
 
+    // When I open it
+    const address = await openCard("Business address");
+
     // Then the status says so
     expect(
-      await (
-        await findCard("Business address")
-      ).findByText("Not found in the passages searched in your 2 documents"),
+      await address.findByText("Not found in the passages searched in your 2 documents"),
     ).toBeInTheDocument();
+    // (its line says it has no value)
+    await userEvent.setup().click(fieldList().getByRole("listitem", { name: "Telephone" }));
+    expect(card("Business address").getByText("No value")).toBeInTheDocument();
   });
 
   it("says when only I can fill a field, why, and keeps the suggestion in the input", async () => {
@@ -996,9 +1004,11 @@ describe("Live fill (status and source of each answer)", () => {
 
     // Then the texts stay neutral
     expect(
-      await (await findCard("Business address")).findByText("Not found in your documents"),
+      await (await openCard("Business address")).findByText("Not found in your documents"),
     ).toBeInTheDocument();
-    expect(card("Name and legal form").getByText("Filled automatically")).toBeInTheDocument();
+    expect(
+      (await openCard("Name and legal form")).getByText("Filled automatically"),
+    ).toBeInTheDocument();
     expect(screen.queryByText(/0 documents/)).not.toBeInTheDocument();
     expect(screen.queryByText(/on behalf of/)).not.toBeInTheDocument();
   });
@@ -1393,8 +1403,11 @@ describe("Live fill (review)", () => {
     await waitFor(() =>
       expect(saved.requests).toEqual([{ fieldId: 6, value: "+41 44 512 38 00" }]),
     );
-    expect(await card("Telephone").findByText("Kept by you · 14:45")).toBeInTheDocument();
+    expect(await card("Telephone").findByText("Kept")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "7 fields need a look" })).toBeInTheDocument();
+    // (opened again, it says when)
+    await user.click(fieldList().getByRole("listitem", { name: "Telephone" }));
+    expect(card("Telephone").getByText("Kept by you · 14:45")).toBeInTheDocument();
     // And it stays where it was
     expect(group("To check").getByRole("textbox", { name: "Telephone" })).toBeInTheDocument();
   });
@@ -1412,7 +1425,7 @@ describe("Live fill (review)", () => {
 
     // Then it is saved, kept by me
     await waitFor(() => expect(saved.requests).toEqual([{ fieldId: 3, value: "Alpenlogic GmbH" }]));
-    expect(await card("Name and legal form").findByText("Kept by you · 14:45")).toBeInTheDocument();
+    expect(await card("Name and legal form").findByText("Kept")).toBeInTheDocument();
     expect(card("Name and legal form").getByRole("textbox")).toHaveValue("Alpenlogic GmbH");
   });
 
@@ -1426,9 +1439,9 @@ describe("Live fill (review)", () => {
 
     // Then it is settled, empty
     await waitFor(() => expect(saved.requests).toEqual([{ fieldId: 4, value: null }]));
-    expect(
-      await card("Business address").findByText("Left empty by you · 14:45"),
-    ).toBeInTheDocument();
+    expect(await card("Business address").findByText("Left empty")).toBeInTheDocument();
+    await user.click(fieldList().getByRole("listitem", { name: "Business address" }));
+    expect(card("Business address").getByText("Left empty by you · 14:45")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "7 fields need a look" })).toBeInTheDocument();
   });
 
