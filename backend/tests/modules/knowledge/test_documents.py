@@ -161,6 +161,62 @@ def test_an_unexpected_failure_is_reported_on_the_document(
     assert notes["error"] == service.UNEXPECTED_ERROR
 
 
+def test_a_passing_failure_while_indexing_is_retried(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    real = service.EXTRACTORS[service.DocumentFormat.DOCX]
+    calls: list[int] = []
+
+    def flaky(content: bytes):
+        calls.append(1)
+        if len(calls) == 1:
+            raise RuntimeError("database connection lost")
+        return real(content)
+
+    monkeypatch.setitem(service.EXTRACTORS, service.DocumentFormat.DOCX, flaky)
+
+    client.post("/knowledge/documents", files=[("files", ("Notes.docx", _word("x y"), DOCX))])
+
+    assert _documents(client)["Notes.docx"]["status"] == "indexed"
+    assert len(calls) == 2
+    assert "attempt 1 of 3" in caplog.text
+
+
+def test_indexing_gives_up_after_three_attempts(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[int] = []
+
+    def broken(_content: bytes):
+        calls.append(1)
+        raise RuntimeError("model crashed")
+
+    monkeypatch.setitem(service.EXTRACTORS, service.DocumentFormat.DOCX, broken)
+
+    client.post("/knowledge/documents", files=[("files", ("Notes.docx", _word("x"), DOCX))])
+
+    assert len(calls) == 3
+    assert _documents(client)["Notes.docx"]["error"] == service.UNEXPECTED_ERROR
+
+
+def test_an_unreadable_file_is_not_retried(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real = service.EXTRACTORS[service.DocumentFormat.PDF]
+    calls: list[int] = []
+
+    def counted(content: bytes):
+        calls.append(1)
+        return real(content)
+
+    monkeypatch.setitem(service.EXTRACTORS, service.DocumentFormat.PDF, counted)
+
+    client.post("/knowledge/documents", files=[("files", ("scan.pdf", b"%PDF-1.7 junk", PDF))])
+
+    assert len(calls) == 1
+    assert _documents(client)["scan.pdf"]["error"] == "This file is not a readable PDF."
+
+
 def test_documents_left_processing_are_indexed_at_the_next_start(
     client: TestClient, tmp_path: Path
 ) -> None:

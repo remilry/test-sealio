@@ -6,6 +6,7 @@ A tenant's knowledge base: its company documents, split into passages and indexe
 import logging
 import re
 import shutil
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -14,6 +15,7 @@ from pathlib import Path
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.db import SessionLocal
 from app.core.errors import NotFoundError, RuleViolationError
 from app.modules.knowledge import index
@@ -133,24 +135,45 @@ def index_documents(document_ids: list[int], data_dir: Path) -> None:
     """Extract, split and index stored documents, each in its own transaction (background task).
 
     Never raises: a document that cannot be indexed ends with status "error" and a message, and
-    a document deleted meanwhile is skipped.
+    a document deleted meanwhile is skipped. An unexpected failure (database, embedding model)
+    may pass: it is tried again, `index_attempts` times in all; an unreadable file is not.
     """
+    settings = get_settings()
     for document_id in document_ids:
-        with SessionLocal() as session:
+        for attempt in range(1, settings.index_attempts + 1):
+            if _try_index(document_id, data_dir, attempt, settings.index_attempts):
+                break
+            time.sleep(settings.index_retry_seconds * attempt)
+
+
+def _try_index(document_id: int, data_dir: Path, attempt: int, attempts: int) -> bool:
+    """One attempt; False when it failed and another one is worth making."""
+    with SessionLocal() as session:
+        document = session.get(Document, document_id)
+        if document is None:
+            return True
+        try:
+            _index(session, document, (data_dir / document.file_path).read_bytes())
+            session.commit()
+            return True
+        except Exception:
+            session.rollback()
             document = session.get(Document, document_id)
             if document is None:
-                continue
-            try:
-                _index(session, document, (data_dir / document.file_path).read_bytes())
-                session.commit()
-            except Exception:
-                session.rollback()
-                document = session.get(Document, document_id)
-                if document is None:
-                    continue
-                logger.exception("Indexing document %s failed", document_id)
-                _fail(document, UNEXPECTED_ERROR)
-                session.commit()
+                return True
+            if attempt < attempts:
+                logger.warning(
+                    "Indexing document %s failed, attempt %s of %s",
+                    document_id,
+                    attempt,
+                    attempts,
+                    exc_info=True,
+                )
+                return False
+            logger.exception("Indexing document %s failed", document_id)
+            _fail(document, UNEXPECTED_ERROR)
+            session.commit()
+            return True
 
 
 def delete_document(session: Session, tenant_id: int, document_id: int, data_dir: Path) -> None:
