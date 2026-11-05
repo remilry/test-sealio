@@ -3,7 +3,7 @@ import path from "node:path";
 import { expect, test } from "@playwright/test";
 
 // The main scenario, grown slice by slice (docs/PLAN.md): today it adds the company's documents
-// (the knowledge base is not seeded), previews one, auto-fills Annex 7, corrects a field, downloads the filled
+// (the knowledge base is not seeded), previews a PDF and a Word one, auto-fills Annex 7, corrects a field, downloads the filled
 // PDF and discards the answers, then auto-fills the Word Annex 4, answers a declaration and downloads it as Word. It runs in a dedicated, clean environment (playwright.config.ts): empty database and data.
 
 // The demo company's documents (Alpenlogic AG, knowledge-base/GROUND_TRUTH.md).
@@ -49,6 +49,13 @@ test("I auto-fill Annex 7 from my documents, correct a field and download it in 
   await expect(viewer.getByRole("link", { name: "Download" })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(viewer).toBeHidden();
+  // A Word document too, laid out page by page.
+  await page.getByRole("button", { name: /^Preview Annual report 2024$/i }).click();
+  const wordViewer = page.getByRole("dialog", { name: /^Annual report 2024$/i });
+  await expect(wordViewer.locator("section.docx").first()).toBeVisible();
+  await expect(wordViewer.getByText("Alpenlogic AG - Annual Report 2024")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(wordViewer).toBeHidden();
   await page.getByRole("list", { name: "Main" }).getByRole("link", { name: "Tenders" }).click();
 
   // Auto-fill Annex 7: the Setup dialog recalls what the answers are drawn from.

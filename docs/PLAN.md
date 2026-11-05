@@ -2,7 +2,7 @@
 
 > Document vivant. Chaque étape y est cochée et détaillée au fur et à mesure.
 > Contexte produit et priorités : voir `CLAUDE.md`. Échéance : jeudi 5 novembre.
-> Statut : étapes 0 à 4.5 faites ; étape 5 découpée en 5a–5d, 5a, 5b et 5c mergées, 5d faite (remplissage automatique dans l'UI, en attente de validation) ; en cours : étape 6 (Annex 4, découpée en 6a–6d ; 6a, 6b et 6c mergées, prochaine : 6d), avant la relecture (7) et les finitions (7.5). Parcours détaillé : `docs/USER_FLOW.md`. Les choix techniques marqués _proposition_ restent à confirmer à l'étape 3.
+> Statut : étapes 0 à 4.5 faites ; étape 5 découpée en 5a–5d, 5a, 5b et 5c mergées, 5d faite (remplissage automatique dans l'UI, en attente de validation) ; en cours : étape 6 (Annex 4, découpée en 6a–6d ; 6a, 6b et 6c mergées, 6d faite, en attente de validation), avant la relecture (7) et les finitions (7.5). Parcours détaillé : `docs/USER_FLOW.md`. Les choix techniques marqués _proposition_ restent à confirmer à l'étape 3.
 
 ## 1. Ce qu'on a appris des deux formulaires
 
@@ -168,6 +168,11 @@ _Avancée avant la relecture et les finitions (décision 2026-11-05) : ses cas d
   - Faux doutes : deux réponses justes formulées autrement (avec ou sans dates de validité, ville ou adresse) sont prises pour un conflit par la fusion ; le capital remplacé (CHF 100 000) parfois proposé comme second candidat.
   - Les déclarations dont la règle ne s'applique pas (CCT, contrat-type) restent vides au lieu de « Yes » (la vérité terrain attend « Yes » expliqué).
   - L'Annex 7 est enregistrée avec une seule exécution : sa 2ᵉ exécution rejoue la 1ʳᵉ.
+
+#### 6d — Aperçu Word dans *Company knowledge* ✅
+- **Front** : un document Word de la base de connaissances s'ouvre dans la modale d'aperçu comme un PDF : rendu page par page par le `WordViewer` de `document-preview` (le même que *Setup* : pagination A4, polices de remplacement, numéros de page), bouton *Download* gardé ; fichier illisible → message `documentLoadError`, téléchargement toujours possible. Le message « pas encore d'aperçu » est retiré.
+- Tests : écran *Knowledge* (vrai rapport annuel DOCX rendu par le vrai `docx-preview` sous jsdom, fichier introuvable), handler MSW `documentFile` ; e2e : aperçu du rapport annuel après le dépôt des documents.
+- Hors périmètre : l'aperçu Word dans la vue *Source* vient avec cette vue (étape 7).
 
 ### Étape 7 — Relecture et humain dans la boucle ⬜ _(testé)_
 - UI : relecture champ par champ avec source visible/cliquable, édition, validation individuelle ou en lot, tri par priorité (introuvables, conflits, déclarations engageantes).

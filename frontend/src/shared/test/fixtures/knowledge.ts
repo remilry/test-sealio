@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import type { Schema } from "@/shared/api";
 
 export type KnowledgeBase = Schema<"KnowledgeBase">;
@@ -16,6 +17,11 @@ export function knowledgeDocument(overrides: Partial<KnowledgeDocument> = {}): K
     indexed_at: "2026-11-04T12:29:05Z",
     ...overrides,
   };
+}
+
+/** The demo company's annual report, a real Word document of `knowledge-base/documents/`. */
+export function annualReportFile(): Uint8Array {
+  return new Uint8Array(readFileSync("../knowledge-base/documents/09_annual_report_2024.docx"));
 }
 
 /** The seeded knowledge base (a few of its 11 documents), as returned by `GET /knowledge`. */

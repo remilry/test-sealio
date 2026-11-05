@@ -1,7 +1,7 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { handlers, renderScreen, server } from "@/shared/test";
-import { knowledgeBase, knowledgeDocument } from "@/shared/test/fixtures";
+import { annualReportFile, knowledgeBase, knowledgeDocument } from "@/shared/test/fixtures";
 import { KnowledgeScreen } from "./KnowledgeScreen";
 
 const documents = () => within(screen.getByRole("table", { name: "Documents" }));
@@ -72,24 +72,40 @@ describe("Company knowledge", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   });
 
-  it("tells me a Word document cannot be previewed yet and lets me download it", async () => {
+  it("previews a Word document in place when I click its name", async () => {
     // Given a Word document
-    server.use(handlers.knowledge(knowledgeBase()));
+    server.use(handlers.knowledge(knowledgeBase()), handlers.documentFile(9, annualReportFile()));
     const user = userEvent.setup();
     renderScreen(<KnowledgeScreen />);
 
     // When I click its name
     await user.click(await screen.findByRole("button", { name: "Preview Annual report 2024" }));
 
-    // Then I am told why there is no preview, and can download it
+    // Then the document itself shows in the dialog, with a way to download it
     const dialog = await screen.findByRole("dialog", { name: "Annual report 2024" });
-    expect(
-      within(dialog).getByRole("heading", { name: "No preview for Word documents yet" }),
-    ).toBeInTheDocument();
+    const preview = within(
+      within(dialog).getByRole("region", { name: "Preview of Annual report 2024" }),
+    );
+    expect(await preview.findByText("Alpenlogic AG - Annual Report 2024")).toBeInTheDocument();
     expect(within(dialog).getByRole("link", { name: "Download" })).toHaveAttribute(
       "href",
       "http://localhost:8000/knowledge/documents/9/file",
     );
+  });
+
+  it("says so when a Word document cannot be shown, and still lets me download it", async () => {
+    // Given a Word document whose file cannot be read
+    server.use(handlers.knowledge(knowledgeBase()), handlers.documentFile(9, null));
+    const user = userEvent.setup();
+    renderScreen(<KnowledgeScreen />);
+
+    // When I click its name
+    await user.click(await screen.findByRole("button", { name: "Preview Annual report 2024" }));
+
+    // Then I am told, and can still download it
+    const dialog = await screen.findByRole("dialog", { name: "Annual report 2024" });
+    expect(await within(dialog).findByRole("alert")).toBeInTheDocument();
+    expect(within(dialog).getByRole("link", { name: "Download" })).toBeInTheDocument();
   });
 
   it("lets me download any document straight from the list", async () => {

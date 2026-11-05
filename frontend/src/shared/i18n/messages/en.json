@@ -205,8 +205,6 @@
     "open": "Preview {name}",
     "download": "Download",
     "downloadDocument": "Download {name}",
-    "previewDocx": "Word documents can't be previewed yet. Download the file to read it.",
-    "previewDocxTitle": "No preview for Word documents yet",
     "addDocuments": "Add documents",
     "adding": "Adding…",
     "chooseFiles": "Choose PDF or Word documents",
