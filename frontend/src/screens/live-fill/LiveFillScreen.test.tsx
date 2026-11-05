@@ -972,9 +972,7 @@ describe("Live fill (status and source of each answer)", () => {
 
     // Then the card asks me to check it, and the document shows it as to check
     expect(
-      await (
-        await findCard("Telephone")
-      ).findByText("Found in one of two searches, check it"),
+      await (await findCard("Telephone")).findByText("Found in one of two searches, check it"),
     ).toBeInTheDocument();
     expect(await findZone(6)).toHaveAttribute("data-tone", "toCheck");
   });
