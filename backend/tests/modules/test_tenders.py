@@ -1,3 +1,4 @@
+import pytest
 from fastapi.testclient import TestClient
 
 from app.core.config import get_settings
@@ -73,13 +74,27 @@ def test_unknown_form_file_is_a_404(client: TestClient) -> None:
     assert client.get("/forms/999999/file").status_code == 404
 
 
-def test_cards_estimate_the_fill_duration_from_the_sections(client: TestClient) -> None:
+def test_cards_estimate_the_fill_duration_from_the_parallel_calls(client: TestClient) -> None:
     annex_4, annex_7 = seeded_forms(client)
 
-    # 25 seconds per section: Annex 7 has one, Annex 4 eight (7 tables and the text after them).
+    # 25 seconds per round of parallel calls: Annex 7 is one call, Annex 4 nine (up to 10 at once).
     assert annex_7["estimated_fill_seconds"] == 25
-    assert annex_4["estimated_fill_seconds"] == 200
+    assert annex_4["estimated_fill_seconds"] == 25
     assert client.get(f"/forms/{annex_7['id']}").json()["estimated_fill_seconds"] == 25
+
+
+def test_fewer_parallel_calls_make_a_longer_estimate(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("FORMPILOT_FILL_MAX_PARALLEL_CALLS", "4")
+    get_settings.cache_clear()
+    try:
+        annex_4, _ = seeded_forms(client)
+    finally:
+        monkeypatch.undo()
+        get_settings.cache_clear()
+
+    assert annex_4["estimated_fill_seconds"] == 75
 
 
 def test_a_card_says_when_the_form_is_being_filled(client: TestClient) -> None:

@@ -20,7 +20,13 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sess
 
 from app.core.config import get_settings
 
-engine = create_engine(get_settings().database_url, pool_pre_ping=True)
+# A fill holds one connection per model call running (fill_max_parallel_calls), next to the
+# requests and live streams.
+engine = create_engine(
+    get_settings().database_url,
+    pool_pre_ping=True,
+    pool_size=get_settings().fill_max_parallel_calls + 5,
+)
 SessionLocal = sessionmaker(engine, expire_on_commit=False)
 
 

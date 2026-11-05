@@ -11,6 +11,9 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.errors import NotFoundError
+
+# Pure (no database): how a fill groups its model calls, for the duration estimate.
+from app.modules.filling.groups import FieldToAnswer, call_groups
 from app.modules.forms.models import Field, FileFormat, Form
 from app.modules.forms.parsing.docx_parser import parse_docx
 from app.modules.forms.parsing.pdf_parser import parse_pdf
@@ -42,15 +45,15 @@ def list_forms(session: Session, tender_id: int) -> list[FormInfo]:
         select(Form).where(Form.tender_id == tender_id).order_by(Form.position)
     ).all()
     form_ids = [form.id for form in forms]
-    counts, sections = _field_counts(session, form_ids), _section_counts(session, form_ids)
-    return [_summary(form, counts, sections) for form in forms]
+    counts, calls = _field_counts(session, form_ids), _call_counts(session, form_ids)
+    return [_summary(form, counts, calls) for form in forms]
 
 
 def get_form(session: Session, form_id: int) -> FormDetail:
     form = _get(session, form_id)
     return FormDetail(
         **_summary(
-            form, _field_counts(session, [form.id]), _section_counts(session, [form.id])
+            form, _field_counts(session, [form.id]), _call_counts(session, [form.id])
         ).model_dump(),
         tender_id=form.tender_id,
         pages=[PageSize.model_validate(page) for page in form.pages],
@@ -183,17 +186,30 @@ def _field_counts(session: Session, form_ids: list[int]) -> dict[int, dict[Field
     return counts
 
 
-def _section_counts(session: Session, form_ids: list[int]) -> dict[int, int]:
+def _call_counts(session: Session, form_ids: list[int]) -> dict[int, int]:
+    """The model calls of a fill of each form (its call groups, filling/groups.py: pure)."""
     rows = session.execute(
-        select(Field.form_id, func.count(func.distinct(Field.section)))
-        .where(Field.form_id.in_(form_ids))
-        .group_by(Field.form_id)
+        select(Field.form_id, Field.id, Field.section, Field.kind)
+        .where(Field.form_id.in_(form_ids), Field.kind != FieldKind.SIGNATURE)
+        .order_by(Field.form_id, Field.position)
     ).all()
-    return dict(rows)
+    by_form: dict[int, list[FieldToAnswer]] = {}
+    for form_id, field_id, section, kind in rows:
+        by_form.setdefault(form_id, []).append(
+            FieldToAnswer(field_id, "", "", kind, section=section)
+        )
+    return {form_id: len(call_groups(fields)) for form_id, fields in by_form.items()}
+
+
+def _estimated_seconds(calls: int) -> int:
+    """Calls run `fill_max_parallel_calls` at a time: the fill takes a call's time per round."""
+    settings = get_settings()
+    rounds = -(-calls // settings.fill_max_parallel_calls)
+    return rounds * settings.fill_seconds_per_call
 
 
 def _summary(
-    form: Form, counts: dict[int, dict[FieldKind, int]], sections: dict[int, int]
+    form: Form, counts: dict[int, dict[FieldKind, int]], calls: dict[int, int]
 ) -> FormInfo:
     by_kind = counts.get(form.id, {})
     return FormInfo(
@@ -210,5 +226,5 @@ def _summary(
         ),
         estimated_fill_seconds=None
         if form.parsed_at is None
-        else sections.get(form.id, 0) * get_settings().fill_seconds_per_section,
+        else _estimated_seconds(calls.get(form.id, 0)),
     )
