@@ -4,15 +4,13 @@ import { expect, test } from "@playwright/test";
 
 // The main scenario, grown slice by slice (docs/PLAN.md): today it adds the company's documents
 // (the knowledge base is not seeded), previews one, auto-fills Annex 7, corrects a field, downloads the filled
-// PDF and discards the answers, then fills the Word Annex 4 by hand and downloads it as Word. It runs in a dedicated, clean environment (playwright.config.ts): empty database and data.
+// PDF and discards the answers, then auto-fills the Word Annex 4, answers a declaration and downloads it as Word. It runs in a dedicated, clean environment (playwright.config.ts): empty database and data.
 
 // The demo company's documents (Alpenlogic AG, knowledge-base/GROUND_TRUTH.md).
 const DEMO_DIR = path.resolve("../knowledge-base/documents");
-// The e2e back (playwright.config.ts).
-const API = "http://localhost:8100";
 const DEMO_FILES = readdirSync(DEMO_DIR).filter((name) => /\.(pdf|docx)$/.test(name));
 
-test("I auto-fill Annex 7 from my documents, correct a field and download it in its original PDF layout, then fill Annex 4 by hand", async ({
+test("I auto-fill Annex 7 from my documents, correct a field and download it in its original PDF layout, then auto-fill Annex 4 and download it as Word", async ({
   page,
 }) => {
   await page.goto("/");
@@ -124,24 +122,37 @@ test("I auto-fill Annex 7 from my documents, correct a field and download it in 
   await expect(started).toContainText("Not started");
   await expect(started.getByRole("button", { name: "Auto-fill" })).toBeVisible();
 
-  // Annex 4 (Word): detected; filled by hand from its URL (its auto-fill comes with step 6c), then exported.
+  // Annex 4 (Word): detected, auto-filled from the same documents, corrected, exported as Word.
   const word = page.getByRole("list", { name: "Forms to complete" }).getByRole("listitem").nth(0);
   await expect(word).toContainText("49 fields detected · 17 Yes/No declarations · 1 signature");
-  await expect(word.getByRole("button", { name: "Auto-fill" })).toBeEnabled();
-  const tenders = await (await page.request.get(`${API}/tenders`)).json();
-  const detail = await (await page.request.get(`${API}/tenders/${tenders[0].id}`)).json();
-  await page.goto(`/forms/${detail.forms[0].id}/fill`);
+  await word.getByRole("button", { name: "Auto-fill" }).click();
+  const wordSetup = page.getByRole("dialog", { name: /^Auto-fill / });
+  await expect(wordSetup).toContainText("11 documents");
+  await wordSetup.getByRole("button", { name: "Start filling" }).click();
+  await expect(page).toHaveURL(/\/forms\/\d+\/fill$/);
 
+  // The recorded fill (9 calls, each made twice and merged): what it could not prove is left
+  // empty, and its doubts (conflicts, expired or old sources, a value only one run found) flagged.
+  // (With the real embedding model; the back's fast tests, with the hash embedder, get 39 / 48.)
+  await expect(page.getByText("40 / 48 filled · 8 empty · 15 doubts")).toBeVisible({
+    timeout: 30_000,
+  });
   const wordPreview = page.getByRole("region", { name: "Form preview" });
   await expect(wordPreview.locator("section.docx").first()).toBeVisible();
-  await expect(wordPreview).toContainText("Exact company name");
-  const company = page
-    .getByRole("list", { name: "Fields" })
-    .getByRole("textbox", { name: "Exact company name" });
-  await company.fill("Alpenlogic AG");
-  await company.press("Tab");
-  await expect(page.getByRole("status")).toHaveText(/saved/i);
-  await expect(wordPreview.getByLabel("Exact company name")).toHaveText("Alpenlogic AG");
+  // A declaration answered with its proof shows in the Word layout.
+  await expect(
+    wordPreview.getByLabel(
+      "Do you comply with the applicable occupational health and safety regulations?",
+    ),
+  ).toHaveText("Yes");
+  // The insurance amounts come from an expired certificate: proposed, to check.
+  const injury = page.getByRole("list", { name: "Fields" }).getByRole("listitem", {
+    name: "Personal injury",
+  });
+  await injury.getByRole("textbox").click();
+  await expect(injury.getByText("Source expired on 31.10.2026")).toBeVisible();
+
+  // No document proves the VAT is paid: left empty, I answer it.
   const vat = page
     .getByRole("list", { name: "Fields" })
     .getByRole("listitem", { name: "Have you paid in full the VAT or sales tax due?" });
