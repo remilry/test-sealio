@@ -95,6 +95,8 @@ Passages:
 Search = Callable[[str, int], list[SourcePassage]]
 # Called with a field's id and its verified evidence, as soon as the field is complete.
 OnField = Callable[[int, ValidatedField], None]
+# Called with a field's id and the value the model is writing for it (not verified yet).
+OnWriting = Callable[[int, str], None]
 
 
 @dataclass(frozen=True)
@@ -131,6 +133,7 @@ def answer_section(
     tender_details: str,
     today: date,
     on_field: OnField | None = None,
+    on_writing: OnWriting | None = None,
     runs: int = 1,
 ) -> SectionResult:
     """The verified evidence of each field of the group, with what finding it cost.
@@ -139,6 +142,8 @@ def answer_section(
     does not answer the same way every time, so what differs between runs becomes a doubt.
     With `on_field`, each field is published as soon as every run has written its answer; the
     fields a run did not answer count as not found for that run, at the end.
+    With `on_writing`, the value the first run is writing for a text field is reported as it
+    grows (unverified: the field's published evidence replaces it).
     """
     fields = group.fields
     started = time.monotonic()
@@ -160,7 +165,12 @@ def answer_section(
     ]
 
     def call(run: int) -> LLMUsage:
-        evidence = _SectionEvidence(fields, passages, lambda f, e: merged.add(run, f, e))
+        evidence = _SectionEvidence(
+            fields,
+            passages,
+            lambda f, e: merged.add(run, f, e),
+            on_writing if run == 0 else None,
+        )
         result = llm.generate_structured(requests[run], evidence.add_streamed)
         evidence.add_all(result.output.fields)
         evidence.add_not_found()
@@ -197,15 +207,45 @@ class _SectionEvidence:
         fields: list[FieldToAnswer],
         passages: list[SourcePassage],
         on_field: OnField | None,
+        on_writing: OnWriting | None = None,
     ) -> None:
         self._fields = fields
         self._passages = passages
         self._on_field = on_field
+        self._on_writing = on_writing
+        self._writing: dict[int, str] = {}
         self._evidence: dict[int, ValidatedField] = {}
 
     def add_streamed(self, partial: dict[str, Any]) -> None:
         """The answers complete so far in the model's partial output (called while it writes)."""
         self.add_all(_complete_answers(partial))
+        if self._on_writing is not None:
+            self._report_writing(self._on_writing, partial)
+
+    def _report_writing(self, on_writing: OnWriting, partial: dict[str, Any]) -> None:
+        """The value of the answer still being written, when it grew (text fields only)."""
+        items = partial.get("fields")
+        if not isinstance(items, list) or not items or not isinstance(items[-1], dict):
+            return
+        item: dict[str, Any] = items[-1]
+        name = item.get("field")
+        # The key is complete once the next property has started.
+        if not isinstance(name, str) or "user_only" not in item:
+            return
+        candidates = item.get("candidates")
+        if not isinstance(candidates, list) or not candidates:
+            return
+        first = candidates[0]
+        text = first.get("value") if isinstance(first, dict) else None
+        if not isinstance(text, str) or not text.strip():
+            return
+        field = _field_named(self._fields, name)
+        if field is None or field.kind != FieldKind.TEXT or self._has(field):
+            return
+        if self._writing.get(field.id) == text:
+            return
+        self._writing[field.id] = text
+        on_writing(field.id, text)
 
     def add_all(self, answers: list[LLMFieldAnswer]) -> None:
         for answer in answers:
@@ -280,7 +320,11 @@ def _complete_answers(partial: dict[str, Any]) -> list[LLMFieldAnswer]:
 def _field_answered(fields: list[FieldToAnswer], answer: LLMFieldAnswer) -> FieldToAnswer | None:
     """The field an answer is for: by key, as the model is asked, else by label (models
     sometimes echo the label instead). None for a field that is not in the section."""
-    name = _normalized(answer.field)
+    return _field_named(fields, answer.field)
+
+
+def _field_named(fields: list[FieldToAnswer], answered: str) -> FieldToAnswer | None:
+    name = _normalized(answered)
     for field in fields:
         if _normalized(field.key) == name:
             return field

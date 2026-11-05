@@ -2,7 +2,8 @@
 
 Every step is recorded as a `fill_event` (committed at once) so the screen can follow it live and
 replay it after a reload (docs/USER_FLOW.md §3.4, the five phases):
-reading_form → detecting_fields → searching (a "field" event per answer) → cross_checking →
+reading_form → detecting_fields → searching ("field" events: the value being written, then the
+answer) → cross_checking →
 preparing_review → done (or error).
 """
 
@@ -39,6 +40,8 @@ UNEXPECTED_ERROR = (
 )
 # The model failed (rate limit, timeout, no usable answer): its details go to the logs only.
 MODEL_ERROR = "Answers could not be found right now. Discard the answers to auto-fill again."
+# A value being written is sent at most this often per field (the live stream polls as often).
+WRITING_INTERVAL_SECONDS = 0.25
 
 
 class _Discarded(Exception):
@@ -218,6 +221,25 @@ def _run(session: Session, fill_id: int, llm: LLM, today: date) -> None:
     def answer_group(group: CallGroup) -> SectionResult:
         with SessionLocal() as group_session:
             by_id = {f.id: f for f in group.fields}
+            # When each field's value being written was last sent (monotonic seconds).
+            written_at: dict[int, float] = {}
+
+            def on_writing(field_id: int, text: str) -> None:
+                now = time.monotonic()
+                if now - written_at.get(field_id, -WRITING_INTERVAL_SECONDS) < (
+                    WRITING_INTERVAL_SECONDS
+                ):
+                    return
+                written_at[field_id] = now
+                with publishing:
+                    if stop.is_set():
+                        raise _Stopped
+                    service.add_event(
+                        group_session,
+                        fill_id,
+                        FillEventType.FIELD,
+                        {"field_id": field_id, "state": "writing", "text": text},
+                    )
 
             def on_field(field_id: int, validated: ValidatedField) -> None:
                 field = by_id[field_id]
@@ -244,6 +266,7 @@ def _run(session: Session, fill_id: int, llm: LLM, today: date) -> None:
                 tender_details=details,
                 today=today,
                 on_field=on_field,
+                on_writing=on_writing,
                 runs=get_settings().fill_runs_per_call,
             )
         name = group.section if group.part is None else f"{group.section} (part {group.part})"

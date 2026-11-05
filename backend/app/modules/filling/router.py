@@ -114,8 +114,10 @@ async def fill_events(
     """The events of the last automatic fill, from the start or after `Last-Event-ID`, then the new
     ones as they happen. Ends with the run ("done" or "error"); empty when no fill ever ran.
 
-    Event types: `phase` ({phase, …}), `field` ({field_id, state: "searching" | "answered",
-    answer, counts}), `done` ({filled, fillable, doubts, seconds}), `error` ({message}).
+    Event types: `phase` ({phase, …}), `field` ({field_id, state: "searching"}, {field_id,
+    state: "writing", text}: the value the model is writing, not verified yet, {field_id, state:
+    "answered", answer, counts}), `done` ({filled, fillable, doubts, seconds}), `error`
+    ({message}).
     """
     if fill_id is None:
         return
