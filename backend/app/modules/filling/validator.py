@@ -24,6 +24,13 @@ from app.modules.forms.parsing.schema import FieldKind
 
 # Shortest quote accepted, in letters and digits: below that, anything matches anything.
 MIN_QUOTE_CHARS = 3
+# A quote in pieces (lines, "…"): each piece says something on its own, and a piece follows the
+# previous one closely (letters skipped, spaces and punctuation not counted): a shortened sentence
+# or the next line, not two statements stitched from far apart.
+MIN_PIECE_CHARS = 4
+MAX_ELLIPSIS_GAP = 60
+# The next line of a quote may be further: a table's row label, its column header, its values.
+MAX_LINE_GAP = 200
 
 # Linking words a value may add between quoted facts ("Alpenlogic AG, company limited by shares").
 CONNECTORS = frozenset({"a", "an", "and", "or", "the", "of", "in", "at", "on", "to", "for", "by"})
@@ -81,7 +88,8 @@ class ValidatedField:
 
 
 # Where a quote breaks into pieces: a line break, or where it was shortened ("...", "…").
-PIECE_BREAK = re.compile(r"\.{3,}|…|\n")
+ELLIPSIS = re.compile(r"\.{3,}|…")
+PIECE_BREAK = re.compile(r"(\.{3,}|…|\n)")
 
 
 def validate_field(
@@ -140,11 +148,15 @@ def find_citation(citation: LLMCitation, passages: list[SourcePassage]) -> Citat
     """The citation if its quote is in a passage sent (the labelled one first), else None.
 
     A quote is made of pieces: its lines, and the parts of a line shortened with an ellipsis
-    ("Alpenlogic AG … has been assessed"). It is found when its pieces are, in that order, in one
-    passage, or else each in a passage of one same document (a quote over two neighbouring
-    passages); never over two documents."""
-    pieces = [piece for piece in map(_letters, PIECE_BREAK.split(citation.quote)) if piece]
-    if sum(map(len, pieces)) < MIN_QUOTE_CHARS:
+    ("Alpenlogic AG … has been assessed"). It is found when its pieces are, in that order and
+    close to each other (MAX_ELLIPSIS_GAP letters skipped after an ellipsis, MAX_LINE_GAP at a
+    line break), in one passage, or else over
+    passages that follow each other in one document (a quote over two neighbouring passages).
+    Never over two documents, and never from pieces too short to say anything on their own."""
+    pieces = _pieces(citation.quote)
+    if sum(len(piece.letters) for piece in pieces) < MIN_QUOTE_CHARS:
+        return None
+    if any(p.after_ellipsis and len(p.letters) < MIN_PIECE_CHARS for p in pieces):
         return None
     labelled = [p for p in passages if p.label == citation.passage.strip()]
     ordered = labelled + [p for p in passages if p.label != citation.passage.strip()]
@@ -152,16 +164,24 @@ def find_citation(citation: LLMCitation, passages: list[SourcePassage]) -> Citat
         if _contains_in_order(_letters(passage.text), pieces):
             return _cited(citation, passage)
     for passage in ordered:
-        if passage.document_id is None or pieces[0] not in _letters(passage.text):
+        if passage.chunk_id is None or pieces[0].letters not in _letters(passage.text):
             continue
-        # The document's passages in reading order (chunks are numbered as they are cut).
-        same_document = sorted(
-            (p for p in passages if p.document_id == passage.document_id),
-            key=lambda p: p.chunk_id or 0,
-        )
-        if _contains_in_order(" ".join(_letters(p.text) for p in same_document), pieces):
+        following = _following_passages(passage, passages)
+        if len(following) > 1 and _contains_in_order(
+            "".join(_letters(p.text) for p in following), pieces
+        ):
             return _cited(citation, passage)
     return None
+
+
+def _following_passages(first: SourcePassage, passages: list[SourcePassage]) -> list[SourcePassage]:
+    """`first`, then the passages sent that follow it in its document (chunks are numbered in
+    reading order as the document is cut), as long as none is missing."""
+    by_chunk = {p.chunk_id: p for p in passages if p.document_id == first.document_id}
+    chain = [first]
+    while (next_id := (chain[-1].chunk_id or 0) + 1) in by_chunk:
+        chain.append(by_chunk[next_id])
+    return chain
 
 
 def _cited(citation: LLMCitation, passage: SourcePassage) -> Citation:
@@ -174,14 +194,48 @@ def _cited(citation: LLMCitation, passage: SourcePassage) -> Citation:
     )
 
 
-def _contains_in_order(text: str, pieces: list[str]) -> bool:
-    start = 0
-    for piece in pieces:
-        found = text.find(piece, start)
-        if found < 0:
-            return False
-        start = found + len(piece)
-    return True
+@dataclass(frozen=True)
+class _Piece:
+    letters: str
+    # After an ellipsis (the model shortened the text) rather than at a line break.
+    after_ellipsis: bool
+
+    @property
+    def max_gap(self) -> int:
+        return MAX_ELLIPSIS_GAP if self.after_ellipsis else MAX_LINE_GAP
+
+
+def _pieces(quote: str) -> list[_Piece]:
+    pieces: list[_Piece] = []
+    after_ellipsis = False
+    for part in PIECE_BREAK.split(quote):
+        if ELLIPSIS.fullmatch(part):
+            after_ellipsis = True
+            continue
+        if part == "\n":
+            continue
+        letters = _letters(part)
+        if letters:
+            pieces.append(_Piece(letters, after_ellipsis and bool(pieces)))
+            after_ellipsis = False
+    return pieces
+
+
+def _contains_in_order(text: str, pieces: list[_Piece]) -> bool:
+    """The pieces in that order, each close enough to the previous one (its `max_gap`)."""
+    first = pieces[0].letters
+    start = text.find(first)
+    while start >= 0:
+        end = start + len(first)
+        for piece in pieces[1:]:
+            found = text.find(piece.letters, end, end + piece.max_gap + len(piece.letters))
+            if found < 0:
+                break
+            end = found + len(piece.letters)
+        else:
+            return True
+        start = text.find(first, start + 1)
+    return False
 
 
 def value_is_supported(value: str, quotes: list[str]) -> bool:

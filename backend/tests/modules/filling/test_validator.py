@@ -1,5 +1,6 @@
 """The validator keeps only what the passages prove (no model call)."""
 
+from dataclasses import replace
 from datetime import date
 
 import pytest
@@ -342,7 +343,7 @@ def test_a_value_is_written_on_one_line() -> None:
 def test_a_quote_shortened_with_an_ellipsis_is_kept_when_each_piece_is_in_the_passage(
     ellipsis: str,
 ) -> None:
-    quote = f"Company name: Alpenlogic AG{ellipsis}Share capital: CHF 500'000"
+    quote = f"Company name: Alpenlogic AG{ellipsis}Company limited by shares (AG)"
     [kept] = validate_field(
         FieldKind.TEXT, answer(candidate("Alpenlogic AG", ("P1", quote))), PASSAGES
     ).candidates
@@ -526,3 +527,47 @@ def test_a_field_one_run_leaves_to_the_user_is_left_to_the_user() -> None:
     merged = merge_runs(_found("Alpenlogic AG", "Alpenlogic AG"), mine)
 
     assert (merged.user_only, merged.suggested_value) == (True, "Zurich")
+
+
+POLICY = SourcePassage(
+    label="P7",
+    text="Alpenlogic AG employs its staff under the Swiss Code of Obligations. No collective "
+    "labour agreement applies to its activity, which is not bound by any such agreement in "
+    "the canton of Zurich, nor by any standard employment contract. The company complies with "
+    "Swiss law on working conditions and wages.",
+    document_name="HR compliance policy",
+    document_id=10,
+    chunk_id=101,
+)
+
+
+def test_pieces_far_apart_do_not_make_a_statement_the_document_does_not_make() -> None:
+    # In the document's order, but over 130 letters apart: "collective labour agreement … complies".
+    stitched = "No collective labour agreement … The company complies with Swiss law"
+
+    result = validate_field(FieldKind.YES_NO, answer(candidate("yes", ("P7", stitched))), [POLICY])
+
+    assert result.candidates == []
+
+
+def test_a_piece_too_short_to_be_a_quote_is_rejected() -> None:
+    quote = "Alpenlogic AG employs its staff … to"
+
+    result = validate_field(
+        FieldKind.TEXT, answer(candidate("Alpenlogic AG", ("P7", quote))), [POLICY]
+    )
+
+    assert result.candidates == []
+
+
+def test_a_quote_over_two_passages_that_are_not_neighbours_is_rejected() -> None:
+    far = replace(CERTIFICATE_2, chunk_id=59)
+    quote = "found to comply with the requirements of ISO 9001:2015\nValid until\n12 March 2028"
+
+    result = validate_field(
+        FieldKind.TEXT,
+        answer(candidate("ISO 9001:2015 valid until 12 March 2028", ("P4", quote))),
+        [*PASSAGES, CERTIFICATE_1, far],
+    )
+
+    assert result.candidates == []
