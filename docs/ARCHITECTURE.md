@@ -146,7 +146,7 @@ backend/
 │     │  ├─ answer_engine.py  section → retrieve par champ → prompt → appel LLM
 │     │  ├─ llm_schema.py     sortie structurée attendue du LLM
 │     │  ├─ validator.py      vérification des citations et des valeurs (pur)
-│     │  └─ rules.py          type de réponse ; groupe, ordre, blocage d'export à l'étape 6 (pur)
+│     │  └─ rules.py          type de réponse ; groupe, ordre, blocage d'export à l'étape 7 (pur)
 │     └─ export/              router · pdf_exporter.py · docx_exporter.py (purs)
 ├─ migrations/                # Alembic
 └─ tests/                     même arborescence que app/ + fixtures
@@ -202,7 +202,7 @@ Toutes les tables héritent d'un `TimestampMixin` : `created_at` (`timestamptz`,
 3. Au moins deux candidats valides aux valeurs normalisées différentes → `conflict`, le plus récent pré-sélectionné.
 4. Date de validité dépassée → `outdated`.
 5. `yes_no` avec preuve → `declaration` cochée ; sans preuve → `missing`.
-6. Une valeur → `auto` ; aucune → `missing`. Puis (étape 6) groupes, ordre de la file et blocage d'export.
+6. Une valeur → `auto` ; aucune → `missing`. Puis (étape 7) groupes, ordre de la file et blocage d'export.
 
 ### Parsing et export
 - **PDF** : parsing des suites de `…`/`.` avec PyMuPDF, libellé à gauche ou au-dessus, une section. Export : effacement des pointillés de la zone, texte dans le rectangle, police réduite si débordement.

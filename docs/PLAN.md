@@ -2,7 +2,7 @@
 
 > Document vivant. Chaque étape y est cochée et détaillée au fur et à mesure.
 > Contexte produit et priorités : voir `CLAUDE.md`. Échéance : jeudi 5 novembre.
-> Statut : étapes 0 à 4.5 faites ; étape 5 découpée en 5a–5d, 5a, 5b et 5c mergées, 5d faite (remplissage automatique dans l'UI, en attente de validation) ; prochaine : étape 6 (relecture). Parcours détaillé : `docs/USER_FLOW.md`. Les choix techniques marqués _proposition_ restent à confirmer à l'étape 3.
+> Statut : étapes 0 à 4.5 faites ; étape 5 découpée en 5a–5d, 5a, 5b et 5c mergées, 5d faite (remplissage automatique dans l'UI, en attente de validation) ; prochaine : étape 6 (Annex 4), avant la relecture (7) et les finitions (7.5). Parcours détaillé : `docs/USER_FLOW.md`. Les choix techniques marqués _proposition_ restent à confirmer à l'étape 3.
 
 ## 1. Ce qu'on a appris des deux formulaires
 
@@ -70,7 +70,7 @@ Chaque étape à partir de la 4 livre une **fonctionnalité utilisable de bout e
 - **Export** (`export/pdf_exporter.py`, pur) : pointillés des champs remplis supprimés (redaction du texte seulement), valeur écrite sur la ligne de base du libellé, police réduite si elle déborde (plancher 5 pt). `GET /forms/{id}/export` (résumé : champs vides, à signer à la main) et `/export/file` (nom de fichier d'origine).
 - **Front** : écran *Live fill* manuel (liste des champs, sauvegarde auto en quittant le champ ou sur Entrée, « ✓ Saved », compteur, aperçu `react-pdf` avec zones synchronisées, clavier ↑↓/j/k/Entrée) et *Export* en modale au-dessus du formulaire (bandeau champs vides, rappel signature, téléchargement PDF ; le résumé attend la sauvegarde en cours).
 - Tests : parseur (schéma attendu de l'Annex 7 + PDF synthétiques), exporteur (valeurs dans leur rectangle, pointillés effacés seulement pour les champs remplis, reste de la page identique), API (pytest) ; écrans *Live fill* (export inclus) / *Tender* (Vitest, `react-pdf` remplacé par un stub) ; scénario Playwright jusqu'au téléchargement (vérifié aussi sur build de production).
-- Limites connues : une valeur trop longue même à 5 pt déborde de sa zone ; le statut *Ready* n'est pas encore posé (étape 6).
+- Limites connues : une valeur trop longue même à 5 pt déborde de sa zone ; le statut *Ready* n'est pas encore posé (étape 7).
 
 ### Étape 5 — Base de connaissances + réponse IA sur l'Annex 7 🟦 _(critique, testé)_
 - UI : écran « base de connaissances » (documents de l'entreprise fictive, état d'ingestion) ; bouton « Remplir avec l'IA » ; chaque champ pré-rempli affiche sa **source** (document + passage) et un état (répondu / introuvable).
@@ -111,7 +111,7 @@ Chaque étape à partir de la 4 livre une **fonctionnalité utilisable de bout e
 - **Façade LLM en flux** : `generate_structured(request, on_partial=...)` ; l'adaptateur OpenAI lit le flux de la Responses API et remet à `on_partial` la sortie partielle à chaque delta ; `FakeLLM` rejoue l'enregistrement en simulant la vraie latence d'après le bloc `timing` (`first_output_seconds`, `total_seconds` : premier champ après ~7 s, fin après ~17 s) ; réglage `FORMPILOT_FAKE_LLM_LATENCY` = `recorded` par défaut, `none` dans les tests et l'e2e.
 - **Moteur** : `on_field` publie chaque champ dès que le modèle l'a complet (recherche faite, validé, règles appliquées), sans attendre la fin de la section ; les champs non publiés en cours de route le sont à la fin. Le job émet `answered` et commite champ par champ.
 - **API** : `DELETE /forms/{id}/fill` (204) supprime toutes les réponses (celles de l'utilisateur aussi) et le run, y compris pendant un remplissage (le run s'arrête), le formulaire revient à `not_started` ; `POST /fill` refuse (409, sans le mot « IA ») un formulaire déjà commencé ; le détail d'une offre expose par formulaire `estimated_fill_seconds` (sections × `fill_seconds_per_section`) et `filling` (remplissage en cours).
-- **Front** : *Tender* : bouton `Auto-fill` (formulaire vierge), `Continue review` + menu `Discard answers` (formulaire commencé), modale *Setup* (fichier et nombres détectés, source utilisée, avertissement si la base de connaissances est vide, « Takes about N seconds », `Cancel` / `Start`) ; *Live fill* : le flux SSE est lu par `fetch` + `eventsource-parser` (pas d'`EventSource` sous Node/jsdom), reconnexion automatique avec `Last-Event-ID`, réponses appliquées au cache TanStack Query champ par champ ; barre de progression qui ne s'arrête et ne recule jamais (fonction pure `fillProgress` : phases + réponses reçues + glissement dans le temps ; plus un maximum atteint dans le composant pour les reconnexions) ; en-tête de phase puis résumé final (« 9 of 9 fields filled in N seconds ») ; statut par réponse (*Filled automatically*, « 2 sources disagree », « Source expired on … », « Only you can fill this », « Not found in the passages searched in your N documents », *Entered by you*), source (document, page, citation) ; *To check* est une teinte de la légende du PDF (conflit, périmé, valeur suggérée à confirmer), pas un statut de carte ; `Discard answers` avec confirmation, aussi pendant le remplissage ; onglet *Source* gardé pour l'étape 6.
+- **Front** : *Tender* : bouton `Auto-fill` (formulaire vierge), `Continue review` + menu `Discard answers` (formulaire commencé), modale *Setup* (fichier et nombres détectés, source utilisée, avertissement si la base de connaissances est vide, « Takes about N seconds », `Cancel` / `Start`) ; *Live fill* : le flux SSE est lu par `fetch` + `eventsource-parser` (pas d'`EventSource` sous Node/jsdom), reconnexion automatique avec `Last-Event-ID`, réponses appliquées au cache TanStack Query champ par champ ; barre de progression qui ne s'arrête et ne recule jamais (fonction pure `fillProgress` : phases + réponses reçues + glissement dans le temps ; plus un maximum atteint dans le composant pour les reconnexions) ; en-tête de phase puis résumé final (« 9 of 9 fields filled in N seconds ») ; statut par réponse (*Filled automatically*, « 2 sources disagree », « Source expired on … », « Only you can fill this », « Not found in the passages searched in your N documents », *Entered by you*), source (document, page, citation) ; *To check* est une teinte de la légende du PDF (conflit, périmé, valeur suggérée à confirmer), pas un statut de carte ; `Discard answers` avec confirmation, aussi pendant le remplissage ; onglet *Source* gardé pour l'étape 7 (relecture).
 - **Tests** : back : flux (publication au fil du modèle, FakeLLM avec latence), `discard` (avant, pendant, SSE), 409 sur formulaire commencé, durée estimée ; front : fonction de progression, lecture des événements SSE, hooks (invalidation), écrans *Tender* (Setup, Auto-fill, Discard) et *Live fill* (réponses une à une, reconnexion, erreur, discard pendant le remplissage) ; e2e : Auto-fill de l'Annex 7 de bout en bout (documents déposés, remplissage, compteurs « 9 / 9 filled · 0 empty · 0 doubts », source avec la bonne page, export PDF).
 - **Mesuré** (vrai modèle, Annex 7, un appel) : premier champ ~7 s, fin ~17 s, ~0,3 à 0,5 centime.
 - **Limites connues** :
@@ -119,25 +119,27 @@ Chaque étape à partir de la 4 livre une **fonctionnalité utilisable de bout e
   - Le bandeau d'erreur d'un remplissage échoué n'est pas réaffiché après un rechargement de la page (les événements sont pourtant conservés).
   - L'e2e vérifie les compteurs finaux, pas le résumé en direct (avec latence `none`, le remplissage finit avant que la page se connecte) ; le flux en direct est couvert par les tests d'écran et la vérification manuelle.
   - Pas de nouveau remplissage sur un formulaire commencé : `Discard answers` puis `Auto-fill` (la valeur de l'utilisateur est effacée aussi). Un meilleur nouveau remplissage est prévu en V2 (voir *Remaining features*).
-  - Retaper la même valeur ne confirme pas une réponse *To check* ; une carte explicite viendra à l'étape 6.
-  - Pas encore de cartes Conflit / Périmé ni de vue *Source* (étapes 6–7).
+  - Retaper la même valeur ne confirme pas une réponse *To check* ; une carte explicite viendra à l'étape 7.
+  - Pas encore de cartes Conflit / Périmé ni de vue *Source* (étape 7).
   - Le numéro de page d'une source est 0-based dans l'API (comme `chunk` / `locator`) ; la carte affiche page + 1.
 
-### Étape 6 — Relecture et humain dans la boucle ⬜ _(testé)_
-- UI : relecture champ par champ avec source visible/cliquable, édition, validation individuelle ou en lot, tri par priorité (introuvables, conflits, déclarations engageantes).
-- Règles (voir `docs/USER_FLOW.md` §4) : export autorisé avec bandeau listant champs vides et doutes ; seule une déclaration Oui/Non sans réponse bloque l'export.
-- Tests : règles de blocage, e2e « corriger une réponse puis exporter ».
-
-### Étape 6.5 — Finitions de l'UI et du remplissage en direct ⬜ _(à détailler le moment venu)_
-- **UI plus proche des maquettes** (`docs/design/Formpilot.dc.html`), en particulier *Live fill* : périmètre et priorités à discuter en détail au début de l'étape.
-- **Texte qui arrive progressivement** : aujourd'hui une réponse apparaît d'un bloc, une fois le champ complet et validé (citations vérifiées) ; on veut voir la valeur s'écrire au fil du flux du modèle. À trancher : comment montrer une valeur encore non vérifiée (style « en cours d'écriture ») et ce qui se passe si la validation finale la rejette.
-
-### Étape 7 — Annex 4 (DOCX) de bout en bout ⬜ _(critique, testé)_
+### Étape 6 — Annex 4 (DOCX) de bout en bout ⬜ _(critique, testé)_
+_Avancée avant la relecture et les finitions (décision 2026-11-05) : ses cas difficiles (conflits, périmé, déclarations Oui/Non) donnent à la relecture de quoi travailler._
 - Parsing des tableaux Word (libellés, cellules, types texte / Oui-Non / nombre), export dans les cellules en préservant la mise en page, avec la même UI que l'Annex 7.
 - Aperçu des documents Word de la base de connaissances (`docx-preview`) dans la modale de *Company knowledge* et dans la vue *Source*.
 - Cas difficiles de la base de connaissances : donnée absente, documents contradictoires, extrait périmé, déclarations Oui/Non non documentées.
 - **Sections en parallèle** dans le job de remplissage (pool borné, par exemple 4 à 7 appels simultanés, une session de base par section) : mêmes appels et même prompt, aucun surcoût. Mesuré sur l'Annex 7 : ~23 s par section, presque tout en génération de la sortie (recherche 0,6 s) ; l'Annex 4 (~7 sections) prendrait 2 à 3 min en séquence, et environ la durée de la section la plus lente en parallèle. Événements émis à mesure que chaque section finit ; durée de *Setup* calculée d'après le nombre de sections. À mesurer sur l'Annex 4.
 - Tests : parseur (schéma attendu), export (réouverture du DOCX, valeurs aux bons endroits, reste intact, comparaison visuelle par rendu), e2e complet.
+
+### Étape 7 — Relecture et humain dans la boucle ⬜ _(testé)_
+- UI : relecture champ par champ avec source visible/cliquable, édition, validation individuelle ou en lot, tri par priorité (introuvables, conflits, déclarations engageantes).
+- Règles (voir `docs/USER_FLOW.md` §4) : export autorisé avec bandeau listant champs vides et doutes ; seule une déclaration Oui/Non sans réponse bloque l'export.
+- Tests : règles de blocage, e2e « corriger une réponse puis exporter » (déjà fait pour l'Annex 7 en 5d).
+- Reste à faire (constaté le 2026-11-05) : blocage de l'export par une déclaration Oui/Non sans réponse et bandeau des doutes non revus dans *Export* ; confirmer une réponse *To check* (« Keep this value ») ; onglet *Source* (passage cité ouvert à la page, citation surlignée) ; cartes Conflit / Périmé ; file groupée *No value* / *Doubt* / *Automatic* (repliée) avec pastilles-filtres.
+
+### Étape 7.5 — Finitions de l'UI et du remplissage en direct ⬜ _(à détailler le moment venu)_
+- **UI plus proche des maquettes** (`docs/design/Formpilot.dc.html`), en particulier *Live fill* : périmètre et priorités à discuter en détail au début de l'étape.
+- **Texte qui arrive progressivement** : aujourd'hui une réponse apparaît d'un bloc, une fois le champ complet et validé (citations vérifiées) ; on veut voir la valeur s'écrire au fil du flux du modèle. À trancher : comment montrer une valeur encore non vérifiée (style « en cours d'écriture ») et ce qui se passe si la validation finale la rejette.
 
 ### Étape 8 — Durcissement ⬜
 - Erreurs et cas limites (fichier illisible, API indisponible, formulaire inconnu), états de chargement, messages clairs.
@@ -243,3 +245,4 @@ UI (relecture)  ──►  API locale
 | 2026-11-04 | 5d : onglet *Source* gardé pour l'étape 6 | validé |
 | 2026-11-04 | 5d : pas de nouveau remplissage sur un formulaire commencé : `Discard answers` (supprime toutes les réponses, celles de l'utilisateur aussi, même pendant un remplissage) puis `Auto-fill` ; un meilleur nouveau remplissage en V2 | validé |
 | 2026-11-05 | Nouvelle étape 6.5 : UI plus proche des maquettes (à discuter en détail) et texte des réponses qui arrive progressivement pendant le remplissage | validé |
+| 2026-11-05 | Ordre inversé : l'Annex 4 passe avant la relecture et les finitions. Renumérotation : Annex 4 = étape 6, relecture = étape 7, finitions = étape 7.5 (les lignes précédentes du journal et les specs datées gardent l'ancienne numérotation) | validé |
