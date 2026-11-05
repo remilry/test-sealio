@@ -119,6 +119,7 @@ export function answer(fieldId: number, value: string | null, at = "2026-11-03T1
   return {
     field_id: fieldId,
     value,
+    proposed_value: null,
     resolved_by: "user",
     resolved_at: at,
     type: null,
@@ -136,7 +137,13 @@ export function aiAnswer(
   at = "2026-11-04T10:00:10Z",
   extra: Partial<Answer> = {},
 ): Answer {
-  return { ...answer(fieldId, value, at), resolved_by: "ai", type, ...extra };
+  return {
+    ...answer(fieldId, value, at),
+    resolved_by: "ai",
+    proposed_value: value,
+    type,
+    ...extra,
+  };
 }
 
 type Citation = Schema<"Citation">;

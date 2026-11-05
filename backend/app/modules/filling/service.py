@@ -212,6 +212,7 @@ def record_ai_answer(session: Session, fill_id: int, field_id: int, decision: De
     """Write the AI's answer to a field, unless the user has set it meanwhile."""
     values = {
         "value": decision.value,
+        "proposed_value": decision.value,
         "resolved_by": ResolvedBy.AI,
         "resolved_at": datetime.now(UTC),
         "type": decision.type,

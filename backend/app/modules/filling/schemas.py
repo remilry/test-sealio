@@ -12,6 +12,8 @@ class AnswerOut(BaseModel):
 
     field_id: int
     value: str | None
+    # What the automatic fill wrote; null when it never answered this field.
+    proposed_value: str | None
     resolved_by: ResolvedBy
     resolved_at: datetime
     # What the AI found; null when the AI never answered this field.

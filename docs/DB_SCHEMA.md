@@ -22,6 +22,7 @@ erDiagram
         bigint form_fill_id FK
         bigint field_id FK
         text value "nullable"
+        text proposed_value "nullable"
         text resolved_by "ai | user"
         timestamptz resolved_at
         text type "auto | missing | manual | outdated | conflict | declaration | unsure; nullable"

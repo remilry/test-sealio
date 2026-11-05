@@ -347,6 +347,8 @@ export interface components {
             field_id: number;
             /** Value */
             value: string | null;
+            /** Proposed Value */
+            proposed_value: string | null;
             resolved_by: components["schemas"]["ResolvedBy"];
             /**
              * Resolved At

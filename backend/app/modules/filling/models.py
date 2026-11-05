@@ -80,6 +80,8 @@ class Answer(TimestampMixin, Base):
     )
     # Null: the field is left empty.
     value: Mapped[str | None]
+    # What the automatic fill wrote (null when it never answered), kept when the user changes it.
+    proposed_value: Mapped[str | None]
     resolved_by: Mapped[ResolvedBy] = mapped_column(str_enum(ResolvedBy))
     resolved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     # What the AI found (rules.py); null when the AI never answered this field.

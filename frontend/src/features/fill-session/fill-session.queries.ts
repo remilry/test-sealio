@@ -121,6 +121,7 @@ function withAnswer(state: FillState, fieldId: number, value: string | null): Fi
   // The user's value replaces the AI's, whose evidence (type, candidates) stays shown.
   const answer: Answer = {
     type: null,
+    proposed_value: null,
     candidates: [],
     user_only_reason: null,
     ...existing,
