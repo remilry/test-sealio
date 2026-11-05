@@ -85,3 +85,20 @@ def test_a_field_of_another_form_is_a_404(client: TestClient) -> None:
 
 def test_answers_of_an_unknown_form_is_a_404(client: TestClient) -> None:
     assert client.get("/forms/999999/answers").status_code == 404
+
+
+def test_a_yes_no_field_takes_yes_or_no(client: TestClient) -> None:
+    annex_4, _ = seeded_forms(client)
+    fields = fields_by_key(client, annex_4["id"])
+    declaration = next(field for field in fields.values() if field["kind"] == "yes_no")
+    url = f"/forms/{annex_4['id']}/fields/{declaration['id']}"
+
+    answered = client.patch(url, json={"value": "Yes"})
+    refused = client.patch(url, json={"value": "maybe"})
+    cleared = client.patch(url, json={"value": ""})
+
+    assert [a["value"] for a in answered.json()["answers"]] == ["yes"]
+    assert refused.status_code == 422
+    assert refused.json()["detail"] == "Answer Yes or No."
+    assert cleared.status_code == 200
+    assert [a["value"] for a in cleared.json()["answers"]] == [None]

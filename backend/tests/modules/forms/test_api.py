@@ -6,8 +6,7 @@ from tests.modules.helpers import seeded_forms
 def test_tender_cards_show_what_was_detected_in_each_form(client: TestClient) -> None:
     annex_4, annex_7 = seeded_forms(client)
 
-    # Word forms are not parsed yet (step 7): no counts, the card cannot be filled.
-    assert annex_4["field_counts"] is None
+    assert annex_4["field_counts"] == {"fields": 49, "yes_no": 17, "signatures": 1}
     assert annex_7["field_counts"] == {"fields": 10, "yes_no": 0, "signatures": 1}
 
 
@@ -37,10 +36,15 @@ def test_form_detail_lists_the_fields_in_reading_order(client: TestClient) -> No
     assert set(locator) == {"format", "page", "box", "baseline", "font_size", "erase"}
 
 
-def test_a_word_form_has_no_fields_yet(client: TestClient) -> None:
+def test_a_word_form_is_parsed_at_seed(client: TestClient) -> None:
     annex_4, _ = seeded_forms(client)
 
-    assert client.get(f"/forms/{annex_4['id']}").json()["fields"] == []
+    form = client.get(f"/forms/{annex_4['id']}").json()
+
+    assert form["file_format"] == "docx"
+    assert len(form["fields"]) == 49
+    assert {f["locator"]["format"] for f in form["fields"]} == {"docx"}
+    assert [(round(p["width"]), round(p["height"])) for p in form["pages"]] == [(595, 842)] * 3
 
 
 def test_unknown_form_is_a_404(client: TestClient) -> None:

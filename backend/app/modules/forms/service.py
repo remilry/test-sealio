@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.core.errors import NotFoundError
 from app.modules.forms.models import Field, FileFormat, Form
+from app.modules.forms.parsing.docx_parser import parse_docx
 from app.modules.forms.parsing.pdf_parser import parse_pdf
 from app.modules.forms.parsing.schema import FieldKind, FormSchema, PageSize
 from app.modules.forms.schemas import FieldCounts, FieldOut, FormDetail, FormInfo
@@ -21,8 +22,11 @@ MEDIA_TYPES = {
     FileFormat.DOCX: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 }
 
-# Formats that can be parsed into fields. Word forms come with step 7 (docs/PLAN.md).
-PARSERS: dict[FileFormat, Callable[[bytes], FormSchema]] = {FileFormat.PDF: parse_pdf}
+# Formats that can be parsed into fields.
+PARSERS: dict[FileFormat, Callable[[bytes], FormSchema]] = {
+    FileFormat.PDF: parse_pdf,
+    FileFormat.DOCX: parse_docx,
+}
 
 
 @dataclass(frozen=True)

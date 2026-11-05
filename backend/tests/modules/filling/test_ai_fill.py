@@ -19,6 +19,8 @@ from app.modules.filling import router as filling_router
 from app.modules.filling import service
 from app.modules.filling.answer_engine import request_key
 from app.modules.filling.models import AiStatus, FillEventType
+from app.modules.forms import service as forms_service
+from app.modules.forms.models import FileFormat
 from app.modules.tenants import service as tenants_service
 from tests.modules.helpers import add_demo_documents, fields_by_key, seeded_forms
 
@@ -331,10 +333,12 @@ def test_the_fill_cannot_start_twice_at_once(client: TestClient, annex_7: int) -
     assert "already being filled" in response.json()["detail"]
 
 
-def test_a_form_that_cannot_be_read_yet_cannot_be_filled(client: TestClient) -> None:
-    annex_4 = seeded_forms(client)[0]["id"]
-
-    response = client.post(f"/forms/{annex_4}/fill")
+def test_a_form_that_cannot_be_read_yet_cannot_be_filled(monkeypatch: pytest.MonkeyPatch) -> None:
+    # A format without a parser: Word forms, had they none.
+    monkeypatch.delitem(forms_service.PARSERS, FileFormat.DOCX)
+    with TestClient(app) as client:
+        annex_4 = seeded_forms(client)[0]["id"]
+        response = client.post(f"/forms/{annex_4}/fill")
 
     assert response.status_code == 422
 

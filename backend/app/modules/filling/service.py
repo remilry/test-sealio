@@ -26,6 +26,8 @@ from app.modules.filling.schemas import AiRun, AnswerOut, FillCounts, FillState
 from app.modules.forms import service as forms_service
 from app.modules.forms.parsing.schema import FieldKind
 
+# How a Yes/No answer is stored (as the validator writes the AI's).
+YES_NO_VALUES = frozenset({"yes", "no"})
 DOUBTS = frozenset({AnswerType.CONFLICT, AnswerType.OUTDATED})
 
 INTERRUPTED = (
@@ -105,11 +107,16 @@ def set_answer(
     field = forms_service.get_field(session, form_id, field_id)
     if field.kind == FieldKind.SIGNATURE:
         raise RuleViolationError("Signatures and stamps are never filled: sign the form by hand.")
+    value = (value or "").strip() or None
+    if field.kind == FieldKind.YES_NO and value is not None:
+        if value.lower() not in YES_NO_VALUES:
+            raise RuleViolationError("Answer Yes or No.")
+        value = value.lower()
     fill = _start_fill(session, tenant_id, form_id)
     if fill.status == FillStatus.NOT_STARTED:
         fill.status = FillStatus.IN_REVIEW
     values = {
-        "value": (value or "").strip() or None,
+        "value": value,
         "resolved_by": ResolvedBy.USER,
         "resolved_at": datetime.now(UTC),
         "needs_review": False,
