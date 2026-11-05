@@ -122,7 +122,9 @@ def test_every_field_is_searching_before_any_answer(client: TestClient, annex_4:
 def test_a_failing_group_ends_the_run_and_the_others_stop_publishing(
     client: TestClient, annex_4: int, llm: SlowLLM
 ) -> None:
-    llm.failing = {annex_4_keys(client, annex_4)[0]}
+    key = annex_4_keys(client, annex_4)[0]
+    # Both runs of the call fail (one alone would leave the other run's answers, to check).
+    llm.failing = {key, f"{key}--run-2"}
 
     client.post(f"/forms/{annex_4}/fill")
 

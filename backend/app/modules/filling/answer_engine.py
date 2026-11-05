@@ -4,6 +4,7 @@ The only module that talks to `app.llm`. The model sees the section's fields, th
 for each of them (deduplicated) and the tender details, and must quote what it answers from.
 """
 
+import logging
 import re
 import threading
 import time
@@ -15,7 +16,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from app.llm.facade import LLM, LLMRequest, LLMUsage
+from app.llm.facade import LLM, LLMError, LLMRequest, LLMUsage
 from app.modules.filling.groups import CallGroup, FieldToAnswer
 from app.modules.filling.llm_schema import LLMFieldAnswer, LLMSectionAnswer
 from app.modules.filling.validator import (
@@ -25,6 +26,8 @@ from app.modules.filling.validator import (
     validate_field,
 )
 from app.modules.forms.parsing.schema import FieldKind
+
+logger = logging.getLogger(__name__)
 
 # Passages searched per field (the search recall test measures this k, see test_search_recall).
 SEARCH_K = 8
@@ -107,11 +110,14 @@ class SectionResult:
     passages: int
     search_seconds: float
     usage: LLMUsage
+    # Runs of the call that failed (their fields are only answered by the other run).
+    failed_runs: int = 0
 
     def describe(self) -> str:
+        failed = f" · {self.failed_runs} run(s) failed" if self.failed_runs else ""
         return (
             f"search {self.search_seconds:.1f}s ({self.passages} passages) · "
-            f"model {self.usage.describe()}"
+            f"model {self.usage.describe()}{failed}"
         )
 
 
@@ -164,29 +170,50 @@ def answer_section(
         replace(request, key=f"{request.key}--run-{run}") for run in range(2, runs + 1)
     ]
 
-    def call(run: int) -> LLMUsage:
-        evidence = _SectionEvidence(
+    evidences = [
+        _SectionEvidence(
             fields,
             passages,
-            lambda f, e: merged.add(run, f, e),
+            lambda f, e, run=run: merged.add(run, f, e),
             on_writing if run == 0 else None,
         )
-        result = llm.generate_structured(requests[run], evidence.add_streamed)
+        for run in range(runs)
+    ]
+
+    def call(run: int) -> LLMUsage | LLMError:
+        evidence = evidences[run]
+        try:
+            result = llm.generate_structured(requests[run], evidence.add_streamed)
+        except LLMError as error:
+            if runs == 1:
+                raise
+            logger.warning("Run %s of %r failed: %s", run + 1, requests[run].key, error)
+            return error
         evidence.add_all(result.output.fields)
         evidence.add_not_found()
         return result.usage
 
     if runs == 1:
-        usage = call(0)
+        outcomes = [call(0)]
     else:
         with ThreadPoolExecutor(max_workers=runs) as pool:
-            usage = sum(pool.map(call, range(runs)), LLMUsage())
+            outcomes = list(pool.map(call, range(runs)))
+    failures = [o for o in outcomes if isinstance(o, LLMError)]
+    if len(failures) == len(outcomes):
+        # Nothing more is published: the fields left are the failed section's.
+        raise failures[0]
+    for run, outcome in enumerate(outcomes):
+        if isinstance(outcome, LLMError):
+            # A failed run's fields not published yet count as not found for it: a value only
+            # the other run found is kept, to check (not cross-checked).
+            evidences[run].add_not_found()
 
     return SectionResult(
         evidence=merged.by_field(),
         passages=len(passages),
         search_seconds=search_seconds,
-        usage=usage,
+        usage=sum((o for o in outcomes if isinstance(o, LLMUsage)), LLMUsage()),
+        failed_runs=len(failures),
     )
 
 
