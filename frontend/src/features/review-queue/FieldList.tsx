@@ -25,6 +25,8 @@ export type QueueField = {
   enteredAt: string | null;
   /** Where the automatic fill is for this field: not reached yet, being searched, answered. */
   state: "pending" | "searching" | "answered";
+  /** The value the automatic fill is writing, not verified yet (null when none). */
+  writing: string | null;
   /** How sure the answer is (null for the user's own value or no answer). */
   type: Schema<"AnswerOut">["type"];
   resolvedBy: "ai" | "user" | null;
@@ -284,6 +286,9 @@ function FieldInput({
         id={inputId}
         name="value"
         defaultValue={shown}
+        // A value being written shows greyed in the empty input, until its answer replaces it.
+        placeholder={field.writing ?? undefined}
+        className={cn(field.writing && "placeholder:text-muted-foreground placeholder:italic")}
         autoComplete="off"
         onFocus={() => onSelect(field.id)}
         onChange={(event) => onDraft(field.id, event.currentTarget.value)}
@@ -459,7 +464,11 @@ function FieldStatus({ field, context }: { field: QueueField; context: FieldCont
     );
   }
   if (field.state === "searching") {
-    return <p className="animate-pulse text-xs text-primary">{t("searching")}</p>;
+    return (
+      <p className="animate-pulse text-xs text-primary">
+        {field.writing ? t("writing") : t("searching")}
+      </p>
+    );
   }
   if (field.type === "manual") {
     return (

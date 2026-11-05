@@ -141,6 +141,7 @@
     "mostRecent": " · most recent",
     "empty": "Empty — exported blank",
     "searching": "Searching your documents…",
+    "writing": "Writing…",
     "filledAutomatically": "Filled automatically",
     "declaration": "Filled automatically · you declare this on behalf of {company}",
     "missing": "Not found in the passages searched in your {count, plural, one {# document} other {# documents}}",

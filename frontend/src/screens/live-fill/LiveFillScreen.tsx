@@ -148,6 +148,8 @@ function FillWorkspace({
       unsaved: unsaved.get(field.id) ?? null,
       enteredAt: answer?.resolved_by === "user" ? answer.resolved_at : null,
       state: fieldState(run, field.id),
+      // What the user saved is theirs: the fill does not write over it.
+      writing: answer?.resolved_by === "user" ? null : (run.writing.get(field.id) ?? null),
       type: answer?.type ?? null,
       resolvedBy: answer?.resolved_by ?? null,
       proposedValue: answer?.proposed_value ?? null,
@@ -158,11 +160,14 @@ function FillWorkspace({
   const zones: PreviewZone[] = form.fields.map((field, index) => {
     const draft = drafts.get(field.id);
     const value = (draft ?? fields[index].value ?? "").trim() || null;
+    const writing = value === null ? fields[index].writing : null;
     return {
       id: field.id,
       label: field.label,
-      value,
-      tone: zoneTone(fields[index], value, draft === undefined ? answers.get(field.id) : undefined),
+      value: value ?? writing,
+      tone: writing
+        ? "writing"
+        : zoneTone(fields[index], value, draft === undefined ? answers.get(field.id) : undefined),
       place: placeOf(field.locator),
     };
   });

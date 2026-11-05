@@ -412,7 +412,9 @@ function fillingBack() {
       send({ type: "phase", phase, ...extra }),
     searching: (...fieldIds: number[]) =>
       fieldIds.forEach((fieldId) => send({ type: "field", field_id: fieldId, state: "searching" })),
-    answered: (fieldId: number, value: string, type: Answer["type"] = "auto") => {
+    writing: (fieldId: number, text: string) =>
+      send({ type: "field", field_id: fieldId, state: "writing", text }),
+    answered: (fieldId: number, value: string | null, type: Answer["type"] = "auto") => {
       const entry = aiAnswer(fieldId, value, type ?? "auto");
       // The back keeps the user's value: it only publishes the answer.
       if (state.answers.find((a) => a.field_id === fieldId)?.resolved_by !== "user") {
@@ -514,6 +516,54 @@ describe("Live fill (watching the automatic fill)", () => {
     // And the counters follow
     expect(screen.getByText("1 / 9 filled · 8 empty · 0 doubts")).toBeInTheDocument();
     expect(screen.getByText("1 / 9")).toBeInTheDocument();
+    back.stream.close();
+  });
+
+  it("shows a value greyed while it is written, then the checked answer instead", async () => {
+    // Given the fill searching the name
+    const { back } = watchFill();
+    startSearch(back);
+    back.searching(3, 4);
+    const card = within(await screen.findByRole("listitem", { name: "Name and legal form" }));
+
+    // When the model starts writing its value
+    back.writing(3, "Alpenlo");
+    back.writing(3, "Alpenlogic AG, Zur");
+
+    // Then it shows greyed in the empty input and on the form, as being written
+    expect(await card.findByText("Writing…")).toBeInTheDocument();
+    expect(card.getByRole("textbox")).toHaveValue("");
+    expect(card.getByRole("textbox")).toHaveAttribute("placeholder", "Alpenlogic AG, Zur");
+    expect(within(await findZone(3)).getByText("Alpenlogic AG, Zur")).toBeInTheDocument();
+    expect(zone(3)).toHaveAttribute("data-tone", "writing");
+
+    // When the checked answer arrives (shorter than what was written)
+    back.answered(3, "Alpenlogic AG");
+
+    // Then it replaces the value being written
+    await waitFor(() => expect(card.getByRole("textbox")).toHaveValue("Alpenlogic AG"));
+    expect(card.queryByText("Writing…")).toBeNull();
+    expect(zone(3)).toHaveAttribute("data-tone", "auto");
+    expect(within(zone(3)).queryByText("Alpenlogic AG, Zur")).toBeNull();
+    back.stream.close();
+  });
+
+  it("drops a value being written that the check rejects", async () => {
+    // Given the model writing an address
+    const { back } = watchFill();
+    startSearch(back);
+    back.searching(4);
+    back.writing(4, "Bahnhofstrasse 1");
+    expect(within(await findZone(4)).getByText("Bahnhofstrasse 1")).toBeInTheDocument();
+
+    // When the check finds no quote for it: the field is answered without a value
+    back.answered(4, null, "missing");
+
+    // Then the unverified value is gone, the field is empty
+    await waitFor(() => expect(zone(4)).toHaveAttribute("data-tone", "empty"));
+    expect(within(zone(4)).queryByText("Bahnhofstrasse 1")).toBeNull();
+    const card = within(fieldList().getByRole("listitem", { name: "Business address" }));
+    expect(card.getByRole("textbox")).not.toHaveAttribute("placeholder");
     back.stream.close();
   });
 

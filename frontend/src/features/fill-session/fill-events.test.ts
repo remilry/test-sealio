@@ -76,4 +76,30 @@ describe("reduceRun", () => {
     expect(done.searching.size).toBe(0);
     expect(done.answered.has(2)).toBe(true);
   });
+
+  it("keeps the value being written until the field's answer replaces it", () => {
+    const writing: FillEvent[] = [
+      ...events.slice(0, 4),
+      { id: 5, type: "field", field_id: 2, state: "writing", text: "Alpen" },
+      { id: 6, type: "field", field_id: 2, state: "writing", text: "Alpenlogic" },
+    ];
+    expect(play(writing).writing.get(2)).toBe("Alpenlogic");
+    const answered = play([...writing, { ...events[4], id: 7 }]);
+    expect(answered.writing.has(2)).toBe(false);
+    // A late value being written never comes back over an answer.
+    const late = play([
+      ...writing,
+      { ...events[4], id: 7 },
+      { id: 8, type: "field", field_id: 2, state: "writing", text: "Alp" },
+    ]);
+    expect(late.writing.has(2)).toBe(false);
+  });
+
+  it("forgets the values being written when the run ends", () => {
+    const writing: FillEvent[] = [
+      ...events.slice(0, 4),
+      { id: 5, type: "field", field_id: 2, state: "writing", text: "Alpen" },
+    ];
+    expect(play([...writing, { id: 6, type: "error", message: "boom" }]).writing.size).toBe(0);
+  });
 });

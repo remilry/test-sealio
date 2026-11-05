@@ -19,6 +19,8 @@ export type FillEvent = { id: number } & (
       file_format?: string;
     }
   | { type: "field"; field_id: number; state: "searching" }
+  /** The value the model is writing for a field: not verified yet, replaced by its answer. */
+  | { type: "field"; field_id: number; state: "writing"; text: string }
   | {
       type: "field";
       field_id: number;
@@ -35,6 +37,8 @@ export type FillRun = {
   toAnswer: number | null;
   searching: ReadonlySet<number>;
   answered: ReadonlySet<number>;
+  /** The value being written for each field not answered yet (unverified). */
+  writing: ReadonlyMap<number, string>;
   /** When the last answer arrived (ms), to estimate the remaining time. */
   lastProgressAt: number | null;
   outcome:
@@ -48,6 +52,7 @@ export const initialRun: FillRun = {
   toAnswer: null,
   searching: new Set(),
   answered: new Set(),
+  writing: new Map(),
   lastProgressAt: null,
   outcome: null,
 };
@@ -66,11 +71,18 @@ export function reduceRun(run: FillRun, event: FillEvent, at: number): FillRun {
         if (run.answered.has(event.field_id)) return run;
         return { ...run, searching: new Set(run.searching).add(event.field_id) };
       }
+      if (event.state === "writing") {
+        if (run.answered.has(event.field_id)) return run;
+        return { ...run, writing: new Map(run.writing).set(event.field_id, event.text) };
+      }
       const searching = new Set(run.searching);
       searching.delete(event.field_id);
+      const writing = new Map(run.writing);
+      writing.delete(event.field_id);
       return {
         ...run,
         searching,
+        writing,
         answered: new Set(run.answered).add(event.field_id),
         lastProgressAt: at,
       };
@@ -80,6 +92,7 @@ export function reduceRun(run: FillRun, event: FillEvent, at: number): FillRun {
       return {
         ...run,
         searching: new Set(),
+        writing: new Map(),
         outcome: {
           kind: "done",
           filled: event.filled,
@@ -88,6 +101,11 @@ export function reduceRun(run: FillRun, event: FillEvent, at: number): FillRun {
         },
       };
     case "error":
-      return { ...run, searching: new Set(), outcome: { kind: "error", message: event.message } };
+      return {
+        ...run,
+        searching: new Set(),
+        writing: new Map(),
+        outcome: { kind: "error", message: event.message },
+      };
   }
 }

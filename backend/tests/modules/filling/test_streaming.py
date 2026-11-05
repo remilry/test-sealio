@@ -164,7 +164,7 @@ def test_fields_are_published_while_the_model_writes(monkeypatch: Any) -> None:
 
 
 def test_each_field_is_published_once() -> None:
-    # 3 answers: the JSON length is not a multiple of 20, chunks cut keys and strings.
+    # 3 answers: the JSON length is not a multiple of CHUNKS, chunks cut keys and strings.
     published: list[int] = []
     _run(
         [_answer("name", "Alpenlogic AG"), _answer("city", "Zurich"), _answer("uid", "CHE-1")],
