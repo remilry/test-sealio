@@ -5,7 +5,9 @@ import dynamic from "next/dynamic";
 import { useTranslations } from "next-intl";
 import { cn } from "@/shared/lib/utils";
 import { Skeleton } from "@/shared/ui/skeleton";
-import { boxToCss, fontSizeToCss, type PageSize, type PdfBox } from "./locator";
+import { boxToCss, fontSizeToCss, type PageSize } from "./locator";
+import { WordDocument } from "./WordDocument";
+import { LEGEND, TONES, type PdfZone, type PreviewZone } from "./zones";
 
 // PDF.js only runs in the browser.
 const PdfPages = dynamic(() => import("./PdfPages"), {
@@ -13,60 +15,17 @@ const PdfPages = dynamic(() => import("./PdfPages"), {
   loading: () => <Skeleton className="aspect-[595/842] w-full" />,
 });
 
-export type ZoneTone = "auto" | "toCheck" | "empty" | "entered" | "signature" | "searching";
-
-/** The tones explained under the document, in this order (a searched zone explains itself). */
-const LEGEND = ["auto", "toCheck", "empty", "entered", "signature"] as const;
-
-/** A field drawn on the document: generic, the preview knows nothing of answers or rules. */
-export type PreviewZone = {
-  id: number;
-  label: string;
-  page: number;
-  box: PdfBox;
-  fontSize: number;
-  /** The placeholder marks printed in the field (dot leaders), hidden once it has a value. */
-  placeholders: PdfBox[];
-  value: string | null;
-  tone: ZoneTone;
-};
-
-const TONES: Record<ZoneTone, { zone: string; swatch: string }> = {
-  auto: {
-    zone: "bg-primary/10 ring-primary/45",
-    swatch: "bg-primary/30",
-  },
-  toCheck: {
-    zone: "bg-warning/12 ring-warning/55",
-    swatch: "bg-warning/35",
-  },
-  entered: {
-    zone: "bg-success/12 ring-success/50",
-    swatch: "bg-success/30",
-  },
-  empty: {
-    zone: "bg-[repeating-linear-gradient(135deg,color-mix(in_oklch,var(--destructive)_18%,transparent)_0_3px,transparent_3px_6px)] ring-destructive/40",
-    swatch: "bg-destructive/25",
-  },
-  signature: {
-    zone: "border border-dashed border-muted-foreground/60 bg-muted/40 ring-transparent",
-    swatch: "bg-muted-foreground/25",
-  },
-  searching: {
-    zone: "animate-pulse bg-primary/8 ring-primary/30",
-    swatch: "bg-primary/15",
-  },
-};
-
 /** The original form, with each field highlighted where its answer goes, kept in sync with the list. */
 export function DocumentPreview({
   fileUrl,
+  fileFormat,
   pages,
   zones,
   selectedId,
   onSelect,
 }: {
   fileUrl: string;
+  fileFormat: "pdf" | "docx";
   pages: PageSize[];
   zones: PreviewZone[];
   selectedId: number | null;
@@ -83,37 +42,65 @@ export function DocumentPreview({
           </li>
         ))}
       </ul>
-      <PdfPages
-        fileUrl={fileUrl}
-        pages={pages}
-        renderOverlay={(pageIndex) => {
-          const onPage = zones.filter((zone) => zone.page === pageIndex);
-          return (
-            <>
-              {onPage.map((zone) => (
-                <PlaceholderMasks key={zone.id} zone={zone} page={pages[pageIndex]} />
-              ))}
-              {onPage.map((zone) => (
-                <Zone
-                  key={zone.id}
-                  zone={zone}
-                  page={pages[pageIndex]}
-                  selected={zone.id === selectedId}
-                  onSelect={onSelect}
-                />
-              ))}
-            </>
-          );
-        }}
-      />
+      {fileFormat === "docx" ? (
+        <WordDocument fileUrl={fileUrl} zones={zones} selectedId={selectedId} onSelect={onSelect} />
+      ) : (
+        <PdfPreview
+          fileUrl={fileUrl}
+          pages={pages}
+          zones={zones.filter((zone): zone is PdfZone => zone.place.format === "pdf")}
+          selectedId={selectedId}
+          onSelect={onSelect}
+        />
+      )}
     </section>
   );
 }
 
+function PdfPreview({
+  fileUrl,
+  pages,
+  zones,
+  selectedId,
+  onSelect,
+}: {
+  fileUrl: string;
+  pages: PageSize[];
+  zones: PdfZone[];
+  selectedId: number | null;
+  onSelect: (id: number) => void;
+}) {
+  return (
+    <PdfPages
+      fileUrl={fileUrl}
+      pages={pages}
+      renderOverlay={(pageIndex) => {
+        const onPage = zones.filter((zone) => zone.place.page === pageIndex);
+        return (
+          <>
+            {onPage.map((zone) => (
+              <PlaceholderMasks key={zone.id} zone={zone} page={pages[pageIndex]} />
+            ))}
+            {onPage.map((zone) => (
+              <Zone
+                key={zone.id}
+                zone={zone}
+                page={pages[pageIndex]}
+                selected={zone.id === selectedId}
+                onSelect={onSelect}
+              />
+            ))}
+          </>
+        );
+      }}
+    />
+  );
+}
+
 /** Paper over the dot leaders of a filled field, as the export removes them: dots only show while empty. */
-function PlaceholderMasks({ zone, page }: { zone: PreviewZone; page: PageSize }) {
+function PlaceholderMasks({ zone, page }: { zone: PdfZone; page: PageSize }) {
   if (!zone.value) return null;
-  return zone.placeholders.map((box, index) => (
+  return zone.place.placeholders.map((box, index) => (
     <div
       key={index}
       aria-hidden
@@ -130,7 +117,7 @@ function Zone({
   selected,
   onSelect,
 }: {
-  zone: PreviewZone;
+  zone: PdfZone;
   page: PageSize;
   selected: boolean;
   onSelect: (id: number) => void;
@@ -149,7 +136,10 @@ function Zone({
       aria-label={zone.label}
       aria-pressed={selected}
       onClick={() => onSelect(zone.id)}
-      style={{ ...boxToCss(zone.box, page), fontSize: fontSizeToCss(zone.fontSize, page) }}
+      style={{
+        ...boxToCss(zone.place.box, page),
+        fontSize: fontSizeToCss(zone.place.fontSize, page),
+      }}
       className={cn(
         "absolute flex cursor-pointer items-end overflow-hidden rounded-[2px] px-[0.3cqw] pb-[0.25cqw] text-left leading-none whitespace-nowrap text-black ring-1 transition-shadow",
         TONES[zone.tone].zone,

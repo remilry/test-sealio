@@ -48,6 +48,14 @@ export const handlers = {
 
   form: (form: FormDetail) => http.get(url(`/forms/${form.id}`), () => HttpResponse.json(form)),
 
+  /** `GET /forms/{id}/file`: the original file's bytes, or a 404 when null. */
+  formFile: (formId: number, bytes: Uint8Array | null) =>
+    http.get(url(`/forms/${formId}/file`), () =>
+      bytes
+        ? HttpResponse.arrayBuffer(bytes.slice().buffer)
+        : new HttpResponse(null, { status: 404 }),
+    ),
+
   /** `GET /forms/{id}/answers`; a function is called at each request (the state follows a run). */
   answers: (formId: number, state: FillState | (() => FillState)) =>
     http.get(url(`/forms/${formId}/answers`), () =>

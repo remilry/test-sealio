@@ -134,3 +134,28 @@ describe("showing a value where the export writes it", () => {
     );
   });
 });
+
+describe("the zone of a field", () => {
+  test("is the place of its value when it shares the paragraph with a label", async () => {
+    const root = await renderAnnex4();
+    const line = paragraphOf(root, "place_and_date");
+
+    const place = write(root, "place_and_date", null);
+    const signature = write(root, "company_stamp_and_legally_valid_signature_s", null);
+
+    expect(place).not.toBe(line);
+    expect(signature).not.toBe(line);
+    expect(place).not.toBe(signature);
+    expect(line.contains(place) && line.contains(signature)).toBe(true);
+    expect(line.textContent).toMatch(/^Place and date: /);
+  });
+
+  test("is the paragraph when the value fills it alone", async () => {
+    const root = await renderAnnex4();
+
+    expect(write(root, "exact_company_name", null)).toBe(paragraphOf(root, "exact_company_name"));
+    expect(write(root, "exact_company_name", "Alpenlogic AG")).toBe(
+      paragraphOf(root, "exact_company_name"),
+    );
+  });
+});

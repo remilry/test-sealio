@@ -6,6 +6,7 @@ export type DocxLocator = Schema<"DocxLocator">;
 const VALUE = "data-preview-value";
 const LEADER = "data-preview-leader";
 const HIDDEN_TEXT = "data-text";
+const EMPTY = "data-preview-empty";
 
 /**
  * The paragraph a Word field's locator points at, in a docx-preview rendering (`inWrapper: false`):
@@ -30,7 +31,11 @@ export function findParagraph(root: Element, locator: DocxLocator): HTMLElement 
 /**
  * Show `value` in the rendered paragraph where the export writes it (blank: nothing, the original
  * text back). Idempotent: what an earlier call added for the same locator is taken back first.
- * Returns the element that holds the value (a new paragraph, or `paragraph`).
+ *
+ * Returns the field's zone: the paragraph when the value fills it alone (an empty paragraph or
+ * cell, the dots of a leader) or under a label (a new paragraph); else, when the value follows a
+ * label on its line, the value itself, an empty placeholder (`data-preview-empty`) while blank, so
+ * two fields sharing a line have a zone each.
  */
 export function writePreviewValue(
   paragraph: HTMLElement,
@@ -40,7 +45,14 @@ export function writePreviewValue(
   const mark = markOf(locator);
   takeBack(paragraph, mark);
   const text = oneLine(value ?? "");
-  if (!text) return paragraph;
+  const original = originalText(paragraph);
+  if (!text) {
+    if (locator.mode !== "in_paragraph" || !original.trim()) return paragraph;
+    const placeholder = valueSpan("", mark);
+    placeholder.setAttribute(EMPTY, "");
+    insertAt(paragraph, locator.start ?? original.length, placeholder);
+    return placeholder;
+  }
 
   if (locator.mode === "new_paragraph") {
     const added = paragraph.cloneNode(false) as HTMLElement;
@@ -50,7 +62,6 @@ export function writePreviewValue(
     paragraph.after(added);
     return added;
   }
-  const original = originalText(paragraph);
   const start = locator.start ?? original.length;
   if (locator.mode === "replace_leader") {
     hideRange(paragraph, start, locator.end ?? start, mark);
@@ -59,8 +70,9 @@ export function writePreviewValue(
   }
   const before = original.slice(0, start);
   const written = before && !/\s$/.test(before) ? ` ${text}` : text;
-  insertAt(paragraph, start, valueSpan(written, mark));
-  return paragraph;
+  const span = valueSpan(written, mark);
+  insertAt(paragraph, start, span);
+  return original.trim() ? span : paragraph;
 }
 
 /** As the export writes it: on one line, Yes/No capitalised. */

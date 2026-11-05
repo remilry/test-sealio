@@ -1,4 +1,12 @@
+import { readFileSync } from "node:fs";
 import type { FormDetail, FormField } from "./annex7";
+
+/** The real Annex 4 file (tests run from frontend/). */
+export function annex4File(): Uint8Array {
+  return new Uint8Array(
+    readFileSync("../forms/Annex_4_Conditions of Participation and Company Self-Declaration.docx"),
+  );
+}
 
 /**
  * Annex 4 as parsed by the back (docx_parser on the real file, locators in the text of each

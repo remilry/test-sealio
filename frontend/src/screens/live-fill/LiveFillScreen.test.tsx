@@ -1,5 +1,6 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { renderAsync } from "docx-preview";
 import { delay, http } from "msw";
 import { API_URL } from "@/shared/api";
 import { handlers, renderScreen, server } from "@/shared/test";
@@ -9,6 +10,10 @@ import {
   citation,
   knowledgeBase,
   aiRun,
+  annex4,
+  annex4Field,
+  annex4Fields,
+  annex4File,
   annex7,
   annex7Fields,
   answer,
@@ -23,6 +28,11 @@ import { LiveFillScreen } from "./LiveFillScreen";
 
 const push = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
+// The real docx-preview, watched: a Word document must be rendered once, not at every keystroke.
+vi.mock("docx-preview", async (original) => {
+  const actual = await original<typeof import("docx-preview")>();
+  return { ...actual, renderAsync: vi.fn(actual.renderAsync) };
+});
 
 beforeEach(() => {
   push.mockClear();
@@ -1015,5 +1025,111 @@ describe("Live fill (status and source of each answer)", () => {
       expect(screen.queryByText("Form not found")).not.toBeInTheDocument();
       expect(screen.queryByText("We couldn't load this form.")).not.toBeInTheDocument();
     });
+  });
+});
+
+describe("Live fill on a Word form", () => {
+  const COMPANY = annex4Field("exact_company_name");
+  const INSURER = annex4Field("insurance_company");
+
+  function givenWord({ file = annex4File() }: { file?: Uint8Array | null } = {}) {
+    let state = fillState([], annex4Fields);
+    const saved = handlers.saveField(1, (fieldId, { value }) => {
+      const others = state.answers.filter((a) => a.field_id !== fieldId);
+      const entered = answer(fieldId, value?.trim() || null, "2026-11-05T09:00:00Z");
+      state = fillState([...others, entered], annex4Fields);
+      return state;
+    });
+    server.use(
+      handlers.form(annex4()),
+      handlers.tender(tender()),
+      handlers.answers(1, () => state),
+      handlers.formFile(1, file),
+      saved.handler,
+    );
+    const user = userEvent.setup();
+    renderScreen(<LiveFillScreen formId={1} />);
+    return { saved, user };
+  }
+
+  it("shows the Word form with each field highlighted where its answer goes", async () => {
+    // Given the parsed Annex 4
+    givenWord();
+
+    // When the form opens, then the document is rendered with a zone per field
+    const company = await findZone(COMPANY.id);
+    expect(company).toHaveAccessibleName("Exact company name");
+    expect(company).toHaveAttribute("data-tone", "empty");
+    expect(preview().querySelectorAll("[data-field-id]")).toHaveLength(49);
+  });
+
+  it("shows what I type on the Word form at once, then saves it", async () => {
+    // Given the Annex 4 open
+    const { saved, user } = givenWord();
+    await findZone(COMPANY.id);
+
+    // When I type the company name
+    await user.type(
+      fieldList().getByRole("textbox", { name: "Exact company name" }),
+      "Alpenlogic AG",
+    );
+
+    // Then it shows on the document before I leave the field
+    expect(zone(COMPANY.id)).toHaveTextContent("Alpenlogic AG");
+    // And leaving the field saves it, entered by me
+    await user.tab();
+    await waitFor(() =>
+      expect(saved.requests).toEqual([{ fieldId: COMPANY.id, value: "Alpenlogic AG" }]),
+    );
+    await waitFor(() => expect(zone(COMPANY.id)).toHaveAttribute("data-tone", "entered"));
+  });
+
+  it("keeps the same document while I type, instead of rendering it again", async () => {
+    // Given the Annex 4 open
+    const { user } = givenWord();
+    await findZone(COMPANY.id);
+    vi.mocked(renderAsync).mockClear();
+
+    // When I type a few characters and leave the field
+    await user.type(fieldList().getByRole("textbox", { name: "Exact company name" }), "Alpen");
+    await user.tab();
+    await waitFor(() => expect(zone(COMPANY.id)).toHaveAttribute("data-tone", "entered"));
+
+    // Then the document was not rendered again, and still shows the value
+    expect(renderAsync).not.toHaveBeenCalled();
+    expect(zone(COMPANY.id)).toHaveTextContent("Alpen");
+  });
+
+  it("selects a field when I click its zone on the Word form", async () => {
+    // Given the Annex 4 open
+    const { user } = givenWord();
+
+    // When I click the insurance company's zone
+    await user.click(await findZone(INSURER.id));
+
+    // Then its input has the focus
+    expect(fieldList().getByRole("textbox", { name: "Insurance company" })).toHaveFocus();
+  });
+
+  it("still lets me fill the fields when the Word document cannot be displayed", async () => {
+    // Given a file the preview cannot load
+    givenWord({ file: null });
+
+    // Then I am told, and the fields are still there
+    expect(await screen.findByText(/couldn't display this document/)).toBeInTheDocument();
+    expect(fieldList().getByRole("textbox", { name: "Exact company name" })).toBeInTheDocument();
+  });
+
+  it("exports the Word form in its original format", async () => {
+    // Given the Annex 4 open
+    const { user } = givenWord();
+    server.use(handlers.exportSummary(1, exportSummary([], { file_format: "docx" })));
+
+    // When I open the export
+    await user.click(await screen.findByRole("button", { name: "Export DOCX" }));
+
+    // Then I download a DOCX
+    const link = await screen.findByRole("link", { name: "Download DOCX" });
+    expect(link).toHaveAttribute("href", "http://localhost:8000/forms/1/export/file");
   });
 });
