@@ -102,7 +102,7 @@ frontend/e2e/            # un test Playwright : le scénario principal
 | Fichier | Rendu | Champs |
 |---|---|---|
 | PDF (Annex 7, documents de la base) | `react-pdf` | calque HTML positionné depuis le rectangle du localisateur |
-| DOCX (Annex 4, documents de la base) | `docx-preview` | localisateur (tableau, ligne, cellule) → cellule du DOM ; citations de la base surlignées par recherche de texte |
+| DOCX (Annex 4, documents de la base) | `docx-preview` (rendu une fois, zones dessinées dessus) | localisateur (tableau, ligne, cellule, paragraphe, positions de caractères) → paragraphe du DOM (`features/document-preview/docx-locator.ts`), valeur écrite à l'endroit de l'export ; citations de la base surlignées par recherche de texte |
 
 ### Flux Live fill
 ```
