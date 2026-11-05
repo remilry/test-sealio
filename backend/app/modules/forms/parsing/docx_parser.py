@@ -22,6 +22,7 @@ from docx import Document
 from docx.table import Table, _Cell
 from docx.text.paragraph import Paragraph
 
+from app.modules.forms.parsing.docx_layout import distinct_cells
 from app.modules.forms.parsing.labels import SIGNATURE_LABEL, clean_label, leader_runs, unique_key
 from app.modules.forms.parsing.schema import (
     DocxLocator,
@@ -170,16 +171,6 @@ def _body_blank(label: str, index: int, mode: DocxWriteMode, run: int | None) ->
 # --- Tables ---------------------------------------------------------------------------------
 
 
-def _distinct_cells(row_cells: list[_Cell]) -> list[_Cell]:
-    """The row's cells, a merged cell once, without the continuations of vertical merges."""
-    cells: list[_Cell] = []
-    for cell in row_cells:
-        if cells and cell._tc is cells[-1]._tc:  # pyright: ignore[reportPrivateUsage]
-            continue
-        cells.append(cell)
-    return [cell for cell in cells if cell._tc.vMerge != "continue"]  # pyright: ignore[reportPrivateUsage]
-
-
 def _cell_blank(cell: _Cell) -> bool:
     return all(_blank(paragraph) for paragraph in cell.paragraphs)
 
@@ -190,7 +181,7 @@ def _labels(cell: _Cell) -> list[str]:
 
 def _table_blanks(table: Table, table_index: int) -> list[_Blank]:
     section = f"Table {table_index + 1}"
-    rows = [_distinct_cells(list(row.cells)) for row in table.rows]
+    rows = [distinct_cells(row) for row in table.rows]
     yes_no = bool(rows) and any(
         YES_NO_HEADER.search(_text(p)) for c in rows[0] for p in c.paragraphs
     )
