@@ -1,0 +1,31 @@
+{
+  "fields": [
+    {
+      "field": "tender_no_type_of_work",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": [
+        {
+          "value": "ZH-2026-0412, Cloud Platform Services – Canton of Zurich",
+          "citations": [
+            {
+              "passage": "P1",
+              "quote": "Project number (reference): ZH-2026-0412"
+            },
+            {
+              "passage": "P1",
+              "quote": "Project title: Cloud Platform Services – Canton of Zurich"
+            }
+          ],
+          "source_date": null,
+          "valid_until": null
+        }
+      ]
+    }
+  ],
+  "timing": {
+    "first_output_seconds": 2.95,
+    "total_seconds": 4.24
+  }
+}

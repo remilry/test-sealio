@@ -1,0 +1,134 @@
+{
+  "fields": [
+    {
+      "field": "competent_tax_office_exact_address",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": [
+        {
+          "value": "Cantonal Tax Office Zurich, Steuerweg 12, 8090 Zurich",
+          "citations": [
+            {
+              "passage": "P2",
+              "quote": "Cantonal Tax Office Zurich"
+            },
+            {
+              "passage": "P2",
+              "quote": "Steuerweg 12, 8090 Zurich"
+            }
+          ],
+          "source_date": {
+            "date": "2026-10-01",
+            "citation": {
+              "passage": "P2",
+              "quote": "Zurich, 1 October 2026"
+            }
+          },
+          "valid_until": null
+        }
+      ]
+    },
+    {
+      "field": "ahv_compensation_office_exact_address",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": [
+        {
+          "value": "AHV compensation office 'Zurich Cantonal', Hardturmstrasse 120, 8005 Zurich",
+          "citations": [
+            {
+              "passage": "P9",
+              "quote": "AHV compensation office 'Zurich Cantonal'"
+            },
+            {
+              "passage": "P9",
+              "quote": "Hardturmstrasse 120, 8005 Zurich"
+            }
+          ],
+          "source_date": {
+            "date": "2026-10-05",
+            "citation": {
+              "passage": "P9",
+              "quote": "Zurich, 5 October 2026"
+            }
+          },
+          "valid_until": null
+        },
+        {
+          "value": "SVA Zurich (AHV compensation office), Röntgenstrasse 17, 8005 Zurich",
+          "citations": [
+            {
+              "passage": "P12",
+              "quote": "affiliated with the SVA Zurich as AHV compensation office (Röntgenstrasse 17, 8005 Zurich)"
+            }
+          ],
+          "source_date": {
+            "date": "2024-01-01",
+            "citation": {
+              "passage": "P12",
+              "quote": "Annual report 2024"
+            }
+          },
+          "valid_until": null
+        }
+      ]
+    },
+    {
+      "field": "for_foreign_bidders_details_of_the_pension_scheme_exact_addr",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": []
+    },
+    {
+      "field": "bvg_pension_fund_exact_address_and_details",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": [
+        {
+          "value": "Sammelstiftung Limmat BVG, Seestrasse 200, 8002 Zurich; Contract no. VT-2016-0412; Insurance plan Plan 3 - basic plus supplementary (BVG+)",
+          "citations": [
+            {
+              "passage": "P14",
+              "quote": "Sammelstiftung Limmat BVG"
+            },
+            {
+              "passage": "P14",
+              "quote": "Seestrasse 200, 8002 Zurich"
+            },
+            {
+              "passage": "P14",
+              "quote": "Contract no. VT-2016-0412"
+            },
+            {
+              "passage": "P14",
+              "quote": "Insurance plan\nPlan 3 - basic plus supplementary (BVG+)"
+            }
+          ],
+          "source_date": {
+            "date": "2026-10-06",
+            "citation": {
+              "passage": "P14",
+              "quote": "Zurich, 6 October 2026"
+            }
+          },
+          "valid_until": null
+        }
+      ]
+    },
+    {
+      "field": "for_foreign_bidders_details_of_the_pension_scheme_exact_addr_2",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": []
+    }
+  ],
+  "timing": {
+    "first_output_seconds": 9.48,
+    "total_seconds": 16.38
+  }
+}

@@ -1,0 +1,149 @@
+{
+  "fields": [
+    {
+      "field": "insurance_coverage_details",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": [
+        {
+          "value": "Personal injury 10,000,000; Property damage 10,000,000; Financial loss (pure) 5,000,000; Annual aggregate 20,000,000; Territorial scope: Switzerland and the Principality of Liechtenstein; worldwide for temporary assignments up to 90 days, excluding USA and Canada",
+          "citations": [
+            {
+              "passage": "P9",
+              "quote": "Personal injury\n10,000,000\n1,000\nIncl. consequential losses"
+            },
+            {
+              "passage": "P9",
+              "quote": "Property damage\n10,000,000\n1,000\nIncl. data media, excl. data itself"
+            },
+            {
+              "passage": "P9",
+              "quote": "Financial loss (pure)\n5,000,000\n5,000\nProfessional liability for consulting\nand development"
+            },
+            {
+              "passage": "P9",
+              "quote": "Annual aggregate (all covers)\n20,000,000\n-\nPer insurance year"
+            },
+            {
+              "passage": "P9",
+              "quote": "Territorial scope: Switzerland and the Principality of Liechtenstein; worldwide for temporary assignments up to 90 days, excluding USA and Canada claims."
+            }
+          ],
+          "source_date": {
+            "date": "2025-11-03",
+            "citation": {
+              "passage": "P2",
+              "quote": "Issued: 3 November 2025"
+            }
+          },
+          "valid_until": null
+        }
+      ]
+    },
+    {
+      "field": "insurance_company",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": [
+        {
+          "value": "Limmat Versicherungen AG",
+          "citations": [
+            {
+              "passage": "P2",
+              "quote": "Limmat Versicherungen AG"
+            }
+          ],
+          "source_date": {
+            "date": "2025-11-03",
+            "citation": {
+              "passage": "P2",
+              "quote": "Issued: 3 November 2025"
+            }
+          },
+          "valid_until": null
+        }
+      ]
+    },
+    {
+      "field": "personal_injury",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": [
+        {
+          "value": "10,000,000",
+          "citations": [
+            {
+              "passage": "P9",
+              "quote": "Personal injury\n10,000,000\n1,000\nIncl. consequential losses"
+            }
+          ],
+          "source_date": {
+            "date": "2025-11-03",
+            "citation": {
+              "passage": "P2",
+              "quote": "Issued: 3 November 2025"
+            }
+          },
+          "valid_until": null
+        }
+      ]
+    },
+    {
+      "field": "property_damage",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": [
+        {
+          "value": "10,000,000",
+          "citations": [
+            {
+              "passage": "P9",
+              "quote": "Property damage\n10,000,000\n1,000\nIncl. data media, excl. data itself"
+            }
+          ],
+          "source_date": {
+            "date": "2025-11-03",
+            "citation": {
+              "passage": "P2",
+              "quote": "Issued: 3 November 2025"
+            }
+          },
+          "valid_until": null
+        }
+      ]
+    },
+    {
+      "field": "financial_loss",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": [
+        {
+          "value": "5,000,000",
+          "citations": [
+            {
+              "passage": "P9",
+              "quote": "Financial loss (pure)\n5,000,000\n5,000\nProfessional liability for consulting\nand development"
+            }
+          ],
+          "source_date": {
+            "date": "2025-11-03",
+            "citation": {
+              "passage": "P2",
+              "quote": "Issued: 3 November 2025"
+            }
+          },
+          "valid_until": null
+        }
+      ]
+    }
+  ],
+  "timing": {
+    "first_output_seconds": 5.07,
+    "total_seconds": 12.78
+  }
+}

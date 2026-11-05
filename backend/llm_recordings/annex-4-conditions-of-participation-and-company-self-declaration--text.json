@@ -1,0 +1,15 @@
+{
+  "fields": [
+    {
+      "field": "place_and_date",
+      "user_only": true,
+      "user_only_reason": "Place and date of signing must be provided and signed by the bidder's representative.",
+      "suggested_value": "Zurich, 05.11.2026",
+      "candidates": []
+    }
+  ],
+  "timing": {
+    "first_output_seconds": 3.56,
+    "total_seconds": 4.22
+  }
+}

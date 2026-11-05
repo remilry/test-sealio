@@ -45,7 +45,7 @@ class Settings(BaseSettings):
     # Runs of each model call, merged: what differs between them becomes a doubt (1 or 2).
     fill_runs_per_call: int = 2
     # Average time of one model call, for the estimate shown before a fill.
-    fill_seconds_per_call: int = 25
+    fill_seconds_per_call: int = 30
     openai_api_key: SecretStr | None = Field(
         default=None,
         validation_alias=AliasChoices("OPENAI_API_KEY", "FORMPILOT_OPENAI_API_KEY"),
