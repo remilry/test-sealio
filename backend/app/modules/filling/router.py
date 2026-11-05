@@ -91,6 +91,32 @@ def start_fill(
     return run
 
 
+@router.post(
+    "/fill/retry",
+    status_code=status.HTTP_202_ACCEPTED,
+    responses={
+        404: {"description": "Unknown form"},
+        409: {"description": "The form is being filled, or no field is left to retry"},
+        503: {"description": "Automatic filling is not available (no API key)"},
+    },
+)
+def retry_fill(
+    form_id: int,
+    background_tasks: BackgroundTasks,
+    session: SessionDep,
+    tenant_id: CurrentTenantId,
+    llm: LanguageModel,
+) -> AiRun:
+    """Fill again, in the background, only the fields the last fill could not answer
+    (`ai_run.failed_field_ids`, less the ones the user filled since). Every other answer stays.
+    Followed on `GET …/fill/events` like a fill."""
+    fill_id, field_ids = service.start_ai_retry(session, tenant_id, form_id)
+    background_tasks.add_task(job.run_fill, fill_id, llm, only=field_ids)
+    run = service.get_ai_run(session, tenant_id, form_id)
+    assert run is not None, "just started"
+    return run
+
+
 @router.delete(
     "/fill",
     status_code=status.HTTP_204_NO_CONTENT,

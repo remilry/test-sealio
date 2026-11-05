@@ -229,6 +229,30 @@ def start_ai_fill(session: Session, tenant_id: int, form_id: int) -> int:
     return fill.id
 
 
+def start_ai_retry(session: Session, tenant_id: int, form_id: int) -> tuple[int, set[int]]:
+    """Run the AI again on the fields the last run could not answer; returns the fill id and
+    those fields (the ones the user filled since are left out). Everything else is kept."""
+    forms_service.get_form(session, form_id)
+    fill = session.scalars(
+        select(FormFill)
+        .where(FormFill.tenant_id == tenant_id, FormFill.form_id == form_id)
+        .with_for_update()
+    ).one_or_none()
+    if fill is not None and fill.ai_status == AiStatus.RUNNING:
+        raise ConflictError("This form is already being filled.")
+    failed = set() if fill is None else set(fill.ai_failed_field_ids)
+    to_retry = failed - user_resolved_field_ids(session, fill.id) if fill else set()
+    if fill is None or not to_retry:
+        raise ConflictError("Nothing to retry: every field has an answer.")
+    session.execute(delete(FillEvent).where(FillEvent.form_fill_id == fill.id))
+    fill.ai_status = AiStatus.RUNNING
+    fill.ai_started_at = datetime.now(UTC)
+    fill.ai_finished_at = None
+    fill.ai_error = None
+    session.commit()
+    return fill.id, to_retry
+
+
 def discard_fill(session: Session, tenant_id: int, form_id: int) -> None:
     """Delete the tenant's fill of the form: every answer (the user's included), the run and its
     events go with it (cascade), and the form is "not started" again. Also while it is running:

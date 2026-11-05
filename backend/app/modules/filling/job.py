@@ -130,13 +130,15 @@ def _publish(
     )
 
 
-def run_fill(fill_id: int, llm: LLM, today: date | None = None) -> None:
+def run_fill(
+    fill_id: int, llm: LLM, today: date | None = None, *, only: set[int] | None = None
+) -> None:
     """Fill the form with the AI. Never raises: a failure ends the run with an "error" event.
     A fill discarded meanwhile ends the run silently (nothing is written into it, or into a new
     fill started since: the ids differ)."""
     with SessionLocal() as session:
         try:
-            _run(session, fill_id, llm, today or date.today())
+            _run(session, fill_id, llm, today or date.today(), only)
         except _Discarded, _Stopped:
             session.rollback()
             logger.info("AI fill %s was discarded, stopped", fill_id)
@@ -175,7 +177,9 @@ def knowledge_search(session: Session, tenant_id: int) -> Search:
     return search
 
 
-def _run(session: Session, fill_id: int, llm: LLM, today: date) -> None:
+def _run(
+    session: Session, fill_id: int, llm: LLM, today: date, only: set[int] | None = None
+) -> None:
     started = time.monotonic()
     fill = session.get_one(FormFill, fill_id)
     tenant_id, form = fill.tenant_id, forms_service.get_form(session, fill.form_id)
@@ -196,6 +200,9 @@ def _run(session: Session, fill_id: int, llm: LLM, today: date) -> None:
         sections=len(sections),
     )
     kept = service.user_resolved_field_ids(session, fill_id)
+    if only is not None:
+        # A retry: every field but the ones to retry is kept as it is.
+        kept |= {f.id for f in form.fields if f.id not in only}
     contexts = forms_service.field_contexts(session, form.id)
     groups = call_groups(
         [

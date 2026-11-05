@@ -144,6 +144,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/forms/{form_id}/fill/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retry Fill
+         * @description Fill again, in the background, only the fields the last fill could not answer
+         *     (`ai_run.failed_field_ids`, less the ones the user filled since). Every other answer stays.
+         *     Followed on `GET …/fill/events` like a fill.
+         */
+        post: operations["retry_fill_forms__form_id__fill_retry_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/forms/{form_id}/fill/events": {
         parameters: {
             query?: never;
@@ -1044,6 +1066,58 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+        };
+    };
+    retry_fill_forms__form_id__fill_retry_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                form_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiRun"];
+                };
+            };
+            /** @description Unknown form */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The form is being filled, or no field is left to retry */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Automatic filling is not available (no API key) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
