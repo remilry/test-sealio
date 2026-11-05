@@ -1,7 +1,7 @@
 # 7 — Relecture et humain dans la boucle (design)
 
 > Étape 7 de `docs/PLAN.md`. Branche `step-7-review`. S'appuie sur 5d (file de champs, statuts), 6b/6c (Annex 4, types `unsure` / `outdated`).
-> Statut : à valider.
+> Statut : validé dans la conversation (2026-11-05).
 
 ## 1. Intention
 
