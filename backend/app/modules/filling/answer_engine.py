@@ -112,61 +112,34 @@ def answer_section(
     today: date,
     on_field: OnField | None = None,
 ) -> SectionResult:
-    """The verified evidence of each field of the section, with what finding it cost."""
+    """The verified evidence of each field of the section, with what finding it cost.
+
+    With `on_field`, each field is published as soon as the model has written its answer; the
+    fields the model did not answer are published as not found at the end.
+    """
     started = time.monotonic()
     passages = _passages(fields, search, tender_details)
     search_seconds = time.monotonic() - started
-    request = LLMRequest(
-        key=request_key(form_file_name, section),
-        instructions=INSTRUCTIONS.format(company=company),
-        prompt=PROMPT.format(
-            today=today.isoformat(),
-            form=form_title,
-            section=section,
-            fields="\n".join(
-                f"- key: {f.key} · label: {f.label} · kind: {_kind(f.kind)}" for f in fields
-            ),
-            passages="\n\n".join(_render(p) for p in passages),
-        ),
-        schema=LLMSectionAnswer,
+
+    request = _section_request(
+        company=company,
+        form_title=form_title,
+        form_file_name=form_file_name,
+        section=section,
+        fields=fields,
+        passages=passages,
+        today=today,
     )
-    evidence: dict[int, ValidatedField] = {}
+    evidence = _SectionEvidence(fields, passages, on_field)
+    if on_field is None:
+        result = llm.generate_structured(request)
+    else:
+        result = llm.generate_structured(request, evidence.add_streamed)
+    evidence.add_all(result.output.fields)
+    evidence.add_not_found()
 
-    def publish(answer: LLMFieldAnswer) -> None:
-        # By key, as asked; models sometimes echo the label instead.
-        match = _match_key(answer.field)
-        field = next((f for f in fields if _match_key(f.key) == match), None) or next(
-            (f for f in fields if _match_key(f.label) == match), None
-        )
-        if field is None or field.id in evidence:
-            return
-        evidence[field.id] = validate_field(field.kind, answer, passages)
-        if on_field is not None:
-            on_field(field.id, evidence[field.id])
-
-    def on_partial(partial: dict[str, Any]) -> None:
-        for item in complete_items(partial, "fields"):
-            # Only a malformed item is skipped: an error raised by `on_field` propagates.
-            try:
-                answer = LLMFieldAnswer.model_validate(item)
-            except ValidationError:
-                continue
-            publish(answer)
-
-    result = (
-        llm.generate_structured(request)
-        if on_field is None
-        else llm.generate_structured(request, on_partial)
-    )
-    for answer in result.output.fields:
-        publish(answer)
-    for field in fields:
-        if field.id not in evidence:
-            evidence[field.id] = validate_field(field.kind, None, passages)
-            if on_field is not None:
-                on_field(field.id, evidence[field.id])
     return SectionResult(
-        evidence={f.id: evidence[f.id] for f in fields},
+        evidence=evidence.by_field(),
         passages=len(passages),
         search_seconds=search_seconds,
         usage=result.usage,
@@ -181,24 +154,127 @@ def complete_items(partial: dict[str, Any], key: str) -> list[dict[str, Any]]:
     return [item for item in items[:-1] if isinstance(item, dict)]
 
 
+class _SectionEvidence:
+    """The verified evidence of a section's fields: each field is validated and published once,
+    from the first answer the model gives for it."""
+
+    def __init__(
+        self,
+        fields: list[FieldToAnswer],
+        passages: list[SourcePassage],
+        on_field: OnField | None,
+    ) -> None:
+        self._fields = fields
+        self._passages = passages
+        self._on_field = on_field
+        self._evidence: dict[int, ValidatedField] = {}
+
+    def add_streamed(self, partial: dict[str, Any]) -> None:
+        """The answers complete so far in the model's partial output (called while it writes)."""
+        self.add_all(_complete_answers(partial))
+
+    def add_all(self, answers: list[LLMFieldAnswer]) -> None:
+        for answer in answers:
+            self.add(answer)
+
+    def add(self, answer: LLMFieldAnswer) -> None:
+        field = _field_answered(self._fields, answer)
+        if field is None or self._has(field):
+            return
+        self._record(field, answer)
+
+    def add_not_found(self) -> None:
+        """The fields the model gave no answer for: validated without one (not found)."""
+        for field in self._fields:
+            if not self._has(field):
+                self._record(field, None)
+
+    def by_field(self) -> dict[int, ValidatedField]:
+        return {field.id: self._evidence[field.id] for field in self._fields}
+
+    def _has(self, field: FieldToAnswer) -> bool:
+        return field.id in self._evidence
+
+    def _record(self, field: FieldToAnswer, answer: LLMFieldAnswer | None) -> None:
+        evidence = validate_field(field.kind, answer, self._passages)
+        self._evidence[field.id] = evidence
+        if self._on_field is not None:
+            self._on_field(field.id, evidence)
+
+
+def _complete_answers(partial: dict[str, Any]) -> list[LLMFieldAnswer]:
+    """The field answers the model has finished writing. A malformed one is skipped (it is
+    validated here, so an error raised while publishing an answer still propagates)."""
+    answers: list[LLMFieldAnswer] = []
+    for item in complete_items(partial, "fields"):
+        try:
+            answers.append(LLMFieldAnswer.model_validate(item))
+        except ValidationError:
+            continue
+    return answers
+
+
+def _field_answered(fields: list[FieldToAnswer], answer: LLMFieldAnswer) -> FieldToAnswer | None:
+    """The field an answer is for: by key, as the model is asked, else by label (models
+    sometimes echo the label instead). None for a field that is not in the section."""
+    name = _normalized(answer.field)
+    for field in fields:
+        if _normalized(field.key) == name:
+            return field
+    for field in fields:
+        if _normalized(field.label) == name:
+            return field
+    return None
+
+
+def _section_request(
+    *,
+    company: str,
+    form_title: str,
+    form_file_name: str,
+    section: str,
+    fields: list[FieldToAnswer],
+    passages: list[SourcePassage],
+    today: date,
+) -> LLMRequest[LLMSectionAnswer]:
+    """The model call for one section: its fields and the passages to answer them from."""
+    return LLMRequest(
+        key=request_key(form_file_name, section),
+        instructions=INSTRUCTIONS.format(company=company),
+        prompt=PROMPT.format(
+            today=today.isoformat(),
+            form=form_title,
+            section=section,
+            fields="\n".join(_describe_field(field) for field in fields),
+            passages="\n\n".join(_render(passage) for passage in passages),
+        ),
+        schema=LLMSectionAnswer,
+    )
+
+
 def _passages(
     fields: list[FieldToAnswer], search: Search, tender_details: str
 ) -> list[SourcePassage]:
     """Tender details first, then each field's passages in rank order, each once, labelled."""
     found = [SourcePassage(label="", text=tender_details, document_name=TENDER_DETAILS)]
-    seen: set[int] = set()
+    seen_chunks: set[int] = set()
     for field in fields:
         for passage in search(field.label, SEARCH_K):
-            if passage.chunk_id is not None and passage.chunk_id in seen:
-                continue
             if passage.chunk_id is not None:
-                seen.add(passage.chunk_id)
+                if passage.chunk_id in seen_chunks:
+                    continue
+                seen_chunks.add(passage.chunk_id)
             found.append(passage)
     return [replace(passage, label=f"P{i}") for i, passage in enumerate(found, start=1)]
 
 
-def _match_key(text: str) -> str:
+def _normalized(text: str) -> str:
+    """Case and spacing ignored: "Telephone " and "telephone" are the same name."""
     return " ".join(text.casefold().split())
+
+
+def _describe_field(field: FieldToAnswer) -> str:
+    return f"- key: {field.key} · label: {field.label} · kind: {_kind(field.kind)}"
 
 
 def _render(passage: SourcePassage) -> str:
