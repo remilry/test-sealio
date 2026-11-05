@@ -46,8 +46,8 @@ with one quote per fact; a field asking for an office, a company or a person wit
 gets the name and the address. When the passages list several people, numbers or addresses, \
 choose the one that fits the field: they are options, not a disagreement.
 - A number must count exactly what the field asks for: a broader or different category ("other \
-staff and apprentices" for auxiliary staff) is not an answer. Likewise, a list holds only items of the kind the field \
-asks for (certificates are certifications, not insurance policies).
+staff and apprentices" for auxiliary staff) is not an answer. Likewise, a list holds only \
+items of the kind the field asks for (certificates are certifications, not insurance policies).
 - When different documents give different values for the same fact (two addresses for the same \
 office, two headcounts), give one candidate per value, each with its own quotes and its \
 document's date, even when you think one of them is out of date: do not choose between documents \
