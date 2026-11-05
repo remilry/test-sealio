@@ -1,4 +1,4 @@
-.PHONY: install db db-stop dev dev-back dev-front test test-slow test-all test-back test-front e2e lint typecheck format gen-api db-schema
+.PHONY: install db db-stop dev dev-back dev-front test test-slow test-all test-back test-front e2e lint typecheck format gen-api db-schema eval eval-live eval-report
 
 BACK = cd backend &&
 FRONT = cd frontend &&
@@ -32,6 +32,19 @@ test-front:
 
 test-slow: db       ## Tests that load the real embedding model
 	$(BACK) uv run pytest -m slow
+
+# The evaluation runs on its own database and data folder: the demo is never touched.
+EVAL = FORMPILOT_DATABASE_URL=postgresql+psycopg://formpilot:formpilot@localhost:5432/formpilot_eval FORMPILOT_DATA_DIR=$(CURDIR)/data-eval
+RUNS ?= 1
+
+eval: db            ## Score the recorded answers against the ground truth (free)
+	$(BACK) $(EVAL) uv run python -m scripts.evaluate
+
+eval-live: db       ## Same with the real model, RUNS=n FORM=annex-4|annex-7 (paid, needs OPENAI_API_KEY)
+	$(BACK) $(EVAL) FORMPILOT_LLM_PROVIDER=openai uv run python -m scripts.evaluate --live --runs $(RUNS) $(if $(FORM),--form $(FORM))
+
+eval-report:        ## Write docs/EVALUATION.md from the saved live runs
+	$(BACK) uv run python -m scripts.evaluate --write ../docs/EVALUATION.md
 
 test-all: db test-front
 	$(BACK) uv run pytest -m ""

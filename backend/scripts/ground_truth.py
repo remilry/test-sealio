@@ -122,3 +122,23 @@ def _problem(want: Expected, got: tuple[AnswerType, str | None] | None) -> str |
 
 def _letters(text: str) -> str:
     return re.sub(r"[^a-z0-9]", "", text.casefold())
+
+
+# knowledge-base/GROUND_TRUTH.md, Annex 7 (the signature is never answered).
+ANNEX_7: dict[str, Expected] = {
+    # From the tender details.
+    "project_number_project_title_project_name": expect(AUTO, contains=("ZH-2026-0412",)),
+    "name_of_the_contracting_authority": expect(AUTO, contains=("Canton of Zurich",)),
+    "name_and_legal_form": expect(AUTO, contains=("Alpenlogic AG", "limited by shares")),
+    "business_address": expect(AUTO, contains=("Pfingstweidstrasse 31", "8005")),
+    "contact_person": expect(AUTO, contains=("Marc Keller",)),
+    "telephone": expect(AUTO, contains=("+41 44 555 01 20",)),
+    "e_mail": expect(AUTO, contains=("marc.keller@alpenlogic.example",)),
+    # The user's to set: pre-written, to review.
+    "place_and_date": expect(MANUAL),
+    # Proposed from the register (sole signature), or left to the user.
+    "first_name_s_and_surname_s": expect(AUTO, MANUAL, contains=("Marc Keller",)),
+}
+
+# Expected answers by form, by the start of its slugged file name.
+GROUND_TRUTH: dict[str, dict[str, Expected]] = {"annex-4": ANNEX_4, "annex-7": ANNEX_7}
