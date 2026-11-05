@@ -8,7 +8,16 @@ from openai.types.responses import ResponseUsage
 from pydantic import BaseModel
 from pydantic_core import from_json
 
-from app.llm.facade import LLMError, LLMPrices, LLMRequest, LLMResult, LLMUsage, OnPartial
+from app.core.config import get_settings
+from app.llm.facade import (
+    LLMError,
+    LLMPrices,
+    LLMRequest,
+    LLMResult,
+    LLMUsage,
+    OnPartial,
+    TransientLLMError,
+)
 
 
 class OpenAILLM:
@@ -19,8 +28,15 @@ class OpenAILLM:
         model: str,
         reasoning_effort: Literal["minimal", "low", "medium", "high"],
         prices: LLMPrices,
+        timeout_seconds: float | None = None,
     ) -> None:
-        self._client = openai.OpenAI(api_key=api_key, timeout=120.0, max_retries=2)
+        # No retry of the SDK's own: RetryingLLM retries every passing failure, the cut stream
+        # included (the SDK only retries before the answer starts).
+        self._client = openai.OpenAI(
+            api_key=api_key,
+            timeout=timeout_seconds or get_settings().llm_call_timeout_seconds,
+            max_retries=0,
+        )
         self._model = model
         self._effort: Literal["minimal", "low", "medium", "high"] = reasoning_effort
         self._prices = prices
@@ -49,11 +65,24 @@ class OpenAILLM:
                         if partial:
                             on_partial(partial)
                 response = stream.get_final_response()
+        except (
+            openai.APIConnectionError,  # APITimeoutError included
+            openai.RateLimitError,
+            openai.InternalServerError,
+        ) as error:
+            raise TransientLLMError(
+                f"The language model failed: {error}", retry_after=_retry_after(error)
+            ) from error
         except openai.APIError as error:
             raise LLMError(f"The language model failed: {error}") from error
+        except ValueError as error:
+            # Unreadable output (pydantic's ValidationError is a ValueError): another try may do.
+            raise TransientLLMError(
+                f"The language model's answer could not be read: {error}"
+            ) from error
         parsed = response.output_parsed
         if parsed is None:
-            raise LLMError("The language model returned no usable answer.")
+            raise TransientLLMError("The language model returned no usable answer.")
         return LLMResult(output=parsed, usage=self._usage(response.usage, started))
 
     def _usage(self, usage: ResponseUsage | None, started: float) -> LLMUsage:
@@ -74,6 +103,16 @@ class OpenAILLM:
             ),
             seconds=seconds,
         )
+
+
+def _retry_after(error: openai.APIError) -> float | None:
+    """The wait in seconds the provider asked for (`Retry-After` header), if any."""
+    if not isinstance(error, openai.APIStatusError):
+        return None
+    try:
+        return float(error.response.headers.get("retry-after", ""))
+    except ValueError:
+        return None
 
 
 def _parse_partial(text: str) -> dict[str, Any] | None:

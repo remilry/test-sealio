@@ -83,6 +83,15 @@ class LLMError(Exception):
     """The model could not give an answer (provider error, refusal, missing recording)."""
 
 
+class TransientLLMError(LLMError):
+    """A failure that may pass (connection cut, timeout, rate limit, server error, an answer that
+    could not be read): worth another try. `retry_after` is the wait the provider asked for."""
+
+    def __init__(self, message: str, *, retry_after: float | None = None) -> None:
+        super().__init__(message)
+        self.retry_after = retry_after
+
+
 # Receives the output parsed so far (a JSON object, possibly incomplete).
 OnPartial = Callable[[dict[str, Any]], None]
 
@@ -97,6 +106,18 @@ class LLM(Protocol):
 
 @lru_cache
 def get_llm() -> LLM:
+    """The configured model, its passing failures retried (RetryingLLM)."""
+    from app.llm.retrying import RetryingLLM
+
+    settings = get_settings()
+    return RetryingLLM(
+        _provider(),
+        attempts=settings.llm_attempts,
+        base_seconds=settings.llm_retry_base_seconds,
+    )
+
+
+def _provider() -> LLM:
     settings = get_settings()
     if settings.llm_provider == "openai":
         from app.llm.openai_adapter import OpenAILLM

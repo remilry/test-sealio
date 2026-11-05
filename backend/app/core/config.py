@@ -40,6 +40,11 @@ class Settings(BaseSettings):
     llm_price_input: float = 0.25
     llm_price_cached_input: float = 0.025
     llm_price_output: float = 2.0
+    # Attempts of a model call failing for a passing reason (timeout, rate limit, cut stream…),
+    # the first pause (doubled after each attempt) and the time one attempt may take.
+    llm_attempts: int = 3
+    llm_retry_base_seconds: float = 2.0
+    llm_call_timeout_seconds: float = 90.0
     # Model calls of a fill run at the same time (one per call group, see filling/groups.py).
     fill_max_parallel_calls: int = 10
     # Runs of each model call, merged: what differs between them becomes a doubt (1 or 2).
