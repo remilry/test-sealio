@@ -2,7 +2,7 @@
 
 > Document vivant. Chaque étape y est cochée et détaillée au fur et à mesure.
 > Contexte produit et priorités : voir `CLAUDE.md`. Échéance : jeudi 5 novembre.
-> Statut : étapes 0 à 4.5 faites ; étape 5 découpée en 5a–5d, 5a, 5b et 5c mergées, 5d faite (remplissage automatique dans l'UI, en attente de validation) ; en cours : étape 6 (Annex 4, découpée en 6a–6d ; 6a, 6b et 6c mergées, 6d faite, en attente de validation), avant la relecture (7) et les finitions (7.5). Parcours détaillé : `docs/USER_FLOW.md`. Les choix techniques marqués _proposition_ restent à confirmer à l'étape 3.
+> Statut : étapes 0 à 4.5 faites ; étape 5 découpée en 5a–5d, 5a, 5b et 5c mergées, 5d faite (remplissage automatique dans l'UI, en attente de validation) ; en cours : étape 6 (Annex 4, découpée en 6a–6d ; 6a à 6d mergées ; prochaine : étape 7), avant la relecture (7) et les finitions (7.5). Parcours détaillé : `docs/USER_FLOW.md`. Les choix techniques marqués _proposition_ restent à confirmer à l'étape 3.
 
 ## 1. Ce qu'on a appris des deux formulaires
 
@@ -123,7 +123,7 @@ Chaque étape à partir de la 4 livre une **fonctionnalité utilisable de bout e
   - Pas encore de cartes Conflit / Périmé ni de vue *Source* (étape 7).
   - Le numéro de page d'une source est 0-based dans l'API (comme `chunk` / `locator`) ; la carte affiche page + 1.
 
-### Étape 6 — Annex 4 (DOCX) de bout en bout ⬜ _(critique, testé)_
+### Étape 6 — Annex 4 (DOCX) de bout en bout ✅ _(critique, testé)_
 _Avancée avant la relecture et les finitions (décision 2026-11-05) : ses cas difficiles (conflits, périmé, déclarations Oui/Non) donnent à la relecture de quoi travailler._
 - Découpée en 4 sous-étapes, chacune sur sa branche et validée avant la suivante : 6a parseur + export DOCX (back), 6b aperçu Word dans *Live fill* + saisie + export dans l'UI, 6c remplissage automatique (sections en parallèle, réponses enregistrées), 6d aperçu Word dans *Company knowledge*.
 
@@ -169,7 +169,7 @@ _Avancée avant la relecture et les finitions (décision 2026-11-05) : ses cas d
   - Les déclarations dont la règle ne s'applique pas (CCT, contrat-type) restent vides au lieu de « Yes » (la vérité terrain attend « Yes » expliqué).
   - L'Annex 7 est enregistrée avec une seule exécution : sa 2ᵉ exécution rejoue la 1ʳᵉ.
 
-#### 6d — Aperçu Word dans *Company knowledge* ✅
+#### 6d — Aperçu Word dans *Company knowledge* ✅ (mergée le 2026-11-05)
 - **Front** : un document Word de la base de connaissances s'ouvre dans la modale d'aperçu comme un PDF : rendu page par page par le `WordViewer` de `document-preview` (le même que *Setup* : pagination A4, polices de remplacement, numéros de page), bouton *Download* gardé ; fichier illisible → message `documentLoadError`, téléchargement toujours possible. Le message « pas encore d'aperçu » est retiré.
 - Tests : écran *Knowledge* (vrai rapport annuel DOCX rendu par le vrai `docx-preview` sous jsdom, fichier introuvable), handler MSW `documentFile` ; e2e : aperçu du rapport annuel après le dépôt des documents.
 - Hors périmètre : l'aperçu Word dans la vue *Source* vient avec cette vue (étape 7).
