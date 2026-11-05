@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import { cn } from "@/shared/lib/utils";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { useDocumentFile } from "./document-preview.queries";
+import { markPageFields, numberPages } from "./docx-fields";
 import { withFontFallbacks, type DocumentFont } from "./docx-fonts";
 import { showImages } from "./docx-images";
 import { findParagraph, writePreviewValue } from "./docx-locator";
@@ -122,6 +123,7 @@ const RENDER_OPTIONS = { inWrapper: false, className: "docx" };
  */
 async function renderPages(blob: Blob, target: HTMLElement, isCurrent: () => boolean) {
   const document_ = await parseAsync(blob, RENDER_OPTIONS);
+  markPageFields(document_);
   const nodes = await renderDocument(document_, RENDER_OPTIONS);
   if (!isCurrent()) return false;
   const pages = document.createElement("div");
@@ -131,6 +133,7 @@ async function renderPages(blob: Blob, target: HTMLElement, isCurrent: () => boo
   withWordLineSpacing(pages);
   target.replaceChildren(pages);
   paginate(pages);
+  numberPages(pages);
   void showImages(pages);
   return true;
 }
