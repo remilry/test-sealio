@@ -89,6 +89,17 @@ test("I auto-fill Annex 7 from my documents, correct a field and download it in 
   await expect(addressCard.locator("blockquote")).toContainText(
     "Pfingstweidstrasse 31, 8005 Zurich",
   );
+  // Opened from the card, the source shows the document at its page, the quote highlighted.
+  await addressCard
+    .getByRole("button", { name: "Open the source: Commercial register extract" })
+    .click();
+  await expect(page.getByRole("tab", { name: "Source" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByText("Used for: Business address")).toBeVisible();
+  const sourcePage = page.getByLabel("Page 1", { exact: true });
+  await expect(sourcePage).toHaveAttribute("aria-current", "page");
+  await expect(sourcePage.locator("mark").first()).toBeVisible();
+  await page.getByRole("tab", { name: "Form" }).click();
+  await expect(preview).toBeVisible();
 
   // Correct one field by hand: it is saved and shown on the form.
   await address.clear();
@@ -169,7 +180,8 @@ test("I auto-fill Annex 7 from my documents, correct a field and download it in 
   await expect(injury.getByText("Source expired on 31.10.2026")).toBeVisible();
   // I keep the amount, as it is.
   await injury.getByRole("button", { name: "Keep this value" }).click();
-  await expect(injury.getByText(/^Kept by you · /)).toBeVisible();
+  // (the card closes on the next open field, its line tagged)
+  await expect(injury.getByText("Kept", { exact: true })).toBeVisible();
 
   // No document proves the VAT is paid: left empty, I answer it.
   const vat = page
@@ -188,7 +200,7 @@ test("I auto-fill Annex 7 from my documents, correct a field and download it in 
   });
   await contract.click();
   await contract.getByRole("button", { name: "Leave empty" }).click();
-  await expect(contract.getByText(/^Left empty by you · /)).toBeVisible();
+  await expect(contract.getByText("Left empty", { exact: true })).toBeVisible();
   await expect.poll(openCount).toBe(openAtFirst - 3);
 
   // The export warns only about what nobody settled.
