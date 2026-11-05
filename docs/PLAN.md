@@ -2,7 +2,7 @@
 
 > Document vivant. Chaque étape y est cochée et détaillée au fur et à mesure.
 > Contexte produit et priorités : voir `CLAUDE.md`. Échéance : jeudi 5 novembre.
-> Statut : étapes 0 à 4.5 faites ; étape 5 découpée en 5a–5d, 5a, 5b et 5c mergées, 5d faite (remplissage automatique dans l'UI, en attente de validation) ; en cours : étape 6 (Annex 4, découpée en 6a–6d ; 6a et 6b mergées, 6c faite, en attente de validation ; prochaine : 6d), avant la relecture (7) et les finitions (7.5). Parcours détaillé : `docs/USER_FLOW.md`. Les choix techniques marqués _proposition_ restent à confirmer à l'étape 3.
+> Statut : étapes 0 à 4.5 faites ; étape 5 découpée en 5a–5d, 5a, 5b et 5c mergées, 5d faite (remplissage automatique dans l'UI, en attente de validation) ; en cours : étape 6 (Annex 4, découpée en 6a–6d ; 6a, 6b et 6c mergées, prochaine : 6d), avant la relecture (7) et les finitions (7.5). Parcours détaillé : `docs/USER_FLOW.md`. Les choix techniques marqués _proposition_ restent à confirmer à l'étape 3.
 
 ## 1. Ce qu'on a appris des deux formulaires
 
@@ -152,7 +152,7 @@ _Avancée avant la relecture et les finitions (décision 2026-11-05) : ses cas d
 - *Setup* : panneau d'aperçu d'une page de haut, défilant : la modale a la même taille pour un PDF et un Word.
 - Limites connues : la pagination reste une approximation (métriques des polices de remplacement ; une page sans le premier en-tête n'en reçoit pas d'autre) ; un saut de page explicite au milieu d'un paragraphe le coupe en deux dans l'aperçu (les paragraphes suivants seraient décalés) ; `docx-preview` approche la mise en page (police d'origine remplacée si absente, tableaux jamais coupés : 2 pages affichées pour 3 dans Word) ; zones Word cliquables mais pas atteignables au clavier (la liste est le chemin clavier) ; le remplissage automatique de l'Annex 4 échoue en mode `fake` jusqu'à 6c.
 
-#### 6c — Remplissage automatique de l'Annex 4 ✅ (en attente de validation)
+#### 6c — Remplissage automatique de l'Annex 4 ✅ (mergée le 2026-11-05)
 - Design : `docs/superpowers/specs/2026-11-05-6c-annex4-auto-fill-design.md` ; plan : `docs/superpowers/plans/2026-11-05-6c-annex4-auto-fill.md`. Carte des erreurs mesurées : https://claude.ai/artifact/3QJNBAthtjwBaBJDaxh167.
 - **Contexte d'en-tête** (parseur Word) : la ligne de titre d'un tableau et le libellé qui chapeaute des libellés à sa droite deviennent le `context` des champs concernés (`field.context`, jamais affiché ni exposé par l'API), ajouté à la requête de recherche et à la ligne du champ dans le prompt. Annex 4 : Table 4 (« Number of employees… ») et les trois montants par sinistre (« Available amounts per claim »). Une base parsée avant reçoit ses contextes au démarrage, champs et réponses gardés.
 - **Groupes d'appel** (`filling/groups.py`, pur) : une section par appel, coupée en parties équilibrées au-delà de 10 champs, coupée avant de retirer les champs de l'utilisateur ; clés `<formulaire>--<section>[--part-n]`. Annex 4 : 9 groupes (Table 7 en 9 + 9).
