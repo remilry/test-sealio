@@ -317,6 +317,9 @@ function FillWorkspace({
                 knowledge && {
                   companyName: knowledge.company_name,
                   documentCount: knowledge.documents.length,
+                  documentFormats: Object.fromEntries(
+                    knowledge.documents.map((document) => [document.id, document.file_format]),
+                  ),
                 }
               }
               onSelect={setChosenId}

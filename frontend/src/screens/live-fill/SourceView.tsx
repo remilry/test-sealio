@@ -63,7 +63,12 @@ export function SourceView({
       )}
       <header className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
         {document && (
-          <span className="rounded-[3px] bg-foreground px-1 py-px font-mono text-[9px] font-semibold text-background uppercase">
+          <span
+            className={cn(
+              "rounded-[3px] px-1 py-px font-mono text-[9px] font-semibold text-white uppercase",
+              document.file_format === "pdf" ? "bg-source-pdf" : "bg-source-docx",
+            )}
+          >
             {document.file_format}
           </span>
         )}

@@ -565,7 +565,7 @@ describe("Live fill (watching the automatic fill)", () => {
     await waitFor(() => expect(zone(4)).toHaveAttribute("data-tone", "empty"));
     expect(within(zone(4)).queryByText("Bahnhofstrasse 1")).toBeNull();
     const card = within(fieldList().getByRole("listitem", { name: "Business address" }));
-    expect(card.getByRole("textbox")).not.toHaveAttribute("placeholder");
+    expect(card.getByRole("textbox")).not.toHaveAttribute("placeholder", "Bahnhofstrasse 1");
     back.stream.close();
   });
 
@@ -917,8 +917,8 @@ describe("Live fill (status and source of each answer)", () => {
     // Then only its source shows
     expect(card("Name and legal form").getByText("Register A, page 1")).toBeInTheDocument();
     expect(card("Business address").queryByText("Register B, page 1")).not.toBeInTheDocument();
-    // (its line only tells it was filled automatically)
-    expect(card("Business address").getByText("Auto")).toBeInTheDocument();
+    // (its line only names its source)
+    expect(card("Business address").getByText("Register B")).toBeInTheDocument();
   });
 
   it("calls the tender documents by their name when the source is the tender", async () => {
@@ -976,7 +976,11 @@ describe("Live fill (status and source of each answer)", () => {
     ).toBeInTheDocument();
     // (its line says it has no value)
     await userEvent.setup().click(fieldList().getByRole("listitem", { name: "Telephone" }));
-    expect(card("Business address").getByText("No value")).toBeInTheDocument();
+    expect(card("Business address").getByText("Not found")).toBeInTheDocument();
+    expect(card("Business address").getByRole("textbox")).toHaveAttribute(
+      "placeholder",
+      "Not found in your documents",
+    );
   });
 
   it("says when only I can fill a field, why, and keeps the suggestion in the input", async () => {
@@ -1013,15 +1017,22 @@ describe("Live fill (status and source of each answer)", () => {
     expect(screen.queryByText(/on behalf of/)).not.toBeInTheDocument();
   });
 
-  it("lists every source when sources disagree", async () => {
+  it("shows each value of a conflict with its own source, the chosen one with its quote", async () => {
     // Given two sources that disagree on the address
     const conflict = aiAnswer(4, "Bahnhofstrasse 1", "conflict", undefined, {
       candidates: [
-        candidate("Bahnhofstrasse 1", [
-          citation({ document_name: "Register extract", quote: "Bahnhofstrasse 1" }),
-        ]),
+        candidate(
+          "Bahnhofstrasse 1",
+          [citation({ document_name: "Register extract", quote: "Address Bahnhofstrasse 1" })],
+          { source_date: { date: "2026-10-20", citation: citation() } },
+        ),
         candidate("Seestrasse 9", [
-          citation({ document_name: "Annual report", quote: "Seestrasse 9" }),
+          citation({
+            document_id: 9,
+            document_name: "Annual report",
+            quote: "Seestrasse 9",
+            page: 2,
+          }),
         ]),
       ],
     });
@@ -1030,13 +1041,37 @@ describe("Live fill (status and source of each answer)", () => {
     // When I open the field
     await user.click(await screen.findByRole("textbox", { name: "Business address" }));
 
-    // Then the status counts the sources and all are shown; the selected value is in the input
+    // Then the status counts the sources, the selected value is in the input
     const address = card("Business address");
     expect(address.getByText("2 sources disagree")).toBeInTheDocument();
-    const sources = within(address.getByRole("list", { name: "Sources" }));
-    expect(sources.getByText("Register extract, page 1")).toBeInTheDocument();
-    expect(sources.getByText("Annual report, page 1")).toBeInTheDocument();
     expect(address.getByRole("textbox")).toHaveValue("Bahnhofstrasse 1");
+    // And each value names its own source, with its format, page and date
+    const register = within(
+      address.getByRole("radio", { name: /Bahnhofstrasse 1/ }).closest("label")!,
+    );
+    expect(
+      register.getByRole("button", { name: "Open the source: Register extract" }),
+    ).toBeInTheDocument();
+    expect(register.getByText("pdf")).toBeInTheDocument();
+    expect(register.getByText("· p.1")).toBeInTheDocument();
+    expect(register.getByText("· 20.10.2026")).toBeInTheDocument();
+    expect(register.getByText("most recent")).toBeInTheDocument();
+    const report = within(address.getByRole("radio", { name: /Seestrasse 9/ }).closest("label")!);
+    expect(await report.findByText("docx")).toBeInTheDocument();
+    expect(report.getByText("· p.3")).toBeInTheDocument();
+    // And only the chosen value shows its quote, highlighted; no separate list of sources
+    expect(register.getByText("Address Bahnhofstrasse 1").tagName).toBe("MARK");
+    expect(report.queryByText("Seestrasse 9", { selector: "mark" })).toBeNull();
+    expect(address.queryByRole("list", { name: "Sources" })).toBeNull();
+
+    // When I choose the other value, its quote shows
+    await user.click(address.getByRole("radio", { name: /Seestrasse 9/ }));
+    expect(report.getByText("Seestrasse 9", { selector: "mark" })).toBeInTheDocument();
+
+    // And its source opens in the Source tab
+    await user.click(report.getByRole("button", { name: "Open the source: Annual report" }));
+    expect(screen.getByRole("tab", { name: "Source" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("heading", { name: "Annual report" })).toBeInTheDocument();
   });
 
   it("shows the expiry date of an outdated source in Swiss format", async () => {

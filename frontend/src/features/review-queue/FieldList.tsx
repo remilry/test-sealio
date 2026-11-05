@@ -5,10 +5,12 @@ import {
   ArrowLeftRightIcon,
   CheckIcon,
   CircleAlertIcon,
+  CircleHelpIcon,
+  ClockAlertIcon,
   LoaderCircleIcon,
   MinusIcon,
   PenLineIcon,
-  UserIcon,
+  ScaleIcon,
   type LucideIcon,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -55,7 +57,12 @@ export type QueueField = {
 };
 
 /** What the status lines name: the bidder and how many documents were searched (when known). */
-export type FieldContext = { companyName: string; documentCount: number };
+export type FieldContext = {
+  companyName: string;
+  documentCount: number;
+  /** The format of each company document, by id (for the badge of a source). */
+  documentFormats: Record<number, "pdf" | "docx">;
+};
 
 /** Ask the list to move the keyboard focus to a field's input (changes on every request). */
 export type FocusRequest = { fieldId: number; at: number };
@@ -316,7 +323,10 @@ function FieldInput({
   onDraft,
   onOpenSource,
 }: CardProps) {
+  const t = useTranslations("fieldList");
   const inputId = `field-${field.id}`;
+  const hint = EMPTY_HINT[field.type ?? ""];
+  const emptyHint = hint && t(`hint.${hint}`);
   const input = useRef<HTMLInputElement | null>(null);
   // The last value sent (or saved), so Enter then leaving the input saves once. Back to the saved
   // value when a save fails, so the kept text is sent again.
@@ -354,10 +364,11 @@ function FieldInput({
       id={inputId}
       name="value"
       defaultValue={shown}
-      // A value being written shows greyed in the empty input, until its answer replaces it.
-      placeholder={field.writing ?? undefined}
+      // A value being written shows greyed in the empty input, until its answer replaces it;
+      // on one line, an empty field says why.
+      placeholder={field.writing ?? (selected ? undefined : emptyHint)}
       className={cn(
-        field.writing && "placeholder:text-muted-foreground placeholder:italic",
+        "placeholder:font-normal placeholder:text-muted-foreground placeholder:italic",
         // On one line, the value reads as text (still editable in place).
         !selected &&
           "h-6 rounded-none border-0 bg-transparent px-0 text-sm font-medium shadow-none focus-visible:ring-0 dark:bg-transparent",
@@ -389,8 +400,18 @@ function FieldInput({
         </CardHeader>
         {selected && <FieldStatus field={field} context={context} />}
         {valueInput}
-        {selected && <FieldSources field={field} expanded onOpenSource={onOpenSource} />}
-        {selected && <ReviewActions field={field} onSettle={onSettle} focusInput={focusInput} />}
+        {selected && !choosing(field) && (
+          <FieldSources field={field} expanded onOpenSource={onOpenSource} />
+        )}
+        {selected && (
+          <ReviewActions
+            field={field}
+            context={context}
+            onSettle={onSettle}
+            focusInput={focusInput}
+            onOpenSource={onOpenSource}
+          />
+        )}
       </div>
       {!selected && <FieldTag field={field} />}
     </form>
@@ -414,6 +435,12 @@ function CardHeader({
     </div>
   );
 }
+
+/** Why a field is empty, shown in its line (the type of its automatic answer). */
+const EMPTY_HINT: Record<string, "notFound" | "manual" | undefined> = {
+  missing: "notFound",
+  manual: "manual",
+};
 
 /** A Yes/No declaration: two choices, saved at once, and a way back to no answer. */
 function YesNoInput({
@@ -443,6 +470,8 @@ function YesNoInput({
             }),
             // Positioned: the hidden radio stays inside (focusing it scrolls to the card).
             "relative has-focus-visible:ring-3 has-focus-visible:ring-ring/50",
+            // Declarations are purple, as in the mockups.
+            chosen === option && "bg-declaration text-white hover:bg-declaration/90",
           )}
         >
           <input
@@ -492,23 +521,46 @@ function YesNoInput({
         {selected && <FieldStatus field={field} context={context} />}
         {choices}
       </fieldset>
-      {selected && <FieldSources field={field} expanded onOpenSource={onOpenSource} />}
-      {selected && <ReviewActions field={field} onSettle={onSettle} focusInput={focusInput} />}
+      {selected && !choosing(field) && (
+        <FieldSources field={field} expanded onOpenSource={onOpenSource} />
+      )}
+      {selected && (
+        <ReviewActions
+          field={field}
+          context={context}
+          onSettle={onSettle}
+          focusInput={focusInput}
+          onOpenSource={onOpenSource}
+        />
+      )}
       {!selected && <FieldTag field={field} />}
     </div>
   );
 }
 
-type Badge = { key: TagKey; tone: BadgeTone; values?: Record<string, number> };
-type BadgeTone = "auto" | "doubt" | "missing" | "user" | "progress" | "muted" | "mine";
+/**
+ * How a field shows on its line, as in the mockups: an icon whose colour says what it is
+ * (automatic, a declaration, a doubt, missing, only the user's, settled by the user), and a tag
+ * saying where it stands. An automatic answer is tagged with its source.
+ */
+type Badge = {
+  icon: LucideIcon;
+  iconTone: Tone;
+  tag: TagKey;
+  tagTone: Tone | "source";
+  values?: Record<string, string | number>;
+};
+type Tone = "auto" | "declaration" | "doubt" | "outdated" | "missing" | "manual" | "user" | "faint";
 type TagKey =
+  | "source"
   | "auto"
   | "declared"
+  | "noEvidence"
   | "conflict"
   | "outdated"
   | "unsure"
-  | "onlyYou"
-  | "noValue"
+  | "manual"
+  | "notFound"
   | "empty"
   | "searching"
   | "writing"
@@ -518,65 +570,71 @@ type TagKey =
   | "notSaved"
   | "signature";
 
-/** The short word that says where a field is, and its colour (one line, open or not). */
 function fieldBadge(field: QueueField): Badge {
-  if (!field.fillable) return { key: "signature", tone: "muted" };
-  if (field.unsaved !== null) return { key: "notSaved", tone: "missing" };
+  const badge = (
+    icon: LucideIcon,
+    iconTone: Tone,
+    tag: TagKey,
+    tagTone: Badge["tagTone"] = iconTone,
+    values?: Badge["values"],
+  ): Badge => ({ icon, iconTone, tag, tagTone, values });
+  if (!field.fillable) return badge(PenLineIcon, "faint", "signature");
+  if (field.unsaved !== null) return badge(CircleAlertIcon, "missing", "notSaved");
   const settled = settledAs(field);
-  if (settled) return { key: settled, tone: settled === "leftEmpty" ? "muted" : "user" };
+  if (settled === "leftEmpty") return badge(MinusIcon, "faint", "leftEmpty");
+  if (settled) return badge(CheckIcon, "user", settled);
   if (field.state === "searching") {
-    return { key: field.writing ? "writing" : "searching", tone: "progress" };
+    return badge(LoaderCircleIcon, "auto", field.writing ? "writing" : "searching");
   }
-  if (field.resolvedBy === null && field.value) return { key: "entered", tone: "user" };
+  if (field.resolvedBy === null && field.value) return badge(CheckIcon, "user", "entered");
   switch (field.type) {
     case "conflict":
-      return { key: "conflict", tone: "doubt", values: { count: field.candidates.length } };
+      return badge(ArrowLeftRightIcon, "missing", "conflict", "doubt", {
+        count: field.candidates.length,
+      });
     case "outdated":
-      return { key: "outdated", tone: "doubt" };
+      return badge(ClockAlertIcon, "outdated", "outdated");
     case "unsure":
-      return { key: "unsure", tone: "doubt" };
+      return badge(CircleAlertIcon, "doubt", "unsure");
     case "manual":
-      return { key: "onlyYou", tone: "mine" };
-    case "auto":
-      return field.value ? { key: "auto", tone: "auto" } : { key: "noValue", tone: "missing" };
-    case "declaration":
-      return field.value ? { key: "declared", tone: "auto" } : { key: "noValue", tone: "missing" };
-    case "missing":
-      return { key: "noValue", tone: "missing" };
-    default:
-      return { key: "empty", tone: "muted" };
+      return badge(PenLineIcon, "manual", "manual");
   }
+  if (field.yesNo) {
+    return field.value
+      ? badge(ScaleIcon, "declaration", "declared")
+      : badge(ScaleIcon, "declaration", "noEvidence", "missing");
+  }
+  if (
+    field.type === "missing" ||
+    ((field.type === "auto" || field.type === "declaration") && !field.value)
+  ) {
+    return badge(CircleHelpIcon, "missing", "notFound");
+  }
+  if (field.value && field.type !== null) {
+    const source = field.candidates[0]?.citations[0]?.document_name;
+    return source
+      ? badge(CheckIcon, "auto", "source", "source", { name: source })
+      : badge(CheckIcon, "auto", "auto");
+  }
+  return badge(MinusIcon, "faint", "empty");
 }
 
-const BADGE_TONE: Record<BadgeTone, { tag: string; icon: string }> = {
-  auto: { tag: "bg-primary/10 text-primary", icon: "bg-primary/10 text-primary" },
-  doubt: { tag: "bg-warning/12 text-warning", icon: "bg-warning/15 text-warning" },
-  missing: {
-    tag: "bg-destructive/10 text-destructive",
-    icon: "bg-destructive/10 text-destructive",
-  },
-  user: { tag: "bg-success/12 text-success", icon: "bg-success/12 text-success" },
-  progress: { tag: "bg-primary/8 text-primary", icon: "bg-primary/8 text-primary" },
-  muted: { tag: "bg-muted text-muted-foreground", icon: "bg-muted text-muted-foreground" },
-  mine: { tag: "bg-chart-4/15 text-chart-4", icon: "bg-chart-4/15 text-chart-4" },
+const ICON_TONE: Record<Tone, string> = {
+  auto: "bg-primary/10 text-primary",
+  declaration: "bg-declaration/10 text-declaration",
+  doubt: "bg-warning/12 text-warning",
+  outdated: "bg-outdated/18 text-outdated",
+  missing: "bg-destructive/10 text-destructive",
+  manual: "bg-muted text-foreground/70",
+  user: "bg-success/12 text-success",
+  faint: "bg-muted text-muted-foreground/70",
 };
 
-const BADGE_ICON: Record<TagKey, LucideIcon> = {
-  auto: CheckIcon,
-  declared: CheckIcon,
-  conflict: ArrowLeftRightIcon,
-  outdated: CircleAlertIcon,
-  unsure: CircleAlertIcon,
-  onlyYou: UserIcon,
-  noValue: MinusIcon,
-  empty: MinusIcon,
-  searching: LoaderCircleIcon,
-  writing: LoaderCircleIcon,
-  kept: CheckIcon,
-  entered: PenLineIcon,
-  leftEmpty: MinusIcon,
-  notSaved: CircleAlertIcon,
-  signature: PenLineIcon,
+const TAG_TONE: Record<Badge["tagTone"], string> = {
+  ...ICON_TONE,
+  faint: "bg-muted text-muted-foreground",
+  // The source of an automatic answer: plain, the icon already says it was found.
+  source: "max-w-28 truncate bg-transparent font-medium text-muted-foreground",
 };
 
 function FieldTag({ field }: { field: QueueField }) {
@@ -586,40 +644,48 @@ function FieldTag({ field }: { field: QueueField }) {
     <span
       className={cn(
         "flex-none rounded-[5px] px-1.5 py-0.5 text-[10.5px] font-semibold whitespace-nowrap",
-        BADGE_TONE[badge.tone].tag,
+        TAG_TONE[badge.tagTone],
       )}
     >
-      {t(badge.key, badge.values)}
+      {t(badge.tag, badge.values)}
     </span>
   );
 }
 
 function FieldIcon({ field }: { field: QueueField }) {
-  const badge = fieldBadge(field);
-  const Icon = BADGE_ICON[badge.key];
+  const { icon: Icon, iconTone, tag } = fieldBadge(field);
+  const busy = tag === "searching" || tag === "writing";
   return (
     <span
       aria-hidden
-      className={cn(
-        "grid size-5 flex-none place-items-center rounded-md",
-        badge ? BADGE_TONE[badge.tone].icon : "bg-muted",
-      )}
+      className={cn("grid size-5 flex-none place-items-center rounded-md", ICON_TONE[iconTone])}
     >
-      {Icon && <Icon className={cn("size-3", badge?.tone === "progress" && "animate-spin")} />}
+      <Icon className={cn("size-3", busy && "animate-spin")} />
     </span>
   );
 }
 
 /** What the user can do to settle the selected field, while it is still open. */
-function ReviewActions({
-  field,
-  onSettle,
-  focusInput,
-}: {
+/** A conflict still to settle: its sources show inside each value to choose from. */
+function choosing(field: QueueField): boolean {
+  return (
+    field.type === "conflict" &&
+    field.candidates.length > 1 &&
+    isOpen(field) &&
+    field.state !== "searching" &&
+    !!field.value
+  );
+}
+
+type ActionProps = {
   field: QueueField;
+  context: FieldContext | undefined;
   onSettle: (fieldId: number, value: string | null) => void;
   focusInput: () => void;
-}) {
+  onOpenSource: (fieldId: number, index: number) => void;
+};
+
+function ReviewActions({ field, onSettle, focusInput, ...props }: ActionProps) {
   const t = useTranslations("fieldList");
   if (!isOpen(field) || field.state === "searching") return null;
   if (!field.value) {
@@ -631,8 +697,8 @@ function ReviewActions({
       </div>
     );
   }
-  if (field.type === "conflict" && field.candidates.length > 1) {
-    return <ConflictChoice field={field} onSettle={onSettle} />;
+  if (choosing(field)) {
+    return <ConflictChoice field={field} onSettle={onSettle} focusInput={focusInput} {...props} />;
   }
   return (
     <div className="flex justify-end gap-2">
@@ -646,57 +712,126 @@ function ReviewActions({
   );
 }
 
-/** Sources that disagree: one value each, the selected (most recent) one chosen first. */
-function ConflictChoice({
-  field,
-  onSettle,
-}: {
-  field: QueueField;
-  onSettle: (fieldId: number, value: string | null) => void;
-}) {
+/**
+ * Sources that disagree: one value each, the selected (most recent) one chosen first. Each value
+ * shows where it comes from (format, document, page, date), the chosen one its quote; the
+ * document opens in the Source tab. Another value is typed in the field above.
+ */
+function ConflictChoice({ field, context, onSettle, focusInput, onOpenSource }: ActionProps) {
   const t = useTranslations("fieldList");
+  const tSource = useTranslations("source");
   const [chosen, setChosen] = useState(field.value ?? field.candidates[0].value);
   const name = `choice-${field.id}`;
+  // Where each candidate's quotes start in the field's sources (the Source tab's numbering).
+  const firstSource = field.candidates.map((_, index) =>
+    field.candidates.slice(0, index).reduce((sum, other) => sum + other.citations.length, 0),
+  );
   return (
-    <fieldset className="flex flex-col gap-1.5 border-t pt-2">
-      <legend className="mb-1 text-xs font-medium">{t("chooseValue")}</legend>
+    <fieldset className="flex flex-col gap-1.5">
+      <legend className="mb-1.5 text-xs font-medium">{t("chooseValue")}</legend>
       {field.candidates.map((candidate, index) => {
-        const first = candidate.citations[0];
+        const on = chosen === candidate.value;
         return (
           <label
             key={candidate.value}
             className={cn(
-              "flex cursor-pointer gap-2 rounded-md border px-2.5 py-2 text-xs",
-              chosen === candidate.value && "border-primary bg-primary/5",
+              "flex cursor-pointer gap-2.5 rounded-lg border px-2.5 py-2.5 text-sm transition-colors",
+              on ? "border-primary bg-primary/5" : "hover:bg-muted/50",
             )}
           >
             <input
               type="radio"
               name={name}
               value={candidate.value}
-              checked={chosen === candidate.value}
+              checked={on}
               onChange={() => setChosen(candidate.value)}
-              className="mt-0.5"
+              className="mt-1 accent-primary"
             />
-            <span className="flex flex-col gap-0.5">
+            <span className="flex min-w-0 flex-col gap-1">
               <span className="font-medium">{candidate.value}</span>
-              <span className="text-muted-foreground">
-                {first && <SourceName citation={first} />}
-                {candidate.source_date &&
-                  t("sourceDated", { date: formatDate(candidate.source_date.date) })}
-                {index === 0 && candidate.source_date && t("mostRecent")}
-              </span>
+              {candidate.citations.slice(0, 1).map((citation) => (
+                <span
+                  key="source"
+                  className="flex flex-wrap items-center gap-1.5 text-[11.5px] text-muted-foreground"
+                >
+                  <FormatBadge format={formatOf(context, citation.document_id)} />
+                  <button
+                    type="button"
+                    aria-label={tSource("open", { name: citation.document_name })}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      onOpenSource(field.id, firstSource[index]);
+                    }}
+                    className="font-medium text-primary underline-offset-2 hover:underline"
+                  >
+                    {citation.document_name}
+                  </button>
+                  {citation.page !== null && (
+                    <span>{t("sourcePage", { page: citation.page + 1 })}</span>
+                  )}
+                  {candidate.source_date && (
+                    <span>{t("sourceDate", { date: formatDate(candidate.source_date.date) })}</span>
+                  )}
+                  {index === 0 && candidate.source_date && (
+                    <span className="rounded-[5px] bg-success/12 px-1.5 py-px text-[10.5px] font-semibold text-success">
+                      {t("mostRecentTag")}
+                    </span>
+                  )}
+                </span>
+              ))}
+              {on &&
+                candidate.citations.map((citation, quote) => (
+                  <blockquote
+                    key={quote}
+                    className="mt-0.5 rounded-md border bg-muted/40 px-2 py-1.5 text-xs leading-relaxed text-foreground/80"
+                  >
+                    {t.rich("quoteMarked", {
+                      quote: citation.quote,
+                      mark: (chunks) => (
+                        <mark className="rounded-[2px] bg-yellow-200 px-0.5 text-inherit dark:bg-yellow-300/40">
+                          {chunks}
+                        </mark>
+                      ),
+                    })}
+                  </blockquote>
+                ))}
             </span>
           </label>
         );
       })}
-      <p className="text-xs text-muted-foreground">{t("orEnterAnother")}</p>
-      <div className="flex justify-end">
+      <button
+        type="button"
+        onClick={focusInput}
+        className="flex items-center gap-2.5 rounded-lg border px-2.5 py-2.5 text-left text-sm font-medium hover:bg-muted/50"
+      >
+        <span aria-hidden className="size-3.5 flex-none rounded-full border-[1.5px] border-input" />
+        {t("enterAnotherValue")}
+      </button>
+      <div className="flex justify-end pt-1">
         <Button size="sm" onClick={() => onSettle(field.id, chosen)}>
           {t("useThisOne")}
         </Button>
       </div>
     </fieldset>
+  );
+}
+
+function formatOf(context: FieldContext | undefined, documentId: number | null) {
+  return documentId === null ? null : (context?.documentFormats[documentId] ?? null);
+}
+
+/** PDF or DOCX, in the colour of its format (as in the mockups). */
+function FormatBadge({ format }: { format: "pdf" | "docx" | null }) {
+  if (!format) return null;
+  return (
+    <span
+      className={cn(
+        "rounded-[3px] px-1 py-px font-mono text-[8.5px] font-semibold text-white uppercase",
+        format === "pdf" ? "bg-source-pdf" : "bg-source-docx",
+      )}
+    >
+      {format}
+    </span>
   );
 }
 
@@ -752,7 +887,7 @@ function FieldStatus({ field, context }: { field: QueueField; context: FieldCont
     const validUntil = field.candidates[0]?.valid_until?.date;
     if (validUntil) {
       return (
-        <p className="text-xs font-medium text-warning">
+        <p className="text-xs font-medium text-outdated">
           {t("outdated", { date: formatDate(validUntil) })}
         </p>
       );
@@ -760,7 +895,7 @@ function FieldStatus({ field, context }: { field: QueueField; context: FieldCont
     const sourceDate = field.candidates[0]?.source_date?.date;
     if (sourceDate) {
       return (
-        <p className="text-xs font-medium text-warning">
+        <p className="text-xs font-medium text-outdated">
           {t("outdatedOld", { date: formatDate(sourceDate) })}
         </p>
       );
