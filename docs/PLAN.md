@@ -2,7 +2,7 @@
 
 > Document vivant. Chaque étape y est cochée et détaillée au fur et à mesure.
 > Contexte produit et priorités : voir `CLAUDE.md`. Échéance : jeudi 5 novembre.
-> Statut : étapes 0 à 4.5 faites ; étape 5 découpée en 5a–5d, 5a, 5b et 5c mergées, 5d faite (remplissage automatique dans l'UI, en attente de validation) ; en cours : étape 6 (Annex 4, découpée en 6a–6d ; 6a mergée, 6b faite, en attente de validation), avant la relecture (7) et les finitions (7.5). Parcours détaillé : `docs/USER_FLOW.md`. Les choix techniques marqués _proposition_ restent à confirmer à l'étape 3.
+> Statut : étapes 0 à 4.5 faites ; étape 5 découpée en 5a–5d, 5a, 5b et 5c mergées, 5d faite (remplissage automatique dans l'UI, en attente de validation) ; en cours : étape 6 (Annex 4, découpée en 6a–6d ; 6a et 6b mergées, prochaine : 6c), avant la relecture (7) et les finitions (7.5). Parcours détaillé : `docs/USER_FLOW.md`. Les choix techniques marqués _proposition_ restent à confirmer à l'étape 3.
 
 ## 1. Ce qu'on a appris des deux formulaires
 
@@ -141,7 +141,7 @@ _Avancée avant la relecture et les finitions (décision 2026-11-05) : ses cas d
 - **Sections en parallèle** dans le job de remplissage (pool borné, par exemple 4 à 7 appels simultanés, une session de base par section) : mêmes appels et même prompt, aucun surcoût. Mesuré sur l'Annex 7 : ~23 s par section, presque tout en génération de la sortie (recherche 0,6 s) ; l'Annex 4 (~7 sections) prendrait 2 à 3 min en séquence, et environ la durée de la section la plus lente en parallèle. Événements émis à mesure que chaque section finit ; durée de *Setup* calculée d'après le nombre de sections. À mesurer sur l'Annex 4.
 - Tests : parseur (schéma attendu), export (réouverture du DOCX, valeurs aux bons endroits, reste intact, comparaison visuelle par rendu), e2e complet.
 
-#### 6b — Annex 4 dans *Live fill* : aperçu Word, saisie, export ✅ _(en attente de validation)_
+#### 6b — Annex 4 dans *Live fill* : aperçu Word, saisie, export ✅ (mergée le 2026-11-05)
 - Design : `docs/superpowers/specs/2026-11-05-6b-word-live-fill-design.md`.
 - **Back** : parseur Word branché au seed (l'Annex 4 est parsée au démarrage, base existante comprise) ; `pages` d'un Word = taille de page de la section × nombre de pages écrit par Word (`docProps/app.xml`), à défaut marques `lastRenderedPageBreak` + 1 (Annex 4 : 3 × A4) ; un champ Oui/Non n'accepte que `yes` / `no` (casse libre, enregistré en minuscules, 422 sinon).
 - **Tender** : la carte Word affiche ses compteurs (« 49 fields detected · 17 Yes/No declarations · 1 signature ») ; `Auto-fill` actif (décision utilisateur, pour voir l'aperçu) : la modale *Setup* montre le Word page par page (`WordViewer`) ; lancé en mode `fake`, le remplissage s'arrête avec « No recorded answer » tant que les réponses de l'Annex 4 ne sont pas enregistrées (6c), le formulaire reste alors remplissable à la main.
@@ -267,4 +267,5 @@ UI (relecture)  ──►  API locale
 | 2026-11-04 | 5d : pas de nouveau remplissage sur un formulaire commencé : `Discard answers` (supprime toutes les réponses, celles de l'utilisateur aussi, même pendant un remplissage) puis `Auto-fill` ; un meilleur nouveau remplissage en V2 | validé |
 | 2026-11-05 | Nouvelle étape 6.5 : UI plus proche des maquettes (à discuter en détail) et texte des réponses qui arrive progressivement pendant le remplissage | validé |
 | 2026-11-05 | Étape 6 découpée en 6a (parseur + export DOCX, back), 6b (aperçu Word, saisie, export dans l'UI), 6c (remplissage automatique, sections en parallèle), 6d (aperçu Word dans *Company knowledge*) ; 6a : pas de comparaison visuelle par rendu (vérification structurelle), localisateur Word par positions de caractères ; validée et mergée | validé |
+| 2026-11-05 | 6b : formulaire Word rempli à la main dans *Live fill*, aperçu `docx-preview` rendu au plus près du papier (pagination A4, polices de remplacement du document, interligne « au moins », numéros de page, logo TIFF) ; déclarations Oui/Non par boutons ; `Auto-fill` actif sur un Word ; modale *Setup* d'une page de haut pour tous les formats ; validée et mergée | validé |
 | 2026-11-05 | Ordre inversé : l'Annex 4 passe avant la relecture et les finitions. Renumérotation : Annex 4 = étape 6, relecture = étape 7, finitions = étape 7.5 (les lignes précédentes du journal et les specs datées gardent l'ancienne numérotation) | validé |
