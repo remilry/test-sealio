@@ -1,10 +1,9 @@
 "use client";
 
-import { DownloadIcon, FileTextIcon } from "lucide-react";
+import { DownloadIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { PdfViewer } from "@/features/document-preview";
+import { PdfViewer, WordViewer } from "@/features/document-preview";
 import { documentFileUrl, type KnowledgeDocument } from "@/features/knowledge-base";
-import { EmptyState } from "@/shared/components/LoadStates";
 import { buttonVariants } from "@/shared/ui/button";
 import {
   Dialog,
@@ -54,14 +53,8 @@ function PreviewContent({ document }: { document: KnowledgeDocument }) {
 }
 
 function DocumentBody({ document, fileUrl }: { document: KnowledgeDocument; fileUrl: string }) {
-  const t = useTranslations("knowledge");
-  // Word documents: preview planned with step 7 (docx-preview).
-  if (document.file_format !== "pdf") {
-    return (
-      <EmptyState icon={<FileTextIcon />} level={2} title={t("previewDocxTitle")}>
-        {t("previewDocx")}
-      </EmptyState>
-    );
+  if (document.file_format === "docx") {
+    return <WordViewer fileUrl={fileUrl} label={document.name} />;
   }
   return <PdfViewer fileUrl={fileUrl} label={document.name} />;
 }

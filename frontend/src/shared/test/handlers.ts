@@ -46,6 +46,14 @@ export const handlers = {
     return { handler, requests };
   },
 
+  /** `GET /knowledge/documents/{id}/file`: the document's bytes, or a 404 when null. */
+  documentFile: (documentId: number, bytes: Uint8Array | null) =>
+    http.get(url(`/knowledge/documents/${documentId}/file`), () =>
+      bytes
+        ? HttpResponse.arrayBuffer(bytes.slice().buffer)
+        : new HttpResponse(null, { status: 404 }),
+    ),
+
   form: (form: FormDetail) => http.get(url(`/forms/${form.id}`), () => HttpResponse.json(form)),
 
   /** `GET /forms/{id}/file`: the original file's bytes, or a 404 when null. */
