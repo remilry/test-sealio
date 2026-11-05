@@ -47,7 +47,7 @@ def _fields(schema: FormSchema) -> list[tuple[object, ...]]:
                 loc.row,
                 loc.cell,
                 loc.paragraph,
-                loc.after_run,
+                loc.start,
             )
         )
     return rows
@@ -87,9 +87,9 @@ def test_stacked_labels_with_colons() -> None:
         )
 
     assert _fields(_parse(build)) == [
-        ("Business purpose", TEXT, "Table 1", IN, 0, 0, 0, 0, 0),
-        ("Main activity", TEXT, "Table 1", IN, 0, 0, 0, 1, 0),
-        ("Secondary activities", TEXT, "Table 1", IN, 0, 0, 0, 2, 0),
+        ("Business purpose", TEXT, "Table 1", IN, 0, 0, 0, 0, 17),
+        ("Main activity", TEXT, "Table 1", IN, 0, 0, 0, 1, 14),
+        ("Secondary activities", TEXT, "Table 1", IN, 0, 0, 0, 2, 21),
     ]
 
 
@@ -100,8 +100,8 @@ def test_label_ending_with_colon_and_tab() -> None:
         table.cell(0, 1).text = " Registered office:"
 
     assert _fields(_parse(build)) == [
-        ("Legal form", TEXT, "Table 1", IN, 0, 0, 0, 0, 0),
-        ("Registered office", TEXT, "Table 1", IN, 0, 0, 1, 0, 0),
+        ("Legal form", TEXT, "Table 1", IN, 0, 0, 0, 0, 13),
+        ("Registered office", TEXT, "Table 1", IN, 0, 0, 1, 0, 19),
     ]
 
 
@@ -141,9 +141,9 @@ def test_labels_after_an_address_label_in_the_same_cell() -> None:
     schema = _parse(build)
 
     assert _fields(schema) == [
-        ("AHV compensation office (exact address)", TEXT, "Table 1", IN, 0, 0, 0, 0, 0),
+        ("AHV compensation office (exact address)", TEXT, "Table 1", IN, 0, 0, 0, 0, 40),
         ("For foreign bidders", TEXT, "Table 1", NEW, 0, 0, 0, 1, None),
-        ("BVG pension fund", TEXT, "Table 1", IN, 0, 1, 0, 0, 0),
+        ("BVG pension fund", TEXT, "Table 1", IN, 0, 1, 0, 0, 17),
         ("For foreign bidders", TEXT, "Table 1", IN, 0, 1, 0, 2, None),
     ]
     assert [f.key for f in schema.fields] == [
@@ -200,7 +200,7 @@ def test_dot_leader_in_a_paragraph() -> None:
         )
 
     assert _fields(_parse(build)) == [
-        ("Tender (No. …, type of work)", TEXT, "Table 1", LEADER, 0, 0, 0, 2, 0),
+        ("Tender (No. …, type of work)", TEXT, "Table 1", LEADER, 0, 0, 0, 2, 12),
     ]
 
 
@@ -215,7 +215,7 @@ def test_place_and_date_and_signature_outside_tables() -> None:
         document.add_paragraph("______________________________")
 
     assert _fields(_parse(build)) == [
-        ("Place and date", TEXT, "Text", IN, None, None, None, 2, 0),
+        ("Place and date", TEXT, "Text", IN, None, None, None, 2, 16),
         (
             "Company stamp and legally valid signature(s)",
             SIGNATURE,
@@ -225,7 +225,7 @@ def test_place_and_date_and_signature_outside_tables() -> None:
             None,
             None,
             2,
-            2,
+            66,
         ),
     ]
 
@@ -348,7 +348,7 @@ def test_annex_4_labels_read_as_in_the_form(annex_4: FormSchema) -> None:
 
 def test_annex_4_locators_are_distinct(annex_4: FormSchema) -> None:
     places = [
-        (loc.table, loc.row, loc.cell, loc.paragraph, loc.mode, loc.after_run)
+        (loc.table, loc.row, loc.cell, loc.paragraph, loc.mode, loc.start)
         for loc in map(docx_locator, annex_4.fields)
     ]
 
@@ -361,3 +361,40 @@ def test_annex_4_counts(annex_4: FormSchema) -> None:
     assert len(kinds) == 49
     assert kinds.count(YES_NO) == 17
     assert kinds.count(SIGNATURE) == 1
+
+
+def test_a_label_merged_over_two_rows_is_one_field() -> None:
+    def build(document: DocumentObject) -> None:
+        table = document.add_table(rows=2, cols=2)
+        table.cell(0, 0).merge(table.cell(1, 0)).text = "Company"
+
+    assert [(f.label, docx_locator(f).row, docx_locator(f).cell) for f in _parse(build).fields] == [
+        ("Company", 0, 1)
+    ]
+
+
+def test_an_answer_cell_merged_over_two_rows_belongs_to_the_first_label() -> None:
+    def build(document: DocumentObject) -> None:
+        table = document.add_table(rows=2, cols=2)
+        table.cell(0, 0).text = "Name"
+        table.cell(1, 0).text = "City"
+        table.cell(0, 1).merge(table.cell(1, 1))
+
+    fields = {f.label: docx_locator(f) for f in _parse(build).fields}
+
+    assert (fields["Name"].row, fields["Name"].cell, fields["Name"].mode) == (0, 1, IN)
+    assert (fields["City"].row, fields["City"].cell, fields["City"].mode) == (1, 0, NEW)
+
+
+def test_a_yes_no_question_is_the_longest_cell_before_the_answer() -> None:
+    def build(document: DocumentObject) -> None:
+        table = document.add_table(rows=2, cols=3)
+        table.cell(0, 0).text = "No."
+        table.cell(0, 1).text = "Question"
+        table.cell(0, 2).text = "Answer: Yes/No"
+        table.cell(1, 0).text = "1"
+        table.cell(1, 1).text = "Do you comply with the occupational health and safety rules?"
+
+    assert [(f.label, f.kind, docx_locator(f).cell) for f in _parse(build).fields] == [
+        ("Do you comply with the occupational health and safety rules?", YES_NO, 2)
+    ]

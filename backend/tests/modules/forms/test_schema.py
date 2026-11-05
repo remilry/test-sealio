@@ -35,7 +35,7 @@ def test_a_field_locator_is_read_by_its_format() -> None:
 
     assert isinstance(docx.locator, DocxLocator)
     assert docx.locator.mode == DocxWriteMode.IN_PARAGRAPH
-    assert docx.locator.after_run is None
+    assert docx.locator.start is None
     assert isinstance(pdf.locator, PdfLocator)
 
 

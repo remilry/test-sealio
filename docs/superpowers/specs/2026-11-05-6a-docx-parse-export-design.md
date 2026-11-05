@@ -52,7 +52,8 @@ row: int | None
 cell: int | None       # index de la cellule distincte dans la ligne (fusions dédoublonnées)
 paragraph: int         # index du paragraphe dans la cellule, ou dans le corps si hors tableau
 mode: "in_paragraph" | "new_paragraph" | "replace_leader"
-after_run: int | None  # in_paragraph : écrire après ce run (None = fin du paragraphe / paragraphe vide)
+start, end: int | None   # positions dans le texte du paragraphe : insertion (start = end) ou pointillés remplacés [start, end) ; None = fin du paragraphe / paragraphe vide
+# (révisé à la relecture finale : au lieu d'un index de run, qui se décale quand deux champs partagent un paragraphe ou quand Word fusionne libellé, tabulations et texte dans un même run)
 ```
 
 Il sert à l'exporteur et, en 6b, à retrouver la zone dans l'aperçu HTML (`docx-preview`) pour la surligner. Forme exacte au builder si un champ manque.

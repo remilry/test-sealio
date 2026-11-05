@@ -39,11 +39,11 @@ class PdfLocator(BaseModel):
 
 
 class DocxWriteMode(StrEnum):
-    # After run `after_run` of the paragraph, or at its end (also an empty paragraph or cell).
+    # At character `start` of the paragraph's text, or at its end (also an empty paragraph/cell).
     IN_PARAGRAPH = "in_paragraph"
     # In a new paragraph inserted right after `paragraph` (a label alone in its cell).
     NEW_PARAGRAPH = "new_paragraph"
-    # In place of the dot leader held by run `after_run`.
+    # In place of the dot leader, characters [start, end) of the paragraph's text.
     REPLACE_LEADER = "replace_leader"
 
 
@@ -59,7 +59,9 @@ class DocxLocator(BaseModel):
     # Index of the paragraph in the cell, or among the body's paragraphs outside tables.
     paragraph: int
     mode: DocxWriteMode
-    after_run: int | None = None
+    # Offsets in the text of the paragraph's runs (python-docx `Run.text`: a tab is one character).
+    start: int | None = None
+    end: int | None = None
 
 
 Locator = Annotated[PdfLocator | DocxLocator, Field(discriminator="format")]

@@ -2,6 +2,7 @@
 
 import io
 import zipfile
+from collections.abc import Callable
 
 import pytest
 from docx import Document
@@ -190,3 +191,91 @@ def _untouched(
                 parts.extend(_xml(p._p) for p in cell.paragraphs[:stop])  # pyright: ignore[reportPrivateUsage]
     parts.append(_xml(document.sections[-1]._sectPr))  # pyright: ignore[reportPrivateUsage]
     return parts
+
+
+# --- Word structures other than Annex 4 ------------------------------------------------------
+
+PLACE = "Zurich, 05.11.2026"
+
+
+def _build(build: Callable[[DocumentObject], None]) -> bytes:
+    document = Document()
+    build(document)
+    buffer = io.BytesIO()
+    document.save(buffer)
+    return buffer.getvalue()
+
+
+def _export(original: bytes, values: dict[str, str]) -> DocumentObject:
+    fields = {field.label: docx_locator(field) for field in parse_docx(original).fields}
+    answers = [(fields[label], value) for label, value in values.items()]
+    return Document(io.BytesIO(export_docx(original, answers)))
+
+
+def _body_line(*runs: str) -> bytes:
+    def build(document: DocumentObject) -> None:
+        paragraph = document.add_paragraph()
+        for text in runs:
+            paragraph.add_run(text)
+
+    return _build(build)
+
+
+def test_two_fields_in_one_paragraph_each_follow_their_label() -> None:
+    original = _body_line("Name:", "\t\t", "City:", "\t\t")
+
+    text = _export(original, {"Name": "Alpenlogic AG", "City": "Zurich"}).paragraphs[0].text
+
+    assert text.startswith("Name: Alpenlogic AG\t")
+    assert text.index("Zurich") > text.index("City:")
+
+
+def test_label_tabs_and_trailing_text_in_one_run() -> None:
+    original = _body_line("Place and date:\t\t\t\tCompany stamp and signature:")
+
+    text = _export(original, {"Place and date": PLACE}).paragraphs[0].text
+
+    assert text.startswith(f"Place and date: {PLACE}\t")
+    assert 1 <= text.count("\t") < 4
+    assert text.endswith("\tCompany stamp and signature:")
+
+
+def test_label_and_tabs_in_one_run_trailing_text_in_the_next() -> None:
+    original = _body_line("Place and date:\t\t\t\t", "Company stamp and signature:")
+
+    text = _export(original, {"Place and date": PLACE}).paragraphs[0].text
+
+    assert text.startswith(f"Place and date: {PLACE}\t")
+    assert 1 <= text.count("\t") < 4
+    assert text.endswith("\tCompany stamp and signature:")
+
+
+def test_tabs_and_trailing_text_in_one_run() -> None:
+    original = _body_line("Place and date: ", "\t\t\t\tCompany stamp and signature:")
+
+    text = _export(original, {"Place and date": PLACE}).paragraphs[0].text
+
+    assert text.startswith(f"Place and date: {PLACE}\t")
+    assert 1 <= text.count("\t") < 4
+
+
+def test_a_dot_leader_split_over_two_runs_is_replaced_whole() -> None:
+    original = _body_line("Tender no. ...", "......... type of work")
+
+    exported = _export(original, {"Tender no. … type of work": "ZH-2026-0412"})
+
+    assert exported.paragraphs[0].text == "Tender no. ZH-2026-0412 type of work"
+
+
+def test_an_answer_cell_merged_over_two_rows_gets_one_value() -> None:
+    def build(document: DocumentObject) -> None:
+        table = document.add_table(rows=2, cols=2)
+        table.cell(0, 0).text = "Name"
+        table.cell(1, 0).text = "City"
+        table.cell(0, 1).merge(table.cell(1, 1))
+
+    exported = _export(_build(build), {"Name": "Alpenlogic AG", "City": "Zurich"})
+
+    table = exported.tables[0]
+    assert table.cell(0, 1).text == "Alpenlogic AG"
+    assert [p.text for p in table.cell(1, 0).paragraphs] == ["City", "Zurich"]

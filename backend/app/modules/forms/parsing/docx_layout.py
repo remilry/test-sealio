@@ -8,13 +8,13 @@ from app.modules.forms.parsing.schema import DocxLocator
 
 
 def distinct_cells(row: _Row) -> list[_Cell]:
-    """The row's cells, a merged cell once, without the continuations of vertical merges."""
-    cells: list[_Cell] = []
-    for cell in row.cells:
-        if cells and cell._tc is cells[-1]._tc:  # pyright: ignore[reportPrivateUsage]
-            continue
-        cells.append(cell)
-    return [cell for cell in cells if cell._tc.vMerge != "continue"]  # pyright: ignore[reportPrivateUsage]
+    """The row's own cells: a merged cell once, without the continuations of a vertical merge
+    (python-docx's `row.cells` repeats the cell above for those)."""
+    return [
+        _Cell(tc, row.table)
+        for tc in row._tr.tc_lst  # pyright: ignore[reportPrivateUsage]
+        if tc.vMerge != "continue"
+    ]
 
 
 def paragraph_at(document: Document, locator: DocxLocator) -> Paragraph:

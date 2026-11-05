@@ -92,24 +92,8 @@ def _kind(label: str) -> FieldKind:
     return FieldKind.SIGNATURE if SIGNATURE_LABEL.search(label) else FieldKind.TEXT
 
 
-def _last_text_run(paragraph: Paragraph) -> int:
-    """Index of the last run holding visible text (the label's end)."""
-    runs = paragraph.runs
-    return max(index for index, run in enumerate(runs) if run.text.strip())
-
-
-def _run_at(paragraph: Paragraph, char_index: int) -> int:
-    """Index of the run holding the paragraph's character at char_index."""
-    position = 0
-    for index, run in enumerate(paragraph.runs):
-        position += len(run.text)
-        if char_index < position:
-            return index
-    return len(paragraph.runs) - 1
-
-
-def _leader_blank(paragraph: Paragraph) -> tuple[str, int] | None:
-    """(label, run holding the dots) for a paragraph with a dot leader."""
+def _leader_blank(paragraph: Paragraph) -> tuple[str, int, int] | None:
+    """(label, start, end) of the first dot leader of a paragraph, offsets in its text."""
     text = _text(paragraph)
     runs = leader_runs(text)
     if not runs:
@@ -117,25 +101,23 @@ def _leader_blank(paragraph: Paragraph) -> tuple[str, int] | None:
     label = text
     for start, end in reversed(runs):
         label = label[:start] + "…" + label[end:]
-    return clean_label(label), _run_at(paragraph, runs[0][0])
+    return clean_label(label), runs[0][0], runs[0][1]
 
 
 def _segments(paragraph: Paragraph) -> list[tuple[str, int, bool]]:
-    """The paragraph's text split at its tabs: (text, run of its last character, tab after it)."""
+    """The paragraph's text split at its tabs: (segment, where an answer to it is inserted,
+    whether a tab follows it).
+
+    Before the tabs when more text follows on the line (so the tabs can make room for it),
+    else at the end of the paragraph."""
+    text = _text(paragraph)
     segments: list[tuple[str, int, bool]] = []
-    current, last_run = "", 0
-    for index, run in enumerate(paragraph.runs):
-        for char in run.text:
-            if char == "\t":
-                if current.strip():
-                    segments.append((current, last_run, True))
-                current = ""
-                continue
-            current += char
-            if not char.isspace():
-                last_run = index
-    if current.strip():
-        segments.append((current, last_run, False))
+    for match in re.finditer(r"[^\t]+", text):
+        if not match.group().strip():
+            continue
+        more_after = bool(text[match.end() :].strip())
+        at = match.end() if more_after else len(text)
+        segments.append((match.group(), at, text[match.end() : match.end() + 1] == "\t"))
     return segments
 
 
@@ -145,26 +127,26 @@ def _segments(paragraph: Paragraph) -> list[tuple[str, int, bool]]:
 def _body_blanks(paragraph: Paragraph, index: int) -> list[_Blank]:
     leader = _leader_blank(paragraph)
     if leader is not None:
-        label, run = leader
-        return [_body_blank(label, index, DocxWriteMode.REPLACE_LEADER, run)]
+        label, start, end = leader
+        return [_body_blank(label, index, DocxWriteMode.REPLACE_LEADER, start, end)]
     blanks: list[_Blank] = []
-    for text, run, tab_after in _segments(paragraph):
-        stripped = text.strip()
+    for segment, at, tab_after in _segments(paragraph):
+        stripped = segment.strip()
         if len(stripped) > MAX_LABEL_CHARS:
             continue
         label = clean_label(stripped)
         is_signature = bool(SIGNATURE_LABEL.search(label))
         if label and (is_signature or (stripped.endswith(":") and tab_after)):
-            blanks.append(_body_blank(label, index, DocxWriteMode.IN_PARAGRAPH, run))
+            blanks.append(_body_blank(label, index, DocxWriteMode.IN_PARAGRAPH, at, at))
     return blanks
 
 
-def _body_blank(label: str, index: int, mode: DocxWriteMode, run: int | None) -> _Blank:
+def _body_blank(label: str, index: int, mode: DocxWriteMode, start: int, end: int) -> _Blank:
     return _Blank(
         label=label,
         section=BODY_SECTION,
         kind=_kind(label),
-        locator=DocxLocator(paragraph=index, mode=mode, after_run=run),
+        locator=DocxLocator(paragraph=index, mode=mode, start=start, end=end),
     )
 
 
@@ -182,6 +164,8 @@ def _labels(cell: _Cell) -> list[str]:
 def _table_blanks(table: Table, table_index: int) -> list[_Blank]:
     section = f"Table {table_index + 1}"
     rows = [distinct_cells(row) for row in table.rows]
+    # Cells of each row, continuations of a vertical merge included: a heading spans the row.
+    widths = [len(row._tr.tc_lst) for row in table.rows]  # pyright: ignore[reportPrivateUsage]
     yes_no = bool(rows) and any(
         YES_NO_HEADER.search(_text(p)) for c in rows[0] for p in c.paragraphs
     )
@@ -190,12 +174,14 @@ def _table_blanks(table: Table, table_index: int) -> list[_Blank]:
         if yes_no and row_index == 0:
             continue
         locate = _Row(table_index, row_index).locator
-        if yes_no and len(cells) >= 2 and _cell_blank(cells[-1]) and not _cell_blank(cells[0]):
-            label = clean_label(" ".join(_labels(cells[0])))
+        questions = [" ".join(_labels(cell)) for cell in cells[:-1] if not _cell_blank(cell)]
+        if yes_no and questions and _cell_blank(cells[-1]):
+            # The question is the longest text before the answer (not a "No." column).
+            label = clean_label(max(questions, key=len))
             locator = locate(len(cells) - 1, 0, DocxWriteMode.IN_PARAGRAPH)
             blanks.append(_Blank(label, section, FieldKind.YES_NO, locator))
             continue
-        heading_row = len(cells) == 1 and _is_heading(cells[0])
+        heading_row = widths[row_index] == 1 and _is_heading(cells[0])
         if heading_row:
             continue
         for cell_index, cell in enumerate(cells):
@@ -221,7 +207,7 @@ class _Row:
     row: int
 
     def locator(
-        self, cell: int, paragraph: int, mode: DocxWriteMode, run: int | None = None
+        self, cell: int, paragraph: int, mode: DocxWriteMode, at: tuple[int, int] | None = None
     ) -> DocxLocator:
         return DocxLocator(
             table=self.table,
@@ -229,7 +215,8 @@ class _Row:
             cell=cell,
             paragraph=paragraph,
             mode=mode,
-            after_run=run,
+            start=None if at is None else at[0],
+            end=None if at is None else at[1],
         )
 
 
@@ -257,7 +244,7 @@ def _in_cell_blanks(
                 leader[0],
                 section,
                 _kind(leader[0]),
-                locate(cell_index, index, DocxWriteMode.REPLACE_LEADER, leader[1]),
+                locate(cell_index, index, DocxWriteMode.REPLACE_LEADER, (leader[1], leader[2])),
             )
             for index, leader in leaders
             if leader is not None
@@ -272,9 +259,8 @@ def _in_cell_blanks(
         if below is not None and _blank(below):
             locator = locate(cell_index, index + 1, DocxWriteMode.IN_PARAGRAPH)
         elif text.endswith(":"):
-            locator = locate(
-                cell_index, index, DocxWriteMode.IN_PARAGRAPH, _last_text_run(paragraph)
-            )
+            end = len(_text(paragraph))
+            locator = locate(cell_index, index, DocxWriteMode.IN_PARAGRAPH, (end, end))
         elif len(text.split()) <= MAX_BARE_LABEL_WORDS:
             locator = locate(cell_index, index, DocxWriteMode.NEW_PARAGRAPH)
         else:
