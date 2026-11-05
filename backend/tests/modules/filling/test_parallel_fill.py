@@ -47,6 +47,8 @@ class SlowLLM(FakeLLM):
         self.failing: set[str] = set()
         self.while_calling: Any = None
         self._lock = threading.Lock()
+        # (start, end) of each call, to see them overlap.
+        self.spans: list[tuple[float, float]] = []
 
     def generate_structured(  # type: ignore[override]
         self, request: LLMRequest[Any], on_partial: OnPartial | None = None
@@ -57,7 +59,10 @@ class SlowLLM(FakeLLM):
             hook, self.while_calling = self.while_calling, None
         if hook is not None:
             hook()
+        began = time.monotonic()
         time.sleep(DELAY)
+        with self._lock:
+            self.spans.append((began, time.monotonic()))
         self._answers[request.key] = {"fields": []}
         return super().generate_structured(request, on_partial)
 
@@ -92,13 +97,11 @@ def test_annex_4_is_answered_by_nine_calls(client: TestClient, annex_4: int) -> 
 
 
 def test_groups_are_called_in_parallel(client: TestClient, annex_4: int, llm: SlowLLM) -> None:
-    started = time.monotonic()
     client.post(f"/forms/{annex_4}/fill")
-    elapsed = time.monotonic() - started
 
-    # In sequence, 9 calls would take 2.7 s.
-    assert elapsed < 4 * DELAY
-    assert len(llm.requests) == 9
+    # Every call has started before the first one ends: they all run at the same time.
+    assert len(llm.spans) == 9
+    assert max(start for start, _ in llm.spans) < min(end for _, end in llm.spans)
     events = read_events(client, annex_4)
     answered = [e for e in events if e["event"] == "field" and e["data"]["state"] == "answered"]
     assert len(answered) == 48
