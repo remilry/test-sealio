@@ -28,7 +28,7 @@ from app.llm.openai_adapter import OpenAILLM
 from app.modules.filling.answer_engine import SectionResult, answer_section, request_key
 from app.modules.filling.groups import CallGroup, FieldToAnswer, call_groups
 from app.modules.filling.job import knowledge_search, run_groups
-from app.modules.filling.rules import AnswerType, decide
+from app.modules.filling.rules import NEEDS_REVIEW, AnswerType, decide
 from app.modules.forms import service as forms_service
 from app.modules.forms.parsing.schema import FieldKind
 from app.modules.forms.schemas import FormDetail
@@ -162,14 +162,24 @@ def main() -> None:
     for form_key, form_answers in answers.items():
         expected = GROUND_TRUTH.get(form_key.split("-conditions")[0])
         if expected is not None:
-            _print_check(form_key, check(expected, form_answers))
+            _print_check(form_key, check(expected, form_answers), form_answers)
 
 
-def _print_check(form_key: str, problems: dict[str, str | None]) -> None:
+def _print_check(
+    form_key: str,
+    problems: dict[str, str | None],
+    answers: dict[str, tuple[AnswerType, str | None]],
+) -> None:
+    """OK, flagged (not as expected, but shown to the user as to check) or silent (wrong with no
+    flag: what the user could miss)."""
     wrong = {key: problem for key, problem in problems.items() if problem is not None}
-    print(f"\nGround truth, {form_key}: {len(problems) - len(wrong)}/{len(problems)} OK")
+    flagged = {key for key in wrong if key in answers and answers[key][0] in NEEDS_REVIEW}
+    print(
+        f"\nGround truth, {form_key}: {len(problems) - len(wrong)}/{len(problems)} OK · "
+        f"{len(flagged)} flagged to check · {len(wrong) - len(flagged)} silent"
+    )
     for key, problem in wrong.items():
-        print(f"  KO {key}: {problem}")
+        print(f"  {'FLAGGED' if key in flagged else 'SILENT '} {key}: {problem}")
 
 
 def _slug(text: str) -> str:
