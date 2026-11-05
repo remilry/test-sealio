@@ -306,6 +306,17 @@ function FieldStatus({ field, context }: { field: QueueField; context: FieldCont
         </p>
       );
     }
+    const sourceDate = field.candidates[0]?.source_date?.date;
+    if (sourceDate) {
+      return (
+        <p className="text-xs font-medium text-warning">
+          {t("outdatedOld", { date: formatDate(sourceDate) })}
+        </p>
+      );
+    }
+  }
+  if (field.type === "unsure") {
+    return <p className="text-xs font-medium text-warning">{t("unsure")}</p>;
   }
   if (field.type === "declaration" && context) {
     return (

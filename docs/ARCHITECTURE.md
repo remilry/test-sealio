@@ -16,7 +16,7 @@
 │ form_parser/    DOCX/PDF → FormSchema (champs + localisateurs)        │
 │ knowledge/      ingestion : texte par page + positions, passages,     │
 │                 index hybride (BM25 + vecteurs), retrieve()           │
-│ answer_engine/  retrieve + LLM (1 appel / section) + validateur       │
+│ answer_engine/  retrieve + LLM (1 appel / groupe, ×2) + validateur    │
 │ rules/          critères génériques : preuve, conflit, péremption,    │
 │                 champ utilisateur, statut/groupe/tri, blocage export  │
 │ exporter/       FormSchema + réponses + original → fichier rempli     │
@@ -34,7 +34,7 @@ data/ (ignoré par git) : uploads, exports. Seed au démarrage : tenant, offre, 
 | Contrat | Modèles Pydantic → OpenAPI → `openapi-typescript` → types TS |
 | Communication | REST + SSE (remplissage). Corrections utilisateur en `PATCH` pendant le flux ; `DELETE /forms/{id}/fill` abandonne le remplissage (réponses de l'utilisateur comprises) |
 | Remplissage | Job asyncio côté back, événements persistés → SSE rejouable (rechargement), écrans de repli sur le même modèle |
-| LLM | OpenAI `gpt-5-mini` (décision 2026-11-04, Claude auparavant) via une façade `llm/` (`generate_structured`) ; aucun autre module n'importe le SDK. **Un appel par section** du formulaire, lu en flux (`on_partial`) : événement SSE par champ, publié dès que le modèle l'a complet |
+| LLM | OpenAI `gpt-5-mini` (décision 2026-11-04, Claude auparavant) via une façade `llm/` (`generate_structured`) ; aucun autre module n'importe le SDK. **Un appel par groupe de champs** (une section, coupée au-delà de 10 champs), fait deux fois en parallèle et fusionné, groupes en parallèle, lu en flux (`on_partial`) : événement SSE par champ, publié dès que le modèle l'a complet |
 | Recherche | RAG hybride dans PostgreSQL : vecteurs (`fastembed` local + pgvector) + plein texte (`tsvector`), fusion des rangs (RRF). Passages = document + page + rectangle |
 | Fiabilité | Le LLM renvoie toutes les valeurs candidates avec leurs citations exactes, ou rien. Le code vérifie chaque citation et chaque valeur, détecte les conflits (valeurs normalisées divergentes) et la péremption (date de validité renvoyée avec sa citation, comparée à aujourd'hui). Plus aucun candidat vérifié → `missing` |
 | Ingestion V1 | Pas d'extraction de faits (coût) : *Company knowledge* liste les documents |
@@ -142,8 +142,9 @@ backend/
 │     ├─ forms/               router · service · models
 │     │  └─ parsing/          pdf_parser.py · docx_parser.py → FormSchema (pur) ; schema.py (localisateur `PdfLocator` | `DocxLocator`) · labels.py (libellés, clés, pointillés) · docx_layout.py (localisateur → paragraphe Word)
 │     ├─ filling/             router (lancer, SSE, PATCH champ) · service · models
-│     │  ├─ job.py            orchestration des 5 phases, émet les événements
-│     │  ├─ answer_engine.py  section → retrieve par champ → prompt → appel LLM
+│     │  ├─ job.py            orchestration des 5 phases, groupes en parallèle, émet les événements
+│     │  ├─ groups.py         groupes d'appel (≤ 10 champs par appel, pur)
+│     │  ├─ answer_engine.py  groupe → retrieve par champ → prompt → 2 appels LLM → fusion
 │     │  ├─ llm_schema.py     sortie structurée attendue du LLM
 │     │  ├─ validator.py      vérification des citations et des valeurs (pur)
 │     │  └─ rules.py          type de réponse ; groupe, ordre, blocage d'export à l'étape 7 (pur)
@@ -155,6 +156,7 @@ backend/
 **Règles de dépendance**
 - Un module n'expose aux autres que son `service.py`.
 - Seul `answer_engine` (et le routeur, pour injecter le modèle) importe `llm/` ; seul `llm/` importe le SDK OpenAI.
+- Exception : `forms/service` importe `filling/groups` (pur, sans base) pour la durée estimée ; `filling/service` importe déjà `forms/service`, l'inverse ferait un cycle.
 - Les briques critiques sont **pures** (données en entrée, données en sortie, ni base ni réseau) : `parsing/`, `validator`, `rules`, `*_exporter`.
 
 ### Modèle de données (PostgreSQL)
@@ -172,7 +174,7 @@ Toutes les tables héritent d'un `TimestampMixin` : `created_at` (`timestamptz`,
 | `document` | tenant, nom, fichier, format, pages (nul pour un DOCX), statut (`processing`/`indexed`/`error`), message d'erreur, `indexed_at` |
 | `chunk` | document, position, page, rectangle, texte (cité tel quel), contexte (titre du document + section, cherché mais jamais cité), `embedding vector(384)` (index HNSW), `tsv tsvector` (colonne générée sur contexte + texte, index GIN) |
 | `form` | offre, fichier d'origine, format, pages. Partagé par tous les tenants |
-| `field` | formulaire, section, ordre, libellé, nature (`text`/`number`/`date`/`yes_no`/`signature`), localisateur (JSONB) |
+| `field` | formulaire, section, ordre, libellé, nature (`text`/`number`/`date`/`yes_no`/`signature`), localisateur (JSONB), contexte (titre qui chapeaute le champ, pour la recherche et le prompt, jamais affiché) |
 | `form_fill` | tenant, formulaire (unique ensemble), statut (`not_started`/`in_review`/`ready`), dernier remplissage IA (`ai_status` `running`/`done`/`failed`, `ai_started_at`, `ai_finished_at`). Créé à la première réponse ou au premier remplissage |
 | `answer` | remplissage, champ (unique ensemble), valeur, candidats JSONB `[{value, citations: [{quote, document_name, document_id, chunk_id, page}], source_date, valid_until}]` (sélectionné en premier ; dates avec leur citation), type (`auto`/`missing`/`manual`/`outdated`/`conflict`/`declaration`, nul si jamais traité par l'IA), raison `user_only`, `needs_review`, `resolved_by`, `resolved_at` |
 | `fill_event` | remplissage, id croissant (= id SSE), type (`phase`/`field`/`done`/`error`), données JSONB. Événements du dernier remplissage seulement |
@@ -183,26 +185,27 @@ Toutes les tables héritent d'un `TimestampMixin` : `created_at` (`timestamptz`,
 - **Fusion** : Reciprocal Rank Fusion des deux listes, top k par champ. Le plein texte rattrape les UID, numéros de police et noms propres ; les vecteurs rattrapent les reformulations.
 
 ### Remplissage
-- Tâche de fond (`BackgroundTasks`, thread) dans le processus, une section à la fois. Chaque champ validé écrit son `answer` puis un `fill_event`, commité aussitôt. Les champs fixés par l'utilisateur ne sont pas redemandés, et l'upsert de l'IA ne remplace jamais une valeur de l'utilisateur, même enregistrée pendant le remplissage.
+- Tâche de fond (`BackgroundTasks`, thread) dans le processus. **Groupes d'appel** (`groups.py`) : les champs d'une section (hors signature), coupés en parties équilibrées au-delà de 10 (Annex 4 : 9 groupes, Table 7 en 2), avant de retirer ceux que l'utilisateur a fixés : la clé et le contenu d'un groupe ne dépendent pas de sa saisie. Les groupes tournent **en parallèle** (`run_groups`, pool de `FORMPILOT_FILL_MAX_PARALLEL_CALLS` = 10), une session de base par groupe ; le premier échec arrête la publication des autres et termine le run en erreur. Chaque champ validé écrit son `answer` puis un `fill_event`, commité aussitôt ; les publications sont sérialisées (un verrou) pour que les identifiants des événements soient commités dans l'ordre, dont dépend la lecture du flux. Les champs fixés par l'utilisateur ne sont pas redemandés, et l'upsert de l'IA ne remplace jamais une valeur de l'utilisateur, même enregistrée pendant le remplissage.
 - SSE : renvoie les événements depuis `Last-Event-ID`, puis lit la base toutes les 250 ms jusqu'à la fin du run (plus simple qu'une `asyncio.Queue` entre threads, et identique après un rechargement). Un run resté `running` au démarrage du serveur passe `failed`.
 - **Streaming** : la façade accepte `on_partial` (sortie partielle à chaque delta, dans l'ordre) ; l'adaptateur OpenAI lit le flux de la Responses API. Le moteur passe `on_field` : dès qu'un champ est complet dans la sortie partielle, il est validé, ses règles appliquées, son `answer` écrit et son événement émis, sans attendre la fin de la section ; ce qui reste à la fin est traité comme avant. `FakeLLM` rejoue les mêmes étapes en dormant d'après le bloc `timing` des enregistrements (`first_output_seconds`, `total_seconds`), selon `FORMPILOT_FAKE_LLM_LATENCY` (`recorded` par défaut, `none` dans les tests et l'e2e).
 - **Abandon** : `DELETE /forms/{id}/fill` supprime les réponses et le run ; un run en cours s'en aperçoit (plus de `form_fill`) et s'arrête sans rien écrire. `POST /fill` répond 409 sur un formulaire commencé.
-- **Appel LLM par section** : champs de la section, passages retrouvés par champ (top 8, dédoublonnés, étiquetés `P1…`), « Tender details ». Sortie structurée au schéma strict, en streaming (`responses.stream` ; chaque champ est publié dès qu'il est complet), effort de raisonnement bas. Par champ : candidats avec une ou plusieurs citations, date de la source et fin de validité avec citation, `user_only` + raison + valeur suggérée, ou rien.
-- Enregistrement : `scripts/record_llm.py` rejoue le moteur avec le vrai modèle en flux et écrit `backend/llm_recordings/<formulaire>--<section>.json` (réponse + bloc `timing` mesuré), que `FakeLLM` rejoue (clé stable : le prompt dépend de l'embedder).
+- **Appel LLM par groupe** : champs du groupe, passages retrouvés par champ (requête = contexte + libellé, top 8, dédoublonnés, étiquetés `P1…`), « Tender details ». **Deux exécutions** du même appel en parallèle (`FORMPILOT_FILL_RUNS_PER_CALL` = 2, clé `…--run-2`), validées chacune puis fusionnées (`merge_runs`) : même valeur → un candidat ; valeurs différentes → `conflict` ; valeur d'une seule exécution → `unsure` ; un champ est publié quand les deux l'ont écrit. Le modèle ne répond pas pareil d'une fois à l'autre : ce qui varie devient un doute visible plutôt qu'une erreur silencieuse (mesuré, docs/PLAN.md 6c). Sortie structurée au schéma strict, en streaming (`responses.stream` ; chaque champ est publié dès qu'il est complet), effort de raisonnement bas. Par champ : candidats avec une ou plusieurs citations, date de la source et fin de validité avec citation, `user_only` + raison + valeur suggérée, ou rien.
+- Enregistrement : `scripts/record_llm.py` rejoue le moteur avec le vrai modèle en flux, groupes en parallèle, et écrit `backend/llm_recordings/<formulaire>--<section>[--part-n][--run-2].json` (réponse + bloc `timing` mesuré), que `FakeLLM` rejoue (clé stable : le prompt dépend de l'embedder ; sans enregistrement `--run-2`, la 2ᵉ exécution rejoue la 1ʳᵉ). Le script compare chaque résultat à `GROUND_TRUTH.md` (`scripts/ground_truth.py` : juste / signalé / silencieux) ; `--form annex-4` limite à un formulaire, `--replay` rejoue les enregistrements sans appel payant.
 
 ### Validateur (pur)
-- La citation doit se trouver dans le texte d'un passage envoyé, l'étiqueté d'abord (seuls lettres et chiffres comparés : casse, accents, espaces, ponctuation et césures tolérés).
+- La citation doit se trouver dans le texte d'un passage envoyé, l'étiqueté d'abord (seuls lettres et chiffres comparés : casse, accents, espaces, ponctuation et césures tolérés). Elle se coupe en morceaux à ses retours à la ligne et à ses « … » : les morceaux, dans l'ordre, dans un même passage, ou à défaut dans les passages d'un même document mis bout à bout dans l'ordre de lecture ; jamais sur deux documents.
 - Chaque mot et nombre significatif de la valeur doit figurer dans ses citations vérifiées après normalisation (nombres `100'000` = `100,000` = `100000`, dates, accents, casse) : une valeur peut combiner plusieurs citations.
-- Un Oui/Non n'est coché qu'avec une citation de preuve vérifiée. Une date n'est gardée que si sa citation l'énonce.
+- Un Oui/Non n'est coché qu'avec une citation de preuve vérifiée. Une date n'est gardée que si sa citation l'énonce (« June 2026 » énonce le 01.06.2026) ; une date du document égale à une date de la valeur est écartée (c'est le fait, pas la date du document).
 - Échec → citation ou candidat rejeté ; plus aucun candidat → `missing`.
 
 ### Règles (pures, dans cet ordre)
 1. Signature ou cachet → jamais rempli.
 2. `user_only` (classé par le LLM avec une raison) → `manual`, valeur suggérée écrite (ville du siège, date du jour), à revoir.
 3. Au moins deux candidats valides aux valeurs normalisées différentes → `conflict`, le plus récent pré-sélectionné.
-4. Date de validité dépassée → `outdated`.
-5. `yes_no` avec preuve → `declaration` cochée ; sans preuve → `missing`.
-6. Une valeur → `auto` ; aucune → `missing`. Puis (étape 7) groupes, ordre de la file et blocage d'export.
+4. Date de validité dépassée, ou source de plus d'un an sans validité en cours → `outdated` (proposé, à vérifier).
+5. Une seule des deux exécutions l'a trouvé → `unsure` (proposé, à vérifier).
+6. `yes_no` avec preuve → `declaration` cochée ; sans preuve → `missing`.
+7. Une valeur → `auto` ; aucune → `missing`. Puis (étape 7) groupes, ordre de la file et blocage d'export.
 
 ### Parsing et export
 - **PDF** : parsing des suites de `…`/`.` avec PyMuPDF, libellé à gauche ou au-dessus, une section. Export : effacement des pointillés de la zone, texte dans le rectangle, police réduite si débordement.

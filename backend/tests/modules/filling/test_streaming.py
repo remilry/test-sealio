@@ -15,6 +15,7 @@ from app.modules.filling.answer_engine import (
     complete_items,
     request_key,
 )
+from app.modules.filling.groups import CallGroup
 from app.modules.filling.validator import SourcePassage, ValidatedField
 from app.modules.forms.parsing.schema import FieldKind
 
@@ -61,8 +62,7 @@ def _run(
         company="Alpenlogic AG",
         form_title="Annex",
         form_file_name=FILE,
-        section=SECTION,
-        fields=fields,
+        group=CallGroup(SECTION, None, fields),
         search=_search,
         tender_details="Tender",
         today=date(2026, 11, 4),

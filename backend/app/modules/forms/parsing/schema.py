@@ -73,6 +73,9 @@ class ParsedField(BaseModel):
     label: str
     kind: FieldKind
     locator: Locator
+    # The heading that covers the field in the form ("Available amounts per claim" over "Personal
+    # injury"): searched and given to the model with the label, never shown.
+    context: str | None = None
 
 
 class PageSize(BaseModel):

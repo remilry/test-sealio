@@ -28,7 +28,7 @@ from app.modules.forms.parsing.schema import FieldKind
 
 # How a Yes/No answer is stored (as the validator writes the AI's).
 YES_NO_VALUES = frozenset({"yes", "no"})
-DOUBTS = frozenset({AnswerType.CONFLICT, AnswerType.OUTDATED})
+DOUBTS = frozenset({AnswerType.CONFLICT, AnswerType.OUTDATED, AnswerType.UNSURE})
 
 INTERRUPTED = (
     "The server stopped while filling this form. Discard its answers to auto-fill it again."

@@ -1,0 +1,143 @@
+{
+  "fields": [
+    {
+      "field": "do_you_comply_with_the_applicable_occupational_health_and_sa",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": [
+        {
+          "value": "yes",
+          "citations": [
+            {
+              "passage": "P2",
+              "quote": "Alpenlogic AG complies with the applicable occupational health and safety regulations."
+            }
+          ],
+          "source_date": null,
+          "valid_until": null
+        }
+      ]
+    },
+    {
+      "field": "do_you_comply_with_the_collective_employment_agreement_that_",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": []
+    },
+    {
+      "field": "do_you_comply_with_the_standard_employment_contract_that_app",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": []
+    },
+    {
+      "field": "do_you_comply_with_the_customary_wage_and_working_conditions",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": [
+        {
+          "value": "yes",
+          "citations": [
+            {
+              "passage": "P5",
+              "quote": "Wages and working conditions meet the customary standards of the sector in Zurich. The company complies with notification and permit obligations under the BGSA when posting or hiring foreign personnel."
+            }
+          ],
+          "source_date": null,
+          "valid_until": null
+        }
+      ]
+    },
+    {
+      "field": "only_for_services_to_be_performed_abroad_for_the_services_to",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": []
+    },
+    {
+      "field": "do_you_comply_with_the_principle_of_non_discrimination_in_pa",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": [
+        {
+          "value": "yes",
+          "citations": [
+            {
+              "passage": "P13",
+              "quote": "The company applies the principle of non-discrimination and equal treatment of women and men, including equal pay, verified by an internal annual pay analysis."
+            }
+          ],
+          "source_date": null,
+          "valid_until": null
+        }
+      ]
+    },
+    {
+      "field": "have_you_paid_in_full_the_taxes_due_at_your_place_of_busines",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": [
+        {
+          "value": "yes",
+          "citations": [
+            {
+              "passage": "P23",
+              "quote": "we confirm that, according to our records as of 30 September 2026, Alpenlogic AG has paid in full all cantonal, municipal and direct federal taxes due, including back taxes, up to and including tax period 2025. No outstanding amounts are recorded."
+            }
+          ],
+          "source_date": {
+            "date": "2026-10-01",
+            "citation": {
+              "passage": "P23",
+              "quote": "Zurich, 1 October 2026"
+            }
+          },
+          "valid_until": null
+        }
+      ]
+    },
+    {
+      "field": "have_you_paid_in_full_the_vat_or_sales_tax_due",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": []
+    },
+    {
+      "field": "have_you_paid_in_full_the_social_security_contributions_due_",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": [
+        {
+          "value": "yes",
+          "citations": [
+            {
+              "passage": "P25",
+              "quote": "We confirm that the above employer is affiliated with our compensation office and that all contributions due up to 30 September 2026 for AHV, IV, EO, FAK (family allowances) and ALV have been paid in full, including the employee shares deducted from wages."
+            }
+          ],
+          "source_date": {
+            "date": "2026-10-05",
+            "citation": {
+              "passage": "P25",
+              "quote": "Zurich, 5 October 2026"
+            }
+          },
+          "valid_until": null
+        }
+      ]
+    }
+  ],
+  "timing": {
+    "first_output_seconds": 7.73,
+    "total_seconds": 14.02
+  }
+}

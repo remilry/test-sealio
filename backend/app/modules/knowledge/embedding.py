@@ -7,6 +7,7 @@ deterministic and instant, so only the tests marked `slow` ever load the model.
 import hashlib
 import math
 import re
+import threading
 from functools import lru_cache
 from pathlib import Path
 from typing import Protocol
@@ -60,8 +61,18 @@ class HashEmbedder:
         return [v / norm for v in vector]
 
 
-@lru_cache
+_building = threading.Lock()
+
+
 def get_embedder() -> Embedder:
+    """The embedder, built once: the groups of a fill ask for it from several threads at once,
+    and loading the model takes seconds and hundreds of MB."""
+    with _building:
+        return _embedder()
+
+
+@lru_cache
+def _embedder() -> Embedder:
     if get_settings().embedder == "hash":
         return HashEmbedder()
     return FastEmbedder()

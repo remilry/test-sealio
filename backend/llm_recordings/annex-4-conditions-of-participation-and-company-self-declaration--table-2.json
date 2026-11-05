@@ -1,0 +1,121 @@
+{
+  "fields": [
+    {
+      "field": "exact_company_name",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": [
+        {
+          "value": "Alpenlogic AG",
+          "citations": [
+            {
+              "passage": "P2",
+              "quote": "Company name\nAlpenlogic AG"
+            }
+          ],
+          "source_date": {
+            "date": "2026-10-20",
+            "citation": {
+              "passage": "P2",
+              "quote": "Issued: 20 October 2026"
+            }
+          },
+          "valid_until": null
+        }
+      ]
+    },
+    {
+      "field": "street_postcode_city_country",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": [
+        {
+          "value": "Pfingstweidstrasse 31, 8005 Zurich, Switzerland",
+          "citations": [
+            {
+              "passage": "P11",
+              "quote": "Address\nPfingstweidstrasse 31, 8005 Zurich, Switzerland"
+            }
+          ],
+          "source_date": {
+            "date": "2026-10-22",
+            "citation": {
+              "passage": "P11",
+              "quote": "Date of request\n22.10.2026"
+            }
+          },
+          "valid_until": null
+        }
+      ]
+    },
+    {
+      "field": "telephone_e_mail",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": [
+        {
+          "value": "+41 44 555 01 00 / info@alpenlogic.example",
+          "citations": [
+            {
+              "passage": "P7",
+              "quote": "Reception\n+41 44 555 01 00\ninfo@alpenlogic.example"
+            }
+          ],
+          "source_date": null,
+          "valid_until": null
+        }
+      ]
+    },
+    {
+      "field": "responsible_person_contact_person",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": [
+        {
+          "value": "Marc Keller, Chief Executive Officer, +41 44 555 01 20, marc.keller@alpenlogic.example",
+          "citations": [
+            {
+              "passage": "P7",
+              "quote": "Chief Executive Officer\nMarc Keller\n+41 44 555 01 20\nmarc.keller@alpenlogic.example"
+            }
+          ],
+          "source_date": null,
+          "valid_until": null
+        }
+      ]
+    },
+    {
+      "field": "uid",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": [
+        {
+          "value": "CHE-123.456.789",
+          "citations": [
+            {
+              "passage": "P2",
+              "quote": "UID\nCHE-123.456.789"
+            }
+          ],
+          "source_date": {
+            "date": "2026-10-20",
+            "citation": {
+              "passage": "P2",
+              "quote": "Issued: 20 October 2026"
+            }
+          },
+          "valid_until": null
+        }
+      ]
+    }
+  ],
+  "timing": {
+    "first_output_seconds": 5.46,
+    "total_seconds": 11.62
+  }
+}

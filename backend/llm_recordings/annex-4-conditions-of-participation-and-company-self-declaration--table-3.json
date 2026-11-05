@@ -1,0 +1,271 @@
+{
+  "fields": [
+    {
+      "field": "legal_form",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": [
+        {
+          "value": "Company limited by shares (Aktiengesellschaft, AG)",
+          "citations": [
+            {
+              "passage": "P5",
+              "quote": "Legal form\nCompany limited by shares (Aktiengesellschaft, AG)"
+            }
+          ],
+          "source_date": {
+            "date": "2026-10-20",
+            "citation": {
+              "passage": "P3",
+              "quote": "Issued: 20 October 2026"
+            }
+          },
+          "valid_until": null
+        }
+      ]
+    },
+    {
+      "field": "registered_office",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": [
+        {
+          "value": "Pfingstweidstrasse 31, 8005 Zurich",
+          "citations": [
+            {
+              "passage": "P5",
+              "quote": "Address\nPfingstweidstrasse 31, 8005 Zurich"
+            }
+          ],
+          "source_date": {
+            "date": "2026-10-20",
+            "citation": {
+              "passage": "P3",
+              "quote": "Issued: 20 October 2026"
+            }
+          },
+          "valid_until": null
+        }
+      ]
+    },
+    {
+      "field": "company_has_had_this_legal_form_since",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": [
+        {
+          "value": "14.03.2016",
+          "citations": [
+            {
+              "passage": "P10",
+              "quote": "14.03.2016\nIncorporation of the company. Share capital CHF 100,000 (200 registered shares of CHF 500)."
+            }
+          ],
+          "source_date": {
+            "date": "2026-10-20",
+            "citation": {
+              "passage": "P3",
+              "quote": "Issued: 20 October 2026"
+            }
+          },
+          "valid_until": null
+        }
+      ]
+    },
+    {
+      "field": "ownership_structure_incl_own_shareholdings",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": [
+        {
+          "value": "Founders (Marc Keller and Sofia Brunner, jointly) 60 %; Helvetia Growth Fund 25 %; Employee participation foundation 15 %; The company holds no treasury shares.",
+          "citations": [
+            {
+              "passage": "P16",
+              "quote": "Founders (Marc Keller and Sofia Brunner, jointly) | 60 % | Swiss nationals, resident in Switzerland"
+            },
+            {
+              "passage": "P16",
+              "quote": "Helvetia Growth Fund (fictitious) | 25 % | Zurich, Switzerland"
+            },
+            {
+              "passage": "P16",
+              "quote": "Employee participation foundation | 15 % | Zurich, Switzerland"
+            },
+            {
+              "passage": "P16",
+              "quote": "The company holds no treasury shares."
+            }
+          ],
+          "source_date": {
+            "date": "2025-03-28",
+            "citation": {
+              "passage": "P35",
+              "quote": "Alpenlogic AG - Annual Report 2024\nPfingstweidstrasse 31, 8005 Zurich - Approved by the Board of Directors on 28 March 2025 - General Meeting of 24 April 2025"
+            }
+          },
+          "valid_until": null
+        }
+      ]
+    },
+    {
+      "field": "share_capital",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": [
+        {
+          "value": "CHF 500,000 (fully paid in)",
+          "citations": [
+            {
+              "passage": "P11",
+              "quote": "Share capital\nCHF 500,000 (fully paid in)"
+            }
+          ],
+          "source_date": {
+            "date": "2026-10-20",
+            "citation": {
+              "passage": "P3",
+              "quote": "Issued: 20 October 2026"
+            }
+          },
+          "valid_until": null
+        }
+      ]
+    },
+    {
+      "field": "business_purpose",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": [
+        {
+          "value": "Consulting, development and operation of digital transformation and artificial intelligence solutions, as well as related training and cloud services.",
+          "citations": [
+            {
+              "passage": "P11",
+              "quote": "Purpose\nConsulting, development and operation of digital transformation and artificial intelligence solutions, as well as related training and cloud services."
+            }
+          ],
+          "source_date": {
+            "date": "2026-10-20",
+            "citation": {
+              "passage": "P3",
+              "quote": "Issued: 20 October 2026"
+            }
+          },
+          "valid_until": null
+        }
+      ]
+    },
+    {
+      "field": "main_activity",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": [
+        {
+          "value": "Consulting",
+          "citations": [
+            {
+              "passage": "P23",
+              "quote": "Consulting | 2,310 | 36 % | Two framework contracts renewed"
+            }
+          ],
+          "source_date": {
+            "date": "2025-03-28",
+            "citation": {
+              "passage": "P35",
+              "quote": "Alpenlogic AG - Annual Report 2024\nPfingstweidstrasse 31, 8005 Zurich - Approved by the Board of Directors on 28 March 2025 - General Meeting of 24 April 2025"
+            }
+          },
+          "valid_until": null
+        }
+      ]
+    },
+    {
+      "field": "secondary_activities",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": [
+        {
+          "value": "AI solutions; Software engineering; Cloud & operations",
+          "citations": [
+            {
+              "passage": "P23",
+              "quote": "AI solutions | 1,990 | 31 % | Strongest growth (+18 %)"
+            },
+            {
+              "passage": "P23",
+              "quote": "Software engineering | 1,410 | 22 % | Stable"
+            },
+            {
+              "passage": "P23",
+              "quote": "Cloud & operations | 710 | 11 % | New managed-service customers"
+            }
+          ],
+          "source_date": {
+            "date": "2025-03-28",
+            "citation": {
+              "passage": "P35",
+              "quote": "Alpenlogic AG - Annual Report 2024\nPfingstweidstrasse 31, 8005 Zurich - Approved by the Board of Directors on 28 March 2025 - General Meeting of 24 April 2025"
+            }
+          },
+          "valid_until": null
+        }
+      ]
+    },
+    {
+      "field": "certificates",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": [
+        {
+          "value": "ISO 9001:2015 (Quality management system) — valid until 12 March 2028; ISO/IEC 27001:2022 (Information security management system) — valid until 12 March 2028",
+          "citations": [
+            {
+              "passage": "P39",
+              "quote": "The management system of Alpenlogic AG, Pfingstweidstrasse 31, 8005 Zurich, Switzerland, has been assessed and found to comply with the requirements of ISO 9001:2015 (Quality management system)."
+            },
+            {
+              "passage": "P39",
+              "quote": "Valid until\n12 March 2028"
+            },
+            {
+              "passage": "P40",
+              "quote": "The management system of Alpenlogic AG, Pfingstweidstrasse 31, 8005 Zurich, Switzerland, has been assessed and found to comply with the requirements of ISO/IEC 27001:2022 (Information security management system)."
+            },
+            {
+              "passage": "P41",
+              "quote": "Valid until\n12 March 2028"
+            }
+          ],
+          "source_date": {
+            "date": "2025-03-13",
+            "citation": {
+              "passage": "P39",
+              "quote": "Certificates dated 13 March 2025"
+            }
+          },
+          "valid_until": {
+            "date": "2028-03-12",
+            "citation": {
+              "passage": "P39",
+              "quote": "Valid until\n12 March 2028"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "timing": {
+    "first_output_seconds": 10.06,
+    "total_seconds": 25.64
+  }
+}

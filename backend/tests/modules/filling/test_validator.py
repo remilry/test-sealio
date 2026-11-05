@@ -1,5 +1,6 @@
 """The validator keeps only what the passages prove (no model call)."""
 
+from dataclasses import replace
 from datetime import date
 
 import pytest
@@ -7,6 +8,8 @@ import pytest
 from app.modules.filling.llm_schema import LLMCandidate, LLMCitation, LLMDate, LLMFieldAnswer
 from app.modules.filling.validator import (
     SourcePassage,
+    ValidatedField,
+    merge_runs,
     normalize_value,
     validate_field,
     value_is_supported,
@@ -334,3 +337,237 @@ def test_a_value_is_written_on_one_line() -> None:
     )
 
     assert [c.value for c in result.candidates] == ["Company name Alpenlogic AG"]
+
+
+@pytest.mark.parametrize("ellipsis", ["...", "…", " … "])
+def test_a_quote_shortened_with_an_ellipsis_is_kept_when_each_piece_is_in_the_passage(
+    ellipsis: str,
+) -> None:
+    quote = f"Company name: Alpenlogic AG{ellipsis}Company limited by shares (AG)"
+    [kept] = validate_field(
+        FieldKind.TEXT, answer(candidate("Alpenlogic AG", ("P1", quote))), PASSAGES
+    ).candidates
+
+    assert kept.citations[0].document_name == "Commercial register extract"
+
+
+def test_the_pieces_of_a_shortened_quote_must_come_in_the_passage_order() -> None:
+    quote = "Share capital: CHF 500'000 ... Company name: Alpenlogic AG"
+
+    result = validate_field(
+        FieldKind.TEXT, answer(candidate("Alpenlogic AG", ("P1", quote))), PASSAGES
+    )
+
+    assert result.candidates == []
+
+
+def test_a_shortened_quote_with_an_invented_piece_is_rejected() -> None:
+    quote = "Company name: Alpenlogic AG ... Share capital: CHF 900'000"
+
+    result = validate_field(
+        FieldKind.TEXT, answer(candidate("Alpenlogic AG", ("P1", quote))), PASSAGES
+    )
+
+    assert result.candidates == []
+
+
+def test_the_pieces_of_a_shortened_quote_must_be_in_the_same_passage() -> None:
+    quote = "Company name: Alpenlogic AG ... Valid until 31 October 2026"
+
+    result = validate_field(
+        FieldKind.TEXT, answer(candidate("Alpenlogic AG", ("P1", quote))), PASSAGES
+    )
+
+    assert result.candidates == []
+
+
+CERTIFICATE_1 = SourcePassage(
+    label="P4",
+    text="The management system of Alpenlogic AG has been assessed and found to comply with the "
+    "requirements of ISO 9001:2015 (Quality management system).",
+    document_name="ISO certificates",
+    document_id=5,
+    chunk_id=51,
+    page=0,
+)
+CERTIFICATE_2 = SourcePassage(
+    label="P5",
+    text="Valid until\n12 March 2028\nAccreditation\nSAS 0xx",
+    document_name="ISO certificates",
+    document_id=5,
+    chunk_id=52,
+    page=0,
+)
+
+
+def test_a_quote_over_two_passages_of_the_same_document_is_kept() -> None:
+    quote = "found to comply with the requirements of ISO 9001:2015\nValid until\n12 March 2028"
+
+    [kept] = validate_field(
+        FieldKind.TEXT,
+        answer(candidate("ISO 9001:2015 valid until 12 March 2028", ("P4", quote))),
+        [*PASSAGES, CERTIFICATE_1, CERTIFICATE_2],
+    ).candidates
+
+    assert kept.citations[0].chunk_id == 51
+
+
+def test_a_quote_over_two_documents_is_rejected() -> None:
+    quote = "Company name: Alpenlogic AG\nValid until\n12 March 2028"
+
+    result = validate_field(
+        FieldKind.TEXT,
+        answer(candidate("Alpenlogic AG", ("P1", quote))),
+        [*PASSAGES, CERTIFICATE_1, CERTIFICATE_2],
+    )
+
+    assert result.candidates == []
+
+
+def test_a_document_dated_by_its_month_is_dated_the_first_of_that_month() -> None:
+    team = SourcePassage(
+        label="P6",
+        text="Team (June 2026)\n28 people: 14 with higher professional training",
+        document_name="Company brochure 2026",
+        document_id=4,
+        chunk_id=41,
+        page=0,
+    )
+    [kept] = validate_field(
+        FieldKind.TEXT,
+        answer(
+            candidate(
+                "14",
+                ("P6", "14 with higher professional training"),
+                source_date=LLMDate(
+                    date="2026-06-01", citation=LLMCitation(passage="P6", quote="Team (June 2026)")
+                ),
+            )
+        ),
+        [team],
+    ).candidates
+
+    assert kept.source_date is not None
+    assert kept.source_date.date == date(2026, 6, 1)
+
+
+def test_the_date_of_the_fact_itself_is_not_the_documents_date() -> None:
+    # "Legal form since 14.03.2016": that date is the answer, not when the extract was issued.
+    [kept] = validate_field(
+        FieldKind.TEXT,
+        answer(
+            candidate(
+                "14.03.2016",
+                ("P1", "Entered on 14.03.2016"),
+                source_date=LLMDate(
+                    date="2016-03-14",
+                    citation=LLMCitation(passage="P1", quote="Entered on 14.03.2016"),
+                ),
+            )
+        ),
+        PASSAGES,
+    ).candidates
+
+    assert kept.source_date is None
+
+
+# --- Two runs of the same call, merged --------------------------------------------------------
+
+
+def _found(value: str, quote: str) -> ValidatedField:
+    return validate_field(FieldKind.TEXT, answer(candidate(value, ("P1", quote))), PASSAGES)
+
+
+def test_two_runs_giving_the_same_value_make_one_sure_candidate() -> None:
+    merged = merge_runs(
+        _found("Alpenlogic AG", "Company name: Alpenlogic AG"),
+        _found("Alpenlogic AG", "Alpenlogic AG"),
+    )
+
+    assert [c.value for c in merged.candidates] == ["Alpenlogic AG"]
+    assert len(merged.candidates[0].citations) == 2
+    assert not merged.unsure
+
+
+def test_two_runs_giving_different_values_keep_both() -> None:
+    merged = merge_runs(
+        _found("Alpenlogic AG", "Company name: Alpenlogic AG"),
+        _found("CHF 500'000", "Share capital: CHF 500'000"),
+    )
+
+    assert [c.value for c in merged.candidates] == ["Alpenlogic AG", "CHF 500'000"]
+
+
+def test_a_value_found_by_one_run_only_is_unsure() -> None:
+    nothing = validate_field(FieldKind.TEXT, None, PASSAGES)
+
+    for merged in (
+        merge_runs(_found("Alpenlogic AG", "Alpenlogic AG"), nothing),
+        merge_runs(nothing, _found("Alpenlogic AG", "Alpenlogic AG")),
+    ):
+        assert [c.value for c in merged.candidates] == ["Alpenlogic AG"]
+        assert merged.unsure
+
+
+def test_two_runs_finding_nothing_find_nothing() -> None:
+    nothing = validate_field(FieldKind.TEXT, None, PASSAGES)
+
+    merged = merge_runs(nothing, nothing)
+
+    assert (merged.candidates, merged.unsure) == ([], False)
+
+
+def test_a_field_one_run_leaves_to_the_user_is_left_to_the_user() -> None:
+    mine = validate_field(
+        FieldKind.TEXT,
+        answer(user_only=True, user_only_reason="Yours", suggested_value="Zurich"),
+        PASSAGES,
+    )
+
+    merged = merge_runs(_found("Alpenlogic AG", "Alpenlogic AG"), mine)
+
+    assert (merged.user_only, merged.suggested_value) == (True, "Zurich")
+
+
+POLICY = SourcePassage(
+    label="P7",
+    text="Alpenlogic AG employs its staff under the Swiss Code of Obligations. No collective "
+    "labour agreement applies to its activity, which is not bound by any such agreement in "
+    "the canton of Zurich, nor by any standard employment contract. The company complies with "
+    "Swiss law on working conditions and wages.",
+    document_name="HR compliance policy",
+    document_id=10,
+    chunk_id=101,
+)
+
+
+def test_pieces_far_apart_do_not_make_a_statement_the_document_does_not_make() -> None:
+    # In the document's order, but over 130 letters apart: "collective labour agreement … complies".
+    stitched = "No collective labour agreement … The company complies with Swiss law"
+
+    result = validate_field(FieldKind.YES_NO, answer(candidate("yes", ("P7", stitched))), [POLICY])
+
+    assert result.candidates == []
+
+
+def test_a_piece_too_short_to_be_a_quote_is_rejected() -> None:
+    quote = "Alpenlogic AG employs its staff … to"
+
+    result = validate_field(
+        FieldKind.TEXT, answer(candidate("Alpenlogic AG", ("P7", quote))), [POLICY]
+    )
+
+    assert result.candidates == []
+
+
+def test_a_quote_over_two_passages_that_are_not_neighbours_is_rejected() -> None:
+    far = replace(CERTIFICATE_2, chunk_id=59)
+    quote = "found to comply with the requirements of ISO 9001:2015\nValid until\n12 March 2028"
+
+    result = validate_field(
+        FieldKind.TEXT,
+        answer(candidate("ISO 9001:2015 valid until 12 March 2028", ("P4", quote))),
+        [*PASSAGES, CERTIFICATE_1, far],
+    )
+
+    assert result.candidates == []

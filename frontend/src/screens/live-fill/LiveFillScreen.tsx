@@ -447,7 +447,7 @@ function zoneTone(field: QueueField, value: string | null, answer: Answer | unde
   if (field.state === "searching") return "searching";
   if (!value) return "empty";
   if (!answer || answer.resolved_by === "user") return "entered";
-  if (answer.type === "conflict" || answer.type === "outdated" || answer.type === "manual") {
+  if (["conflict", "outdated", "manual", "unsure"].includes(answer.type ?? "")) {
     return "toCheck";
   }
   return "auto";

@@ -1,0 +1,78 @@
+{
+  "fields": [
+    {
+      "field": "with_higher_professional_training",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": [
+        {
+          "value": "14",
+          "citations": [
+            {
+              "passage": "P4",
+              "quote": "14 with higher professional training"
+            }
+          ],
+          "source_date": null,
+          "valid_until": null
+        }
+      ]
+    },
+    {
+      "field": "with_professional_training",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": [
+        {
+          "value": "9",
+          "citations": [
+            {
+              "passage": "P4",
+              "quote": "9 with professional training"
+            }
+          ],
+          "source_date": null,
+          "valid_until": null
+        }
+      ]
+    },
+    {
+      "field": "auxiliary_staff",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": []
+    },
+    {
+      "field": "apprentices",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": [
+        {
+          "value": "3",
+          "citations": [
+            {
+              "passage": "P3",
+              "quote": "including 3 apprentices"
+            }
+          ],
+          "source_date": {
+            "date": "2024-12-31",
+            "citation": {
+              "passage": "P3",
+              "quote": "At 31 December 2024 the company employed 31 people (29.2 full-time equivalents), including 3 apprentices."
+            }
+          },
+          "valid_until": null
+        }
+      ]
+    }
+  ],
+  "timing": {
+    "first_output_seconds": 8.34,
+    "total_seconds": 14.78
+  }
+}

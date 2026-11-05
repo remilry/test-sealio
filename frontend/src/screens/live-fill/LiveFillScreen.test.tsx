@@ -963,6 +963,39 @@ describe("Live fill (status and source of each answer)", () => {
     ).toBeInTheDocument();
   });
 
+  it("asks me to check a value only one of the two searches found", async () => {
+    // Given a value only one run of the search found
+    const unsure = aiAnswer(6, "+41 44 512 38 00", "unsure", undefined, {
+      candidates: [candidate("+41 44 512 38 00", [citation({ document_name: "Brochure" })])],
+    });
+    given(annex7(), fillState([unsure]));
+
+    // Then the card asks me to check it, and the document shows it as to check
+    expect(
+      await (await findCard("Telephone")).findByText("Found in one of two searches, check it"),
+    ).toBeInTheDocument();
+    expect(await findZone(6)).toHaveAttribute("data-tone", "toCheck");
+  });
+
+  it("asks me to check a value taken from an old document", async () => {
+    // Given a value whose source is over a year old, with no validity date
+    const old = aiAnswer(6, "+41 44 512 38 00", "outdated", undefined, {
+      candidates: [
+        candidate("+41 44 512 38 00", [citation({ document_name: "Annual report 2024" })], {
+          source_date: { date: "2024-12-31", citation: citation() },
+        }),
+      ],
+    });
+    given(annex7(), fillState([old]));
+
+    // Then the card gives the document's date and asks me to check it is still true
+    expect(
+      await (
+        await findCard("Telephone")
+      ).findByText("Source dated 31.12.2024, check it is still current"),
+    ).toBeInTheDocument();
+  });
+
   it("keeps the earlier source visible once I enter my own value", async () => {
     // Given a user value over a field that had an automatic source
     const mine = {

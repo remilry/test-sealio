@@ -5,8 +5,10 @@ for each of them (deduplicated) and the tender details, and must quote what it a
 """
 
 import re
+import threading
 import time
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, replace
 from datetime import date
 from typing import Any
@@ -14,8 +16,14 @@ from typing import Any
 from pydantic import ValidationError
 
 from app.llm.facade import LLM, LLMRequest, LLMUsage
+from app.modules.filling.groups import CallGroup, FieldToAnswer
 from app.modules.filling.llm_schema import LLMFieldAnswer, LLMSectionAnswer
-from app.modules.filling.validator import SourcePassage, ValidatedField, validate_field
+from app.modules.filling.validator import (
+    SourcePassage,
+    ValidatedField,
+    merge_runs,
+    validate_field,
+)
 from app.modules.forms.parsing.schema import FieldKind
 
 # Passages searched per field (the search recall test measures this k, see test_search_recall).
@@ -34,18 +42,37 @@ For each field:
 a personal choice), set user_only with a short reason for the user. You may suggest a value they \
 can confirm (for place and date: the city of the registered office and today's date, written \
 day.month.year).
+- If the field only applies to a case the passages show the bidder is not in (a question for \
+foreign bidders when the bidder is Swiss, services performed abroad when none are), return no \
+candidate.
 - Otherwise give one answer: the complete value the field asks for, on one line, as it should be \
-written in the form. When the field asks for several facts (a name and a legal form), combine \
-them in that one value, with one quote per fact. When the passages list several people, numbers \
-or addresses, choose the one that fits the field: they are options, not a disagreement.
-- Give a second candidate only when the sources disagree about the same fact (two documents \
-giving two different addresses for the same office, two different headcounts), the most recent or \
-most official first.
+written in the form: the value only, without the document's labels or surrounding words ("14", \
+not "14 with higher professional training"; "+41 44 555 01 20", not "Reception +41 44 555 01 20"). \
+When the field asks for several facts (a name and a legal form), combine them in that one value, \
+with one quote per fact; a field asking for an office, a company or a person with its address \
+gets the name and the address. When the passages list several people, numbers or addresses, \
+choose the one that fits the field: they are options, not a disagreement.
+- A number must count exactly what the field asks for: a broader or different category ("other \
+staff and apprentices" for auxiliary staff) is not an answer. Likewise, a list holds only \
+items of the kind the field asks for (certificates are certifications, not insurance policies).
+- When different documents give different values for the same fact (two addresses for the same \
+office, two headcounts), give one candidate per value, each with its own quotes and its \
+document's date, even when you think one of them is out of date: do not choose between documents \
+yourself, the user decides. Give a second candidate only in that case.
 - Each value must be made only of words found in its quotes, and each quote copied exactly from \
-the passage it cites. Prefer the current state over history (superseded entries, former \
-addresses).
-- For a Yes/No field, answer "yes" or "no" only if a passage states it; quote that statement.
-- When a document gives its date or its end of validity, return it with the quote stating it.
+the passage it cites: a short excerpt taken from a single line of a single passage (quote two \
+lines as two quotes). Within one document, prefer the current state over the history it \
+records itself (an entry it marks as modified or deleted, a former address it names as such); \
+when the only figure found comes from an older document (a past year's report), \
+still give it, with that document's date.
+- For a Yes/No field, answer "yes" or "no" only if a passage states it; quote that statement. A \
+passage saying that the rule asked about does not apply to the bidder (no collective agreement \
+applies) does not answer whether the bidder complies with it: return no candidate.
+- For every candidate, return the date of the document it comes from and its end of validity \
+when the document states them, with the quote stating each, even when the value itself comes \
+from a table or another part of that document. The document's date is when it was issued or \
+written (its "Issued:" line, the date in its letterhead, a report's year), never the date of an \
+event it records (an incorporation, a register entry, a capital increase).
 - When the passages do not contain the answer, return no candidate. Never guess, never infer \
 from general knowledge, never reuse a value given for another field unless the passage supports \
 it for this one.
@@ -63,14 +90,6 @@ Fields to fill:
 Passages:
 {passages}
 """
-
-
-@dataclass(frozen=True)
-class FieldToAnswer:
-    id: int
-    key: str
-    label: str
-    kind: FieldKind
 
 
 Search = Callable[[str, int], list[SourcePassage]]
@@ -94,9 +113,11 @@ class SectionResult:
         )
 
 
-def request_key(form_file_name: str, section: str) -> str:
-    """Stable name of a section's call, for recorded answers: "annex-7-…--page-1"."""
-    return f"{_slug(form_file_name.rsplit('.', 1)[0])}--{_slug(section)}"
+def request_key(form_file_name: str, section: str, part: int | None = None) -> str:
+    """Stable name of a call, for recorded answers: "annex-7-…--page-1", and
+    "annex-4-…--table-7--part-2" for a part of a section cut in several calls."""
+    key = f"{_slug(form_file_name.rsplit('.', 1)[0])}--{_slug(section)}"
+    return key if part is None else f"{key}--part-{part}"
 
 
 def answer_section(
@@ -105,18 +126,21 @@ def answer_section(
     company: str,
     form_title: str,
     form_file_name: str,
-    section: str,
-    fields: list[FieldToAnswer],
+    group: CallGroup,
     search: Search,
     tender_details: str,
     today: date,
     on_field: OnField | None = None,
+    runs: int = 1,
 ) -> SectionResult:
-    """The verified evidence of each field of the section, with what finding it cost.
+    """The verified evidence of each field of the group, with what finding it cost.
 
-    With `on_field`, each field is published as soon as the model has written its answer; the
-    fields the model did not answer are published as not found at the end.
+    The call is made `runs` times at once (1 or 2) and the runs merged (`merge_runs`): the model
+    does not answer the same way every time, so what differs between runs becomes a doubt.
+    With `on_field`, each field is published as soon as every run has written its answer; the
+    fields a run did not answer count as not found for that run, at the end.
     """
+    fields = group.fields
     started = time.monotonic()
     passages = _passages(fields, search, tender_details)
     search_seconds = time.monotonic() - started
@@ -124,25 +148,35 @@ def answer_section(
     request = _section_request(
         company=company,
         form_title=form_title,
-        form_file_name=form_file_name,
-        section=section,
+        key=request_key(form_file_name, group.section, group.part),
+        section=group.section,
         fields=fields,
         passages=passages,
         today=today,
     )
-    evidence = _SectionEvidence(fields, passages, on_field)
-    if on_field is None:
-        result = llm.generate_structured(request)
+    merged = _MergedEvidence(fields, runs, on_field)
+    requests = [request] + [
+        replace(request, key=f"{request.key}--run-{run}") for run in range(2, runs + 1)
+    ]
+
+    def call(run: int) -> LLMUsage:
+        evidence = _SectionEvidence(fields, passages, lambda f, e: merged.add(run, f, e))
+        result = llm.generate_structured(requests[run], evidence.add_streamed)
+        evidence.add_all(result.output.fields)
+        evidence.add_not_found()
+        return result.usage
+
+    if runs == 1:
+        usage = call(0)
     else:
-        result = llm.generate_structured(request, evidence.add_streamed)
-    evidence.add_all(result.output.fields)
-    evidence.add_not_found()
+        with ThreadPoolExecutor(max_workers=runs) as pool:
+            usage = sum(pool.map(call, range(runs)), LLMUsage())
 
     return SectionResult(
-        evidence=evidence.by_field(),
+        evidence=merged.by_field(),
         passages=len(passages),
         search_seconds=search_seconds,
-        usage=result.usage,
+        usage=usage,
     )
 
 
@@ -202,6 +236,35 @@ class _SectionEvidence:
             self._on_field(field.id, evidence)
 
 
+class _MergedEvidence:
+    """The evidence of every run of a group's call: a field is merged and published once all the
+    runs have validated it (runs write from their own threads)."""
+
+    def __init__(self, fields: list[FieldToAnswer], runs: int, on_field: OnField | None) -> None:
+        self._fields = fields
+        self._runs = runs
+        self._on_field = on_field
+        self._by_run: dict[int, dict[int, ValidatedField]] = {}
+        self._merged: dict[int, ValidatedField] = {}
+        self._lock = threading.Lock()
+
+    def add(self, run: int, field_id: int, evidence: ValidatedField) -> None:
+        with self._lock:
+            self._by_run.setdefault(field_id, {})[run] = evidence
+            runs = self._by_run[field_id]
+            if len(runs) < self._runs:
+                return
+            merged = runs[0]
+            for other in range(1, self._runs):
+                merged = merge_runs(merged, runs[other])
+            self._merged[field_id] = merged
+            if self._on_field is not None:
+                self._on_field(field_id, merged)
+
+    def by_field(self) -> dict[int, ValidatedField]:
+        return {field.id: self._merged[field.id] for field in self._fields}
+
+
 def _complete_answers(partial: dict[str, Any]) -> list[LLMFieldAnswer]:
     """The field answers the model has finished writing. A malformed one is skipped (it is
     validated here, so an error raised while publishing an answer still propagates)."""
@@ -231,15 +294,15 @@ def _section_request(
     *,
     company: str,
     form_title: str,
-    form_file_name: str,
+    key: str,
     section: str,
     fields: list[FieldToAnswer],
     passages: list[SourcePassage],
     today: date,
 ) -> LLMRequest[LLMSectionAnswer]:
-    """The model call for one section: its fields and the passages to answer them from."""
+    """The model call for one group: its fields and the passages to answer them from."""
     return LLMRequest(
-        key=request_key(form_file_name, section),
+        key=key,
         instructions=INSTRUCTIONS.format(company=company),
         prompt=PROMPT.format(
             today=today.isoformat(),
@@ -259,7 +322,7 @@ def _passages(
     found = [SourcePassage(label="", text=tender_details, document_name=TENDER_DETAILS)]
     seen_chunks: set[int] = set()
     for field in fields:
-        for passage in search(field.label, SEARCH_K):
+        for passage in search(field.query, SEARCH_K):
             if passage.chunk_id is not None:
                 if passage.chunk_id in seen_chunks:
                     continue
@@ -274,7 +337,8 @@ def _normalized(text: str) -> str:
 
 
 def _describe_field(field: FieldToAnswer) -> str:
-    return f"- key: {field.key} · label: {field.label} · kind: {_kind(field.kind)}"
+    context = f" · context: {field.context}" if field.context else ""
+    return f"- key: {field.key} · label: {field.label}{context} · kind: {_kind(field.kind)}"
 
 
 def _render(passage: SourcePassage) -> str:

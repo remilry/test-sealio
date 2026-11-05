@@ -1,0 +1,177 @@
+{
+  "fields": [
+    {
+      "field": "have_you_paid_in_full_the_contributions_due_under_generally_",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": []
+    },
+    {
+      "field": "are_you_subject_to_debt_enforcement_or_bankruptcy_proceeding",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": [
+        {
+          "value": "no",
+          "citations": [
+            {
+              "passage": "P10",
+              "quote": "Debt collection proceedings (pending)\nLast 5 years\n0\n0.00"
+            },
+            {
+              "passage": "P10",
+              "quote": "Bankruptcy proceedings\nLast 5 years\n0\n0.00"
+            }
+          ],
+          "source_date": {
+            "date": "2026-10-22",
+            "citation": {
+              "passage": "P10",
+              "quote": "Issued: 22 October 2026"
+            }
+          },
+          "valid_until": null
+        }
+      ]
+    },
+    {
+      "field": "have_any_seizures_been_carried_out_against_you_in_the_past_t",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": [
+        {
+          "value": "no",
+          "citations": [
+            {
+              "passage": "P11",
+              "quote": "Seizures carried out\nLast 5 years\n0\n0.00"
+            }
+          ],
+          "source_date": {
+            "date": "2026-10-22",
+            "citation": {
+              "passage": "P10",
+              "quote": "Issued: 22 October 2026"
+            }
+          },
+          "valid_until": null
+        }
+      ]
+    },
+    {
+      "field": "have_you_entered_into_any_agreements_or_taken_other_measures",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": [
+        {
+          "value": "no",
+          "citations": [
+            {
+              "passage": "P13",
+              "quote": "Alpenlogic AG does not enter into agreements and does not take measures that restrict competition."
+            }
+          ],
+          "source_date": {
+            "date": "2026-01-15",
+            "citation": {
+              "passage": "P32",
+              "quote": "2.0 | 15.01.2026 | N. Frei | Annual review, structure revised"
+            }
+          },
+          "valid_until": null
+        }
+      ]
+    },
+    {
+      "field": "do_you_confirm_that_you_are_not_on_the_list_of_sanctioned_bi",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": [
+        {
+          "value": "yes",
+          "citations": [
+            {
+              "passage": "P23",
+              "quote": "The company is not on any list of sanctioned bidders, including the list under Art. 45 para. 3 IVöB (verified internally on 1 October 2026)."
+            }
+          ],
+          "source_date": {
+            "date": "2026-10-01",
+            "citation": {
+              "passage": "P23",
+              "quote": "verified internally on 1 October 2026"
+            }
+          },
+          "valid_until": null
+        }
+      ]
+    },
+    {
+      "field": "do_you_comply_with_the_swiss_regulations_on_environmental_pr",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": [
+        {
+          "value": "yes",
+          "citations": [
+            {
+              "passage": "P26",
+              "quote": "The company complies with Swiss environmental protection regulations applicable at its place of performance."
+            }
+          ],
+          "source_date": null,
+          "valid_until": null
+        }
+      ]
+    },
+    {
+      "field": "only_for_services_to_be_performed_abroad_do_you_comply_with_",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": []
+    },
+    {
+      "field": "do_you_confirm_that_you_have_included_or_will_include_the_ab",
+      "user_only": false,
+      "user_only_reason": null,
+      "suggested_value": null,
+      "candidates": [
+        {
+          "value": "yes",
+          "citations": [
+            {
+              "passage": "P22",
+              "quote": "In agreements with subcontractors and suppliers, the company includes the obligations regarding working conditions, tax, social insurance and environmental protection required by public procurement law."
+            }
+          ],
+          "source_date": {
+            "date": "2026-01-15",
+            "citation": {
+              "passage": "P32",
+              "quote": "2.0 | 15.01.2026 | N. Frei | Annual review, structure revised"
+            }
+          },
+          "valid_until": null
+        }
+      ]
+    },
+    {
+      "field": "remarks",
+      "user_only": true,
+      "user_only_reason": "Remarks are optional and must be provided by the bidder's representative if needed.",
+      "suggested_value": null,
+      "candidates": []
+    }
+  ],
+  "timing": {
+    "first_output_seconds": 8.29,
+    "total_seconds": 17.02
+  }
+}
