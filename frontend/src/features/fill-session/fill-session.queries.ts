@@ -183,6 +183,8 @@ export function useRetryFill(formId: number) {
         queryClient.invalidateQueries({ queryKey: TENDERS_KEY }),
         queryClient.invalidateQueries({ queryKey: fillKeys.answers(formId) }),
       ]),
+    // Refused (filled meanwhile, a retry already running elsewhere): what is left is read again.
+    onError: () => queryClient.invalidateQueries({ queryKey: fillKeys.answers(formId) }),
   });
 }
 

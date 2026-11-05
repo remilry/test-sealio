@@ -1972,6 +1972,60 @@ describe("Live fill (fields a fill could not answer)", () => {
     expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
   });
 
+  it("tells me when Retry is refused, and shows what is left", async () => {
+    // Given a failed field a colleague has filled meanwhile: the back refuses the retry
+    backWithFailedFields({ failed: [6] });
+    server.use(
+      http.post(`${API_URL}/forms/2/fill/retry`, () =>
+        Response.json({ detail: "Nothing to retry: every field has an answer." }, { status: 409 }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderScreen(<LiveFillScreen formId={2} />);
+    const banner = await screen.findByRole("alert");
+    // (The back now has the colleague's answer.)
+    server.use(
+      handlers.answers(
+        2,
+        fillState([aiAnswer(3, "Alpenlogic AG"), answer(6, "044")], annex7Fields, aiRun("done")),
+      ),
+    );
+
+    // When I retry
+    await user.click(within(banner).getByRole("button", { name: "Retry" }));
+
+    // Then the answers are read again: nothing is left, the banner goes
+    await waitFor(() => expect(screen.queryByText(/couldn't be filled/)).not.toBeInTheDocument());
+    expect(row("Telephone").getByRole("textbox")).toHaveValue("044");
+  });
+
+  it("tells me why Retry could not start", async () => {
+    // Given the back cannot fill automatically right now
+    backWithFailedFields({ failed: [6] });
+    server.use(
+      http.post(`${API_URL}/forms/2/fill/retry`, () =>
+        Response.json(
+          { detail: "Automatic filling is not available: the service is not configured." },
+          { status: 503 },
+        ),
+      ),
+    );
+    const user = userEvent.setup();
+    renderScreen(<LiveFillScreen formId={2} />);
+
+    // When I retry
+    const banner = await screen.findByRole("alert");
+    await user.click(within(banner).getByRole("button", { name: "Retry" }));
+
+    // Then the banner says why, and Retry stays there
+    expect(
+      await within(banner).findByText(
+        "Automatic filling is not available: the service is not configured.",
+      ),
+    ).toBeInTheDocument();
+    expect(within(banner).getByRole("button", { name: "Retry" })).toBeEnabled();
+  });
+
   it("drops a failed field from the banner once I fill it", async () => {
     // Given two fields that couldn't be filled
     backWithFailedFields({ failed: [6, 7] });

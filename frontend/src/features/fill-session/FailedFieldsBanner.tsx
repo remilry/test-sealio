@@ -2,6 +2,7 @@
 
 import { CircleAlertIcon, RotateCwIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { ApiError } from "@/shared/api";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Button } from "@/shared/ui/button";
 import { useRetryFill } from "./fill-session.queries";
@@ -20,7 +21,9 @@ export function FailedFieldsBanner({
   unavailable: boolean;
 }) {
   const t = useTranslations("liveFill");
+  const tCommon = useTranslations("common");
   const retry = useRetryFill(formId);
+  const failure = retry.error ? whyNot(retry.error, tCommon("retryLater")) : null;
   return (
     <Alert variant={unavailable ? "destructive" : "default"}>
       <CircleAlertIcon />
@@ -29,6 +32,7 @@ export function FailedFieldsBanner({
         {unavailable && t("failedTitle", { count })}
         {unavailable && " · "}
         {t("failedDescription")}
+        {failure && <p className="font-medium text-destructive">{failure}</p>}
       </AlertDescription>
       <AlertAction>
         <Button
@@ -43,4 +47,13 @@ export function FailedFieldsBanner({
       </AlertAction>
     </Alert>
   );
+}
+
+/** Why Retry did not start: the back's refusals (409, 503) are worded for the user, anything
+ * else (network, unexpected) is said in plain words. */
+function whyNot(error: Error, fallback: string): string {
+  if (error instanceof ApiError && (error.status === 409 || error.status === 503)) {
+    return error.message;
+  }
+  return fallback;
 }
