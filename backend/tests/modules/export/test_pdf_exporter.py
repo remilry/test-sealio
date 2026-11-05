@@ -7,6 +7,7 @@ from app.core.config import get_settings
 from app.modules.export.pdf_exporter import MIN_FONT_SIZE, export_pdf, fitting_font_size
 from app.modules.forms.parsing.pdf_parser import parse_pdf
 from app.modules.forms.parsing.schema import Box, FormSchema, PdfLocator
+from tests.modules.helpers import pdf_locator
 
 ANNEX_7 = "Annex_7_Self-Declaration_Art29c_Ukraine_Ordinance.pdf"
 DOTS = set("….")
@@ -32,7 +33,7 @@ def schema(original: bytes) -> FormSchema:
 
 @pytest.fixture(scope="module")
 def exported(original: bytes, schema: FormSchema) -> bytes:
-    answers = [(f.locator, VALUES[f.key]) for f in schema.fields if f.key in VALUES]
+    answers = [(pdf_locator(f), VALUES[f.key]) for f in schema.fields if f.key in VALUES]
     return export_pdf(original, answers)
 
 
@@ -56,7 +57,7 @@ def test_each_value_is_written_inside_its_field_box(exported: bytes, schema: For
     for field in schema.fields:
         if field.key not in VALUES:
             continue
-        written = [text for rect, text in words if _inside(rect, field.locator.box)]
+        written = [text for rect, text in words if _inside(rect, pdf_locator(field).box)]
         assert " ".join(written) == VALUES[field.key], field.key
 
 
@@ -66,7 +67,7 @@ def test_dots_of_filled_fields_are_removed_and_kept_for_empty_ones(
     words = _words(exported)
 
     for field in schema.fields:
-        for mark in field.locator.erase:
+        for mark in pdf_locator(field).erase:
             dots = [t for r, t in words if set(t) <= DOTS and _inside(r, mark)]
             assert bool(dots) == (field.key not in VALUES), field.key
 
@@ -90,7 +91,7 @@ def test_the_rest_of_the_page_is_unchanged(original: bytes, exported: bytes) -> 
 
 
 def test_no_answers_gives_back_the_same_content(original: bytes, schema: FormSchema) -> None:
-    exported = export_pdf(original, [(f.locator, "  ") for f in schema.fields])
+    exported = export_pdf(original, [(pdf_locator(f), "  ") for f in schema.fields])
 
     assert [t for _, t in _words(exported)] == [t for _, t in _words(original)]
 
@@ -99,11 +100,11 @@ def test_a_long_value_is_shrunk_to_fit_its_box(original: bytes, schema: FormSche
     telephone = next(f for f in schema.fields if f.key == "telephone")
     value = "+41 44 512 38 00 (switchboard) or +41 79 123 45 67 (mobile)"
 
-    words = _words(export_pdf(original, [(telephone.locator, value)]))
+    words = _words(export_pdf(original, [(pdf_locator(telephone), value)]))
 
     written = [(r, t) for r, t in words if t in value.split() and r.y0 > 360 and r.y1 < 380]
     assert " ".join(t for _, t in written) == value
-    assert max(r.x1 for r, _ in written) <= telephone.locator.box.x1 + 0.5
+    assert max(r.x1 for r, _ in written) <= pdf_locator(telephone).box.x1 + 0.5
 
 
 def test_font_size_keeps_the_preferred_size_when_it_fits_and_has_a_floor() -> None:

@@ -5,13 +5,13 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
-from app.core.errors import RuleViolationError
+from app.modules.export.docx_exporter import export_docx
 from app.modules.export.pdf_exporter import export_pdf
 from app.modules.export.schemas import ExportSummary, FieldRef
 from app.modules.filling import service as filling_service
 from app.modules.forms import service as forms_service
 from app.modules.forms.models import FileFormat
-from app.modules.forms.parsing.schema import FieldKind
+from app.modules.forms.parsing.schema import DocxLocator, FieldKind, PdfLocator
 
 
 @dataclass(frozen=True)
@@ -42,18 +42,24 @@ def export_summary(session: Session, tenant_id: int, form_id: int) -> ExportSumm
 
 
 def export_file(session: Session, tenant_id: int, form_id: int, data_dir: Path) -> ExportedFile:
-    """The original file with the tenant's answers written in, in its original format and layout."""
+    """The original file with the tenant's answers written in, in its original format and layout.
+    Signatures are never written."""
     form_file = forms_service.get_form_file(session, form_id, data_dir)
-    if form_file.file_format != FileFormat.PDF:
-        raise RuleViolationError("Export of Word forms is not available yet.")
     values = filling_service.answer_values(session, tenant_id, form_id)
     answers = [
         (field.locator, values[field.id])
         for field in forms_service.list_fields(session, form_id)
         if field.id in values and field.kind != FieldKind.SIGNATURE
     ]
+    original = form_file.path.read_bytes()
+    if form_file.file_format == FileFormat.PDF:
+        content = export_pdf(
+            original, [(loc, v) for loc, v in answers if isinstance(loc, PdfLocator)]
+        )
+    else:
+        content = export_docx(
+            original, [(loc, v) for loc, v in answers if isinstance(loc, DocxLocator)]
+        )
     return ExportedFile(
-        content=export_pdf(form_file.path.read_bytes(), answers),
-        file_name=form_file.file_name,
-        media_type=form_file.media_type,
+        content=content, file_name=form_file.file_name, media_type=form_file.media_type
     )

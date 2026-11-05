@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 
 from app.core.config import REPO_ROOT, get_settings
 from app.core.db import SessionLocal
+from app.modules.forms.parsing.schema import DocxLocator, ParsedField, PdfLocator
 from app.modules.knowledge import service as knowledge_service
 from app.modules.knowledge.embedding import Embedder
 from app.modules.tenants import service as tenants_service
@@ -38,3 +39,13 @@ def add_demo_documents(embedder: Embedder | None = None) -> None:
 
 def demo_document(file_name: str) -> Path:
     return DEMO_DOCUMENTS / file_name
+
+
+def pdf_locator(field: ParsedField) -> PdfLocator:
+    assert isinstance(field.locator, PdfLocator), field.key
+    return field.locator
+
+
+def docx_locator(field: ParsedField) -> DocxLocator:
+    assert isinstance(field.locator, DocxLocator), field.key
+    return field.locator

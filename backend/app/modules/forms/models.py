@@ -57,5 +57,5 @@ class Field(TimestampMixin, Base):
     section: Mapped[str]
     label: Mapped[str]
     kind: Mapped[FieldKind] = mapped_column(str_enum(FieldKind))
-    # Where the answer goes in the original file (PdfLocator for now), see parsing/schema.py.
+    # Where the answer goes in the original file (PdfLocator or DocxLocator), see parsing/schema.py.
     locator: Mapped[dict[str, Any]] = mapped_column(JSONB)

@@ -8,12 +8,12 @@ Two generic kinds of blanks are detected, with no knowledge of any specific form
   on its right; the answer goes on the label's line, to its right.
 """
 
-import re
 from dataclasses import dataclass, field
 from typing import Any, cast
 
 import pymupdf
 
+from app.modules.forms.parsing.labels import SIGNATURE_LABEL, clean_label, leader_runs, unique_key
 from app.modules.forms.parsing.schema import (
     Box,
     FieldKind,
@@ -23,17 +23,12 @@ from app.modules.forms.parsing.schema import (
     PdfLocator,
 )
 
-# Weight of each placeholder character: a run must weigh at least MIN_LEADER_WEIGHT
-# (two ellipses, or six periods) so that "..." ending a sentence is not a field.
-LEADER_WEIGHTS = {"…": 3, ".": 1}
-MIN_LEADER_WEIGHT = 6
 # A rule is a filled rectangle (or a line) thinner than this, in points.
 RULE_THICKNESS = 2.0
 # Tolerance when comparing coordinates, in points.
 TOLERANCE = 1.5
 # A table cell must leave at least this much free width to the right of its label.
 MIN_CELL_FREE_WIDTH = 40.0
-SIGNATURE_LABEL = re.compile(r"\b(signature|stamp)", re.IGNORECASE)
 
 
 @dataclass
@@ -147,19 +142,7 @@ def _text_lines(page: pymupdf.Page) -> list[_Line]:
 
 def _leader_runs(line: _Line) -> list[tuple[int, int]]:
     """[start, end) indexes of the placeholder runs of a line."""
-    runs: list[tuple[int, int]] = []
-    start = None
-    for index, ch in enumerate([*line.chars, None]):
-        if ch is not None and ch.c in LEADER_WEIGHTS:
-            if start is None:
-                start = index
-            continue
-        if start is not None:
-            weight = sum(LEADER_WEIGHTS[c.c] for c in line.chars[start:index])
-            if weight >= MIN_LEADER_WEIGHT:
-                runs.append((start, index))
-            start = None
-    return runs
+    return leader_runs("".join(ch.c for ch in line.chars))
 
 
 def _dot_leaders(page_index: int, lines: list[_Line]) -> list[_Blank]:
@@ -172,7 +155,7 @@ def _dot_leaders(page_index: int, lines: list[_Line]) -> list[_Blank]:
         previous_end = 0
         for start, end in runs:
             run = line.chars[start:end]
-            label = _clean_label("".join(ch.c for ch in line.chars[previous_end:start]))
+            label = clean_label("".join(ch.c for ch in line.chars[previous_end:start]))
             label = label or _label_on_the_left(line, run[0].x0, lines)
             label = label or _label_above(line, lines)
             previous_end = end
@@ -228,7 +211,7 @@ def _label_on_the_left(line: _Line, x: float, lines: list[_Line]) -> str:
         return ""
     nearest = max(candidates, key=lambda other: other.x1)
     nearest.used = True
-    return _clean_label(nearest.text)
+    return clean_label(nearest.text)
 
 
 def _label_above(line: _Line, lines: list[_Line]) -> str:
@@ -246,11 +229,7 @@ def _label_above(line: _Line, lines: list[_Line]) -> str:
         return ""
     nearest = max(candidates, key=lambda other: other.y1)
     nearest.used = True
-    return _clean_label(nearest.text)
-
-
-def _clean_label(text: str) -> str:
-    return re.sub(r"\s+", " ", text).strip().rstrip(":").strip()
+    return clean_label(nearest.text)
 
 
 # --- Table cells -----------------------------------------------------------------------------
@@ -310,7 +289,7 @@ def _table_cells(
         gap = line.size * 0.6
         blanks.append(
             _Blank(
-                label=_clean_label(line.text),
+                label=clean_label(line.text),
                 locator=PdfLocator(
                     page=page_index,
                     box=Box(x0=line.x1 + gap, y0=line.y0, x1=right - gap / 2, y1=line.y1),
@@ -329,7 +308,7 @@ def _to_fields(blanks: list[_Blank]) -> list[ParsedField]:
     fields: list[ParsedField] = []
     seen: set[str] = set()
     for blank in blanks:
-        key = _unique_key(blank.label, seen)
+        key = unique_key(blank.label, seen)
         fields.append(
             ParsedField(
                 key=key,
@@ -340,12 +319,3 @@ def _to_fields(blanks: list[_Blank]) -> list[ParsedField]:
             )
         )
     return fields
-
-
-def _unique_key(label: str, seen: set[str]) -> str:
-    base = re.sub(r"[^a-z0-9]+", "_", label.lower()).strip("_")[:60] or "field"
-    key, suffix = base, 2
-    while key in seen:
-        key, suffix = f"{base}_{suffix}", suffix + 1
-    seen.add(key)
-    return key
