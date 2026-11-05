@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { MoreHorizontalIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { DiscardFillDialog, SetupDialog } from "@/features/fill-session";
+import { PdfViewer } from "@/features/document-preview";
+import { DiscardFillDialog, originalFileUrl, SetupDialog } from "@/features/fill-session";
 import type { FormSummary } from "@/features/tender";
 import { routes } from "@/shared/lib/routes";
 import { Button, buttonVariants } from "@/shared/ui/button";
@@ -37,6 +38,12 @@ export function FormAction({
       <SetupDialog
         form={form}
         documentCount={documentCount}
+        preview={
+          // Word forms get a preview with step 7.
+          form.file_name.toLowerCase().endsWith(".pdf") ? (
+            <PdfViewer fileUrl={originalFileUrl(form.id)} label={form.title} />
+          ) : undefined
+        }
         onStarted={() => router.push(routes.fillForm(form.id))}
       />
     );

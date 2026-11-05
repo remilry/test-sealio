@@ -54,8 +54,8 @@ test("I auto-fill Annex 7 from my documents, correct a field and download it in 
   // Auto-fill Annex 7: the Setup dialog recalls what the answers are drawn from.
   await annex7.getByRole("button", { name: "Auto-fill" }).click();
   const setup = page.getByRole("dialog", { name: /^Auto-fill / });
-  await expect(setup).toContainText("Company knowledge · 11 documents");
-  await setup.getByRole("button", { name: "Start" }).click();
+  await expect(setup).toContainText("11 documents");
+  await setup.getByRole("button", { name: "Start filling" }).click();
   await expect(page).toHaveURL(/\/forms\/\d+\/fill$/);
 
   // The form fills itself field by field; the recorded run answers all 9 fillable fields.

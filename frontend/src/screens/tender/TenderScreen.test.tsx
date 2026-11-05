@@ -123,9 +123,16 @@ describe("Tender", () => {
       expect(
         dialog.getByText("Annex_7_Self-Declaration_Art29c_Ukraine_Ordinance.pdf"),
       ).toBeInTheDocument();
-      expect(dialog.getByText("Company knowledge · 11 documents")).toBeInTheDocument();
-      expect(dialog.getByText("Tender details")).toBeInTheDocument();
+      const sources = within(dialog.getByRole("region", { name: "Answers from" }));
+      expect(sources.getByText("Company knowledge")).toBeInTheDocument();
+      expect(sources.getByText("11 documents")).toBeInTheDocument();
+      expect(sources.getByText("Tender details")).toBeInTheDocument();
       expect(dialog.getByText("Takes about 25 seconds")).toBeInTheDocument();
+      // And the form itself, page by page
+      const preview = dialog.getByRole("region", {
+        name: "Preview of Annex 7 — Sanctions self-declaration (Art. 29c)",
+      });
+      expect(await within(preview).findByLabelText("Page 1")).toBeInTheDocument();
     });
 
     it("starts the fill and opens the live fill", async () => {
@@ -137,7 +144,7 @@ describe("Tender", () => {
       const dialog = await openSetup(user);
 
       // When I start
-      await user.click(dialog.getByRole("button", { name: "Start" }));
+      await user.click(dialog.getByRole("button", { name: "Start filling" }));
 
       // Then the fill is requested and I land on the form
       await waitFor(() => expect(push).toHaveBeenCalledWith("/forms/2/fill"));
@@ -173,7 +180,7 @@ describe("Tender", () => {
       const dialog = await openSetup(user);
 
       // When I start
-      await user.click(dialog.getByRole("button", { name: "Start" }));
+      await user.click(dialog.getByRole("button", { name: "Start filling" }));
 
       // Then the reason shows in the dialog
       expect(await dialog.findByText("Auto-fill is not available right now.")).toBeInTheDocument();
@@ -193,7 +200,7 @@ describe("Tender", () => {
       const dialog = await openSetup(user);
 
       // When I start
-      await user.click(dialog.getByRole("button", { name: "Start" }));
+      await user.click(dialog.getByRole("button", { name: "Start filling" }));
 
       // Then I am asked to try again, in the dialog still open
       expect(await dialog.findByRole("alert")).toHaveTextContent(
@@ -270,7 +277,7 @@ describe("Tender", () => {
       const dialog = await openSetup(user);
 
       // When I start
-      await user.click(dialog.getByRole("button", { name: "Start" }));
+      await user.click(dialog.getByRole("button", { name: "Start filling" }));
 
       // Then I go to the form
       await waitFor(() => expect(push).toHaveBeenCalledWith("/forms/2/fill"));
@@ -288,7 +295,7 @@ describe("Tender", () => {
       const dialog = await openSetup(user);
 
       // When I start
-      await user.click(dialog.getByRole("button", { name: "Start" }));
+      await user.click(dialog.getByRole("button", { name: "Start filling" }));
 
       // Then I follow the run on the form
       await waitFor(() => expect(push).toHaveBeenCalledWith("/forms/2/fill"));

@@ -62,15 +62,17 @@
   "autoFill": {
     "trigger": "Auto-fill",
     "title": "Auto-fill {formTitle}",
-    "sources": "Sources",
-    "companyKnowledge": "Company knowledge · {count, plural, one {# document} other {# documents}}",
-    "companyKnowledgeUncounted": "Company knowledge",
+    "intro": "We read the form, look for each answer in your company documents and show you the source of every value. You review everything before export.",
+    "sources": "Answers from",
+    "companyKnowledge": "Company knowledge",
+    "documentCount": "{count, plural, =0 {No document yet} one {# document} other {# documents}}",
     "tenderDetails": "Tender details",
+    "tenderDetailsSub": "Project title, reference, contracting authority and deadline",
     "knowledgeEmpty": "Your company knowledge is empty: only the tender details can be used.",
     "addDocuments": "Add documents",
     "duration": "Takes about {seconds} seconds",
     "cancel": "Cancel",
-    "start": "Start",
+    "start": "Start filling",
     "unavailable": "Auto-fill is not available right now."
   },
   "discardFill": {
