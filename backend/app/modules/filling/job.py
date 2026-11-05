@@ -17,7 +17,8 @@ from sqlalchemy.orm import Session
 from app.core.db import SessionLocal
 from app.llm.facade import LLM, LLMError, LLMUsage
 from app.modules.filling import service
-from app.modules.filling.answer_engine import FieldToAnswer, Search, answer_section
+from app.modules.filling.answer_engine import Search, answer_section
+from app.modules.filling.groups import FieldToAnswer, call_groups
 from app.modules.filling.models import AiStatus, FillEventType, FormFill
 from app.modules.filling.rules import AnswerType, decide
 from app.modules.filling.validator import SourcePassage, ValidatedField
@@ -106,7 +107,16 @@ def _run(session: Session, fill_id: int, llm: LLM, today: date) -> None:
         sections=len(sections),
     )
     kept = service.user_resolved_field_ids(session, fill_id)
-    to_answer = [f for f in form.fields if f.kind != FieldKind.SIGNATURE and f.id not in kept]
+    contexts = forms_service.field_contexts(session, form.id)
+    groups = call_groups(
+        [
+            FieldToAnswer(f.id, f.key, f.label, f.kind, context=contexts[f.id], section=f.section)
+            for f in form.fields
+            if f.kind != FieldKind.SIGNATURE
+        ],
+        skip=kept,
+    )
+    to_answer = [field for group in groups for field in group.fields]
     phase(
         "detecting_fields",
         fields=len(form.fields),
@@ -127,8 +137,8 @@ def _run(session: Session, fill_id: int, llm: LLM, today: date) -> None:
 
     types: Counter[AnswerType] = Counter()
     usage, search_seconds = LLMUsage(), 0.0
-    for section, section_fields in groupby(to_answer, key=lambda f: f.section):
-        fields = [FieldToAnswer(f.id, f.key, f.label, f.kind) for f in section_fields]
+    for group in groups:
+        fields = group.fields
         for field in fields:
             service.add_event(
                 session, fill_id, FillEventType.FIELD, {"field_id": field.id, "state": "searching"}
@@ -171,15 +181,15 @@ def _run(session: Session, fill_id: int, llm: LLM, today: date) -> None:
             company=company,
             form_title=form.title,
             form_file_name=form.file_name,
-            section=section,
-            fields=fields,
+            group=group,
             search=search,
             tender_details=details,
             today=today,
             on_field=on_field,
         )
         usage, search_seconds = usage + result.usage, search_seconds + result.search_seconds
-        logger.info("AI fill %s, section %r: %s", fill_id, section, result.describe())
+        name = group.section if group.part is None else f"{group.section} (part {group.part})"
+        logger.info("AI fill %s, section %r: %s", fill_id, name, result.describe())
 
     phase(
         "cross_checking",

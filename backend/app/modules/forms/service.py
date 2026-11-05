@@ -67,6 +67,14 @@ def list_fields(session: Session, form_id: int) -> list[FieldOut]:
     return [FieldOut.model_validate(field) for field in fields]
 
 
+def field_contexts(session: Session, form_id: int) -> dict[int, str | None]:
+    """The heading context of each field, by field id: for the answer engine only (not in the
+    API, never shown)."""
+    return dict(
+        session.execute(select(Field.id, Field.context).where(Field.form_id == form_id)).all()
+    )
+
+
 def get_field(session: Session, form_id: int, field_id: int) -> FieldOut:
     field = session.get(Field, field_id)
     if field is None or field.form_id != form_id:

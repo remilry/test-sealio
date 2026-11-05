@@ -14,6 +14,7 @@ from typing import Any
 from pydantic import ValidationError
 
 from app.llm.facade import LLM, LLMRequest, LLMUsage
+from app.modules.filling.groups import CallGroup, FieldToAnswer
 from app.modules.filling.llm_schema import LLMFieldAnswer, LLMSectionAnswer
 from app.modules.filling.validator import SourcePassage, ValidatedField, validate_field
 from app.modules.forms.parsing.schema import FieldKind
@@ -65,14 +66,6 @@ Passages:
 """
 
 
-@dataclass(frozen=True)
-class FieldToAnswer:
-    id: int
-    key: str
-    label: str
-    kind: FieldKind
-
-
 Search = Callable[[str, int], list[SourcePassage]]
 # Called with a field's id and its verified evidence, as soon as the field is complete.
 OnField = Callable[[int, ValidatedField], None]
@@ -94,9 +87,11 @@ class SectionResult:
         )
 
 
-def request_key(form_file_name: str, section: str) -> str:
-    """Stable name of a section's call, for recorded answers: "annex-7-…--page-1"."""
-    return f"{_slug(form_file_name.rsplit('.', 1)[0])}--{_slug(section)}"
+def request_key(form_file_name: str, section: str, part: int | None = None) -> str:
+    """Stable name of a call, for recorded answers: "annex-7-…--page-1", and
+    "annex-4-…--table-7--part-2" for a part of a section cut in several calls."""
+    key = f"{_slug(form_file_name.rsplit('.', 1)[0])}--{_slug(section)}"
+    return key if part is None else f"{key}--part-{part}"
 
 
 def answer_section(
@@ -105,18 +100,19 @@ def answer_section(
     company: str,
     form_title: str,
     form_file_name: str,
-    section: str,
-    fields: list[FieldToAnswer],
+    group: CallGroup,
     search: Search,
     tender_details: str,
     today: date,
     on_field: OnField | None = None,
 ) -> SectionResult:
-    """The verified evidence of each field of the section, with what finding it cost.
+    """The verified evidence of each field of the group (one model call), with what finding it
+    cost.
 
     With `on_field`, each field is published as soon as the model has written its answer; the
     fields the model did not answer are published as not found at the end.
     """
+    fields = group.fields
     started = time.monotonic()
     passages = _passages(fields, search, tender_details)
     search_seconds = time.monotonic() - started
@@ -124,8 +120,8 @@ def answer_section(
     request = _section_request(
         company=company,
         form_title=form_title,
-        form_file_name=form_file_name,
-        section=section,
+        key=request_key(form_file_name, group.section, group.part),
+        section=group.section,
         fields=fields,
         passages=passages,
         today=today,
@@ -231,15 +227,15 @@ def _section_request(
     *,
     company: str,
     form_title: str,
-    form_file_name: str,
+    key: str,
     section: str,
     fields: list[FieldToAnswer],
     passages: list[SourcePassage],
     today: date,
 ) -> LLMRequest[LLMSectionAnswer]:
-    """The model call for one section: its fields and the passages to answer them from."""
+    """The model call for one group: its fields and the passages to answer them from."""
     return LLMRequest(
-        key=request_key(form_file_name, section),
+        key=key,
         instructions=INSTRUCTIONS.format(company=company),
         prompt=PROMPT.format(
             today=today.isoformat(),
@@ -259,7 +255,7 @@ def _passages(
     found = [SourcePassage(label="", text=tender_details, document_name=TENDER_DETAILS)]
     seen_chunks: set[int] = set()
     for field in fields:
-        for passage in search(field.label, SEARCH_K):
+        for passage in search(field.query, SEARCH_K):
             if passage.chunk_id is not None:
                 if passage.chunk_id in seen_chunks:
                     continue
@@ -274,7 +270,8 @@ def _normalized(text: str) -> str:
 
 
 def _describe_field(field: FieldToAnswer) -> str:
-    return f"- key: {field.key} · label: {field.label} · kind: {_kind(field.kind)}"
+    context = f" · context: {field.context}" if field.context else ""
+    return f"- key: {field.key} · label: {field.label}{context} · kind: {_kind(field.kind)}"
 
 
 def _render(passage: SourcePassage) -> str:

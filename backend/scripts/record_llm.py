@@ -13,7 +13,6 @@ Needs OPENAI_API_KEY (backend/.env) and costs a few cents per run.
 import argparse
 import time
 from datetime import date
-from itertools import groupby
 
 from app.core.config import REPO_ROOT, get_settings
 from app.core.db import SessionLocal
@@ -21,7 +20,8 @@ from app.core.migrations import upgrade_to_head
 from app.llm.facade import LLMUsage
 from app.llm.fake_adapter import RecordingLLM
 from app.llm.openai_adapter import OpenAILLM
-from app.modules.filling.answer_engine import FieldToAnswer, answer_section, request_key
+from app.modules.filling.answer_engine import answer_section, request_key
+from app.modules.filling.groups import FieldToAnswer, call_groups
 from app.modules.filling.job import knowledge_search
 from app.modules.filling.rules import decide
 from app.modules.forms import service as forms_service
@@ -78,10 +78,19 @@ def main() -> None:
                 if summary.field_counts is None:
                     continue
                 form = forms_service.get_form(session, summary.id)
-                fillable = [f for f in form.fields if f.kind != FieldKind.SIGNATURE]
-                for section, fields in groupby(fillable, key=lambda f: f.section):
-                    to_answer = [FieldToAnswer(f.id, f.key, f.label, f.kind) for f in fields]
-                    key = request_key(form.file_name, section)
+                contexts = forms_service.field_contexts(session, form.id)
+                groups = call_groups(
+                    [
+                        FieldToAnswer(
+                            f.id, f.key, f.label, f.kind, context=contexts[f.id], section=f.section
+                        )
+                        for f in form.fields
+                        if f.kind != FieldKind.SIGNATURE
+                    ]
+                )
+                for group in groups:
+                    to_answer = group.fields
+                    key = request_key(form.file_name, group.section, group.part)
                     print(f"\n{key}")
                     started = time.monotonic()
 
@@ -101,8 +110,7 @@ def main() -> None:
                         company=company,
                         form_title=form.title,
                         form_file_name=form.file_name,
-                        section=section,
-                        fields=to_answer,
+                        group=group,
                         search=search,
                         tender_details=details,
                         today=today,
