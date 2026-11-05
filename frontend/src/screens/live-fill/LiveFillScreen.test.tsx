@@ -696,7 +696,9 @@ describe("Export (dialog over the form)", () => {
     const panel = within(dialog);
     expect(await panel.findByRole("heading", { name: "Ready to submit" })).toBeInTheDocument();
     expect(
-      panel.getByText("Annex 7 — Sanctions self-declaration (Art. 29c) · 9 of 9 fields filled"),
+      panel.getByText(
+        "Annex 7 — Sanctions self-declaration (Art. 29c) · 9 of 9 fields filled · 0 automatically from your documents · 9 reviewed by you",
+      ),
     ).toBeInTheDocument();
     expect(panel.queryByRole("list", { name: "Empty fields" })).not.toBeInTheDocument();
   });
@@ -1447,5 +1449,50 @@ describe("Live fill (review)", () => {
     expect(screen.queryByRole("group", { name: "Show only" })).not.toBeInTheDocument();
     expect(fieldCards()[0]).toHaveAccessibleName("Project number/project title/project name");
     back.stream.close();
+  });
+});
+
+describe("Export (what the review left open)", () => {
+  it("warns about doubts not reviewed: their automatic answer will be used", async () => {
+    // Given every field filled, the telephone still to check
+    const { dialog } = await openExport(
+      exportSummary(ALL_FILLED, { unreviewed_doubts: [{ id: 6, label: "Telephone" }] }),
+    );
+
+    // Then the export says so, and lists it
+    const panel = within(dialog);
+    expect(await panel.findByRole("heading", { name: "1 doubt not reviewed" })).toBeInTheDocument();
+    expect(
+      panel.getByText("1 doubt not reviewed — the automatic answer will be used"),
+    ).toBeVisible();
+    const doubts = within(panel.getByRole("list", { name: "Doubts not reviewed" }));
+    expect(doubts.getByText("Telephone")).toBeInTheDocument();
+    expect(panel.getByRole("link", { name: "Download PDF" })).toBeInTheDocument();
+  });
+
+  it("does not warn about a field I left empty on purpose", async () => {
+    // Given the e-mail left empty on purpose, everything else filled
+    const { dialog } = await openExport(
+      exportSummary([1, 2, 3, 4, 5, 6, 8, 9], { empty_fields: [], left_empty: 1 }),
+    );
+
+    // Then the form is ready, with no warning
+    const panel = within(dialog);
+    expect(await panel.findByRole("heading", { name: "Ready to submit" })).toBeInTheDocument();
+    expect(panel.queryByRole("list", { name: "Empty fields" })).not.toBeInTheDocument();
+  });
+
+  it("takes me back to the first field it warns about", async () => {
+    // Given the telephone still to check
+    const { dialog, user } = await openExport(
+      exportSummary(ALL_FILLED, { unreviewed_doubts: [{ id: 6, label: "Telephone" }] }),
+    );
+
+    // When I go back to review the doubts
+    await user.click(await within(dialog).findByRole("button", { name: "Review doubts" }));
+
+    // Then the export closes and the telephone is selected, its input focused
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(screen.getByRole("textbox", { name: "Telephone" })).toHaveFocus();
   });
 });

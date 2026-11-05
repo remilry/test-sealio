@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { CircleCheckIcon, DownloadIcon, PenLineIcon, TriangleAlertIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { LoadError } from "@/shared/components/LoadStates";
@@ -29,6 +29,7 @@ export function ExportDialog({
   fileFormat,
   savePending,
   filling,
+  onReview,
 }: {
   formId: number;
   formTitle: string;
@@ -37,9 +38,12 @@ export function ExportDialog({
   savePending: boolean;
   /** The form is being filled automatically: the export waits for the end. */
   filling: boolean;
+  /** Back to the review, on a field the export warns about. */
+  onReview: (fieldId: number) => void;
 }) {
   const t = useTranslations("export");
   const format = fileFormat.toUpperCase();
+  const [open, setOpen] = useState(false);
   if (filling) {
     return (
       <Button disabled>
@@ -49,7 +53,7 @@ export function ExportDialog({
     );
   }
   return (
-    <Dialog>
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={<Button />}>
         <DownloadIcon data-icon="inline-start" />
         {t("open", { format })}
@@ -61,6 +65,10 @@ export function ExportDialog({
           formTitle={formTitle}
           format={format}
           savePending={savePending}
+          onReview={(fieldId) => {
+            setOpen(false);
+            onReview(fieldId);
+          }}
         />
       </DialogContent>
     </Dialog>
@@ -73,11 +81,13 @@ function ExportContent({
   formTitle,
   format,
   savePending,
+  onReview,
 }: {
   formId: number;
   formTitle: string;
   format: string;
   savePending: boolean;
+  onReview: (fieldId: number) => void;
 }) {
   const t = useTranslations("export");
   const summary = useExportSummary(formId, { enabled: !savePending });
@@ -100,7 +110,13 @@ function ExportContent({
     );
   }
   return (
-    <ExportReady formId={formId} formTitle={formTitle} format={format} summary={summary.data} />
+    <ExportReady
+      formId={formId}
+      formTitle={formTitle}
+      format={format}
+      summary={summary.data}
+      onReview={onReview}
+    />
   );
 }
 
@@ -131,42 +147,49 @@ function ExportReady({
   formTitle,
   format,
   summary,
+  onReview,
 }: {
   formId: number;
   formTitle: string;
   format: string;
   summary: ExportSummary;
+  onReview: (fieldId: number) => void;
 }) {
   const t = useTranslations("export");
   const empty = summary.empty_fields.length;
+  const doubts = summary.unreviewed_doubts.length;
 
   return (
     <>
       <DialogHeader>
         <DialogTitle className="flex items-center gap-2 text-lg font-semibold">
-          <ReadinessTitle emptyCount={empty} />
+          <ReadinessTitle emptyCount={empty} doubtCount={doubts} />
         </DialogTitle>
         <DialogDescription>
-          {t("filledSummary", { formTitle, filled: summary.filled, fillable: summary.fillable })}
+          {t("filledSummary", {
+            formTitle,
+            filled: summary.filled,
+            fillable: summary.fillable,
+            automatic: summary.automatic,
+            reviewed: summary.reviewed,
+          })}
         </DialogDescription>
       </DialogHeader>
 
-      {empty > 0 && (
-        <Alert className="border-warning/40 bg-warning/5">
-          <TriangleAlertIcon className="text-warning" />
-          <AlertTitle>{t("emptyWarning", { count: empty })}</AlertTitle>
-          <AlertDescription>
-            <ul
-              aria-label={t("emptyFields")}
-              className="max-h-48 list-inside list-disc overflow-y-auto"
-            >
-              {summary.empty_fields.map((field) => (
-                <li key={field.id}>{field.label}</li>
-              ))}
-            </ul>
-          </AlertDescription>
-        </Alert>
-      )}
+      <FieldsWarning
+        fields={summary.empty_fields}
+        title={t("emptyWarning", { count: empty })}
+        listLabel={t("emptyFields")}
+        reviewLabel={t("reviewEmpty")}
+        onReview={onReview}
+      />
+      <FieldsWarning
+        fields={summary.unreviewed_doubts}
+        title={t("doubtsWarning", { count: doubts })}
+        listLabel={t("doubtFields")}
+        reviewLabel={t("reviewDoubts")}
+        onReview={onReview}
+      />
 
       {summary.sign_by_hand.length > 0 && (
         <section aria-labelledby="before-you-submit" className="flex flex-col gap-1.5">
@@ -198,9 +221,48 @@ function ExportReady({
   );
 }
 
-function ReadinessTitle({ emptyCount }: { emptyCount: number }) {
+/** Fields the export warns about (empty or not reviewed), with a way back to the first one. */
+function FieldsWarning({
+  fields,
+  title,
+  listLabel,
+  reviewLabel,
+  onReview,
+}: {
+  fields: ExportSummary["empty_fields"];
+  title: string;
+  listLabel: string;
+  reviewLabel: string;
+  onReview: (fieldId: number) => void;
+}) {
+  if (fields.length === 0) return null;
+  return (
+    <Alert className="border-warning/40 bg-warning/5">
+      <TriangleAlertIcon className="text-warning" />
+      <AlertTitle>{title}</AlertTitle>
+      <AlertDescription className="flex flex-col gap-2">
+        <ul aria-label={listLabel} className="max-h-40 list-inside list-disc overflow-y-auto">
+          {fields.map((field) => (
+            <li key={field.id}>{field.label}</li>
+          ))}
+        </ul>
+        <Button
+          variant="outline"
+          size="sm"
+          className="self-start"
+          onClick={() => onReview(fields[0].id)}
+        >
+          {reviewLabel}
+        </Button>
+      </AlertDescription>
+    </Alert>
+  );
+}
+
+function ReadinessTitle({ emptyCount, doubtCount }: { emptyCount: number; doubtCount: number }) {
   const t = useTranslations("export");
   if (emptyCount > 0) return t("stillEmpty", { count: emptyCount });
+  if (doubtCount > 0) return t("doubtsLeft", { count: doubtCount });
   return (
     <>
       <CircleCheckIcon className="size-5 text-success" aria-hidden />

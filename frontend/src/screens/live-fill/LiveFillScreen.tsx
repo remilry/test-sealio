@@ -265,6 +265,7 @@ function FillWorkspace({
             fileFormat={form.file_format}
             savePending={save.isPending}
             filling={filling}
+            onReview={focusField}
           />
         </>
       }
