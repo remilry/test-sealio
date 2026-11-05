@@ -6,6 +6,7 @@
   "common": {
     "appName": "Formpilot",
     "tryAgain": "Try again",
+    "errorTitle": "This page couldn't be shown",
     "retryLater": "Something went wrong on our side. Please try again in a moment.",
     "withdrawnByBuyer": "It may have been withdrawn by the buyer.",
     "fieldCounts": "{fields, plural, one {# field} other {# fields}} detected{yesNo, plural, =0 {} one { · # Yes/No declaration} other { · # Yes/No declarations}}{signatures, plural, =0 {} one { · # signature} other { · # signatures}}"
