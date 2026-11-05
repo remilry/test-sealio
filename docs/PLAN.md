@@ -2,7 +2,7 @@
 
 > Document vivant. Chaque étape y est cochée et détaillée au fur et à mesure.
 > Contexte produit et priorités : voir `CLAUDE.md`. Échéance : jeudi 5 novembre.
-> Statut : étapes 0 à 4.5 faites ; étape 5 découpée en 5a–5d, 5a, 5b et 5c mergées, 5d faite (remplissage automatique dans l'UI, en attente de validation) ; étape 6 (Annex 4, 6a à 6d) mergée ; étape 7 (relecture) faite sur `step-7-review`, en attente de validation ; prochaine : finitions (7.5). Parcours détaillé : `docs/USER_FLOW.md`. Les choix techniques marqués _proposition_ restent à confirmer à l'étape 3.
+> Statut : étapes 0 à 4.5 faites ; étape 5 découpée en 5a–5d, 5a, 5b et 5c mergées, 5d faite (remplissage automatique dans l'UI, en attente de validation) ; étape 6 (Annex 4, 6a à 6d) mergée ; étape 7 (relecture) mergée ; prochaine : finitions (7.5). Parcours détaillé : `docs/USER_FLOW.md`. Les choix techniques marqués _proposition_ restent à confirmer à l'étape 3.
 
 ## 1. Ce qu'on a appris des deux formulaires
 
@@ -174,7 +174,7 @@ _Avancée avant la relecture et les finitions (décision 2026-11-05) : ses cas d
 - Tests : écran *Knowledge* (vrai rapport annuel DOCX rendu par le vrai `docx-preview` sous jsdom, fichier introuvable), handler MSW `documentFile` ; e2e : aperçu du rapport annuel après le dépôt des documents.
 - Hors périmètre : l'aperçu Word dans la vue *Source* vient avec cette vue (étape 7).
 
-### Étape 7 — Relecture et humain dans la boucle ✅ _(testé, en attente de validation)_
+### Étape 7 — Relecture et humain dans la boucle ✅ _(testé, mergée le 2026-11-05)_
 - Design : `docs/superpowers/specs/2026-11-05-7-review-design.md` ; plan : `docs/superpowers/plans/2026-11-05-7-review.md`. Branche `step-7-review`.
 - **Tranché** = enregistré par l'utilisateur (`answer.resolved_by = user`) : valeur gardée, candidat choisi, valeur saisie, ou champ **laissé vide volontairement** (Oui/Non compris). Nouvelle colonne `answer.proposed_value` (ce que le remplissage automatique a écrit, gardé quand l'utilisateur change la valeur) : « Kept by you » / « Entered by you » / « Left empty by you ».
 - **Back** : `FillCounts.open` (champs non tranchés vides ou à vérifier, valeurs suggérées comprises) ; statut `ready` quand plus rien n'est ouvert (après chaque enregistrement et à la fin d'un remplissage), `in_review` sinon ; résumé d'export : `empty_fields` = vides non tranchés, + `unreviewed_doubts`, `left_empty`, `automatic`, `reviewed`. **L'export n'est jamais bloqué** (décision utilisateur, remplace le blocage par une déclaration non tranchée).
@@ -302,3 +302,4 @@ UI (relecture)  ──►  API locale
 | 2026-11-05 | 6c : on garde l'état actuel (0 erreur silencieuse sur l'enregistrement versionné, erreurs communes aux deux exécutions possibles), améliorations plus tard | validé |
 | 2026-11-05 | 7 : file de relecture avec les doutes d'abord, puis les champs sans valeur, puis les réponses automatiques (repliées) ; tout champ vide (Oui/Non compris) peut être laissé vide volontairement ; l'export n'est jamais bloqué, il signale seulement ce que personne n'a tranché ; onglet *Source* déplacé en 7.5 | validé |
 | 2026-11-05 | Ordre inversé : l'Annex 4 passe avant la relecture et les finitions. Renumérotation : Annex 4 = étape 6, relecture = étape 7, finitions = étape 7.5 (les lignes précédentes du journal et les specs datées gardent l'ancienne numérotation) | validé |
+| 2026-11-05 | Étape 7 validée et mergée dans `main` | validé |
