@@ -484,8 +484,10 @@ export interface components {
             /** Paragraph */
             paragraph: number;
             mode: components["schemas"]["DocxWriteMode"];
-            /** After Run */
-            after_run?: number | null;
+            /** Start */
+            start?: number | null;
+            /** End */
+            end?: number | null;
         };
         /**
          * DocxWriteMode
