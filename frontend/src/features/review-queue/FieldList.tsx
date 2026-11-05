@@ -225,7 +225,8 @@ function YesNoInput({
               key={option}
               className={cn(
                 buttonVariants({ variant: chosen === option ? "default" : "outline", size: "sm" }),
-                "has-focus-visible:ring-3 has-focus-visible:ring-ring/50",
+                // Positioned: the hidden radio stays inside (focusing it scrolls to the card).
+                "relative has-focus-visible:ring-3 has-focus-visible:ring-ring/50",
               )}
             >
               <input
