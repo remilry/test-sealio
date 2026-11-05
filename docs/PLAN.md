@@ -2,7 +2,7 @@
 
 > Document vivant. Chaque étape y est cochée et détaillée au fur et à mesure.
 > Contexte produit et priorités : voir `CLAUDE.md`. Échéance : jeudi 5 novembre.
-> Statut : étapes 0 à 4.5 faites ; étape 5 découpée en 5a–5d, 5a, 5b et 5c mergées, 5d faite (remplissage automatique dans l'UI, en attente de validation) ; en cours : étape 6 (Annex 4, découpée en 6a–6d ; 6a faite, en attente de validation), avant la relecture (7) et les finitions (7.5). Parcours détaillé : `docs/USER_FLOW.md`. Les choix techniques marqués _proposition_ restent à confirmer à l'étape 3.
+> Statut : étapes 0 à 4.5 faites ; étape 5 découpée en 5a–5d, 5a, 5b et 5c mergées, 5d faite (remplissage automatique dans l'UI, en attente de validation) ; en cours : étape 6 (Annex 4, découpée en 6a–6d ; 6a mergée, prochaine : 6b), avant la relecture (7) et les finitions (7.5). Parcours détaillé : `docs/USER_FLOW.md`. Les choix techniques marqués _proposition_ restent à confirmer à l'étape 3.
 
 ## 1. Ce qu'on a appris des deux formulaires
 
@@ -127,7 +127,7 @@ Chaque étape à partir de la 4 livre une **fonctionnalité utilisable de bout e
 _Avancée avant la relecture et les finitions (décision 2026-11-05) : ses cas difficiles (conflits, périmé, déclarations Oui/Non) donnent à la relecture de quoi travailler._
 - Découpée en 4 sous-étapes, chacune sur sa branche et validée avant la suivante : 6a parseur + export DOCX (back), 6b aperçu Word dans *Live fill* + saisie + export dans l'UI, 6c remplissage automatique (sections en parallèle, réponses enregistrées), 6d aperçu Word dans *Company knowledge*.
 
-#### 6a — Parseur et export DOCX (back) ✅ _(en attente de validation)_
+#### 6a — Parseur et export DOCX (back) ✅ (mergée le 2026-11-05)
 - Design : `docs/superpowers/specs/2026-11-05-6a-docx-parse-export-design.md`.
 - **Parseur générique** (`forms/parsing/docx_parser.py`, pur) : ligne « libellé | cellule vide » → la cellule ; dans une cellule, chaque paragraphe court est un libellé → le paragraphe vide en dessous, sinon à la suite s'il finit par `:`, sinon un nouveau paragraphe (12 mots au plus) ; tableau dont l'en-tête dit « Yes/No » → champs `yes_no` (question = texte le plus long avant la case de réponse) ; pointillés → remplacés (une cellule à pointillés n'a que ces champs) ; hors tableau : libellé `:` suivi de tabulations, signature/cachet. Pas des champs : texte long, ligne de titre, libellé qui chapeaute plusieurs libellés à sa droite. Sections `Table n` et `Text`. Annex 4 : 49 champs (17 Oui/Non, 1 signature), 8 sections.
 - **`DocxLocator`** (tableau, ligne, cellule propre — fusions horizontales une fois, continuations de fusion verticale ignorées —, paragraphe, mode `in_paragraph` / `new_paragraph` / `replace_leader`, positions `start` / `end` dans le texte du paragraphe : l'exporteur coupe les runs à ces positions et écrit un paragraphe de la fin vers le début, ce qui tient deux champs sur une ligne et des pointillés ou tabulations répartis sur plusieurs runs) ; `locator` = union discriminée par `format` dans l'API (types du front régénérés).
@@ -255,4 +255,5 @@ UI (relecture)  ──►  API locale
 | 2026-11-04 | 5d : onglet *Source* gardé pour l'étape 6 | validé |
 | 2026-11-04 | 5d : pas de nouveau remplissage sur un formulaire commencé : `Discard answers` (supprime toutes les réponses, celles de l'utilisateur aussi, même pendant un remplissage) puis `Auto-fill` ; un meilleur nouveau remplissage en V2 | validé |
 | 2026-11-05 | Nouvelle étape 6.5 : UI plus proche des maquettes (à discuter en détail) et texte des réponses qui arrive progressivement pendant le remplissage | validé |
+| 2026-11-05 | Étape 6 découpée en 6a (parseur + export DOCX, back), 6b (aperçu Word, saisie, export dans l'UI), 6c (remplissage automatique, sections en parallèle), 6d (aperçu Word dans *Company knowledge*) ; 6a : pas de comparaison visuelle par rendu (vérification structurelle), localisateur Word par positions de caractères ; validée et mergée | validé |
 | 2026-11-05 | Ordre inversé : l'Annex 4 passe avant la relecture et les finitions. Renumérotation : Annex 4 = étape 6, relecture = étape 7, finitions = étape 7.5 (les lignes précédentes du journal et les specs datées gardent l'ancienne numérotation) | validé |
