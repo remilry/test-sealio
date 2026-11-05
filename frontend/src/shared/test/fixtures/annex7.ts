@@ -189,8 +189,20 @@ export function fillState(
   const filled = fillable.filter((field) =>
     answers.some((a) => a.field_id === field.id && a.value),
   ).length;
+  // Not settled by the user, and empty or with a value to check.
+  const open = fillable.filter((field) => {
+    const answer = answers.find((a) => a.field_id === field.id);
+    if (answer?.resolved_by === "user") return false;
+    return !answer?.value || answer.needs_review;
+  }).length;
   return {
-    counts: { fillable: fillable.length, filled, empty: fillable.length - filled, doubts: 0 },
+    counts: {
+      fillable: fillable.length,
+      filled,
+      empty: fillable.length - filled,
+      doubts: 0,
+      open,
+    },
     answers,
     ai_run,
   };

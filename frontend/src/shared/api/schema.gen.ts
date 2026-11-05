@@ -567,6 +567,8 @@ export interface components {
             empty: number;
             /** Doubts */
             doubts: number;
+            /** Open */
+            open: number;
         };
         /**
          * FillState

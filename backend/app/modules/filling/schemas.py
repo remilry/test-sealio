@@ -34,6 +34,8 @@ class FillCounts(BaseModel):
     empty: int
     # Conflicts and outdated sources the user has not reviewed yet.
     doubts: int
+    # Left to review: fields nobody settled that are empty or have a doubt (suggested values too).
+    open: int
 
 
 class AiRun(BaseModel):
