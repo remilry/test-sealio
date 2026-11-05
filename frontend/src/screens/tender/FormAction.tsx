@@ -34,16 +34,19 @@ export function FormAction({
   const [discarding, setDiscarding] = useState(false);
 
   if (form.status === "not_started" && !form.filling) {
+    // Temporary (step 6c): Word forms are not auto-filled yet; they open from their URL.
+    if (form.file_format === "docx") {
+      return (
+        <Button disabled title={t("wordAutoFillSoon")}>
+          {t("autoFill")}
+        </Button>
+      );
+    }
     return (
       <SetupDialog
         form={form}
         documentCount={documentCount}
-        preview={
-          // Word forms get a preview with step 7.
-          form.file_name.toLowerCase().endsWith(".pdf") ? (
-            <PdfViewer fileUrl={originalFileUrl(form.id)} label={form.title} />
-          ) : undefined
-        }
+        preview={<PdfViewer fileUrl={originalFileUrl(form.id)} label={form.title} />}
         onStarted={() => router.push(routes.fillForm(form.id))}
       />
     );
