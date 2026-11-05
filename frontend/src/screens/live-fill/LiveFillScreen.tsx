@@ -22,7 +22,13 @@ import {
 } from "@/features/fill-session";
 import { ExportDialog } from "@/features/form-export";
 import { useKnowledgeBase } from "@/features/knowledge-base";
-import { FieldList, type FocusRequest, type QueueField } from "@/features/review-queue";
+import {
+  FieldList,
+  groupFields,
+  nextOpen,
+  type FocusRequest,
+  type QueueField,
+} from "@/features/review-queue";
 import { useTender } from "@/features/tender";
 import { isNotFound } from "@/shared/api";
 import { EmptyState, LoadError } from "@/shared/components/LoadStates";
@@ -162,11 +168,14 @@ function FillWorkspace({
   });
   const fillable = fields.filter((field) => field.fillable);
 
+  // Once the fill is over, the fields are reviewed group by group: doubts, no value, automatic.
+  const grouped = !filling;
+  const queue = grouped ? queueOrder(fields) : fields;
   const [chosenId, setChosenId] = useState<number | null>(null);
   const [focusRequest, setFocusRequest] = useState<FocusRequest | null>(null);
-  // Until the user picks one, the first field without a value is selected (once the fill is over:
-  // meanwhile the selection would jump at every answer).
-  const firstOpen = (fillable.find((field) => !field.value) ?? fillable[0] ?? fields[0])?.id;
+  // Until the user picks one, the first open field is selected (once the fill is over: meanwhile
+  // the selection would jump at every answer).
+  const firstOpen = nextOpen(fields, -1) ?? (fillable[0] ?? fields[0])?.id;
   const selectedId = chosenId ?? (filling ? null : (firstOpen ?? null));
 
   const focusField = (fieldId: number) => {
@@ -176,14 +185,27 @@ function FillWorkspace({
     }
   };
   const moveSelection = (step: 1 | -1) => {
-    const index = fields.findIndex((field) => field.id === selectedId);
-    const next = fields[Math.min(Math.max(index + step, 0), fields.length - 1)];
+    const index = queue.findIndex((field) => field.id === selectedId);
+    const next = queue[Math.min(Math.max(index + step, 0), queue.length - 1)];
     if (next) setChosenId(next.id);
   };
-  const focusNextFillable = (fieldId: number) => {
+  // After a field: the next open one in the review queue, or the next one in the form while the
+  // form fills.
+  const focusNext = (fieldId: number) => {
+    if (grouped) {
+      const next = nextOpen(fields, fieldId);
+      if (next !== null) focusField(next);
+      return;
+    }
     const index = fields.findIndex((field) => field.id === fieldId);
     const next = fields.slice(index + 1).find((field) => field.fillable);
     if (next) focusField(next.id);
+  };
+  const saveField = (fieldId: number, value: string | null) => {
+    // The saved answer takes over from the draft (and comes back if the save fails).
+    setDraft(fieldId, null);
+    setUnsaved((previous) => withEntry(previous, fieldId, null));
+    save.mutate({ fieldId, value });
   };
 
   useHandleKeyDown({
@@ -252,12 +274,13 @@ function FillWorkspace({
           <FillHeader
             run={run}
             filling={filling}
-            emptyCount={counts.empty}
+            openCount={counts.open}
             estimatedSeconds={form.estimated_fill_seconds}
             startedAt={fill.ai_run?.started_at ?? null}
           />
           <FieldList
             fields={fields}
+            grouped={grouped}
             selectedId={selectedId}
             focusRequest={focusRequest}
             context={
@@ -267,13 +290,12 @@ function FillWorkspace({
               }
             }
             onSelect={setChosenId}
-            onSave={(fieldId, value) => {
-              // The saved answer takes over from the draft (and comes back if the save fails).
-              setDraft(fieldId, null);
-              setUnsaved((previous) => withEntry(previous, fieldId, null));
-              save.mutate({ fieldId, value });
+            onSave={saveField}
+            onSettle={(fieldId, value) => {
+              saveField(fieldId, value);
+              focusNext(fieldId);
             }}
-            onNext={focusNextFillable}
+            onNext={focusNext}
             onDraft={setDraft}
           />
         </div>
@@ -298,13 +320,14 @@ function FillWorkspace({
 function FillHeader({
   run,
   filling,
-  emptyCount,
+  openCount,
   estimatedSeconds,
   startedAt,
 }: {
   run: FillRun;
   filling: boolean;
-  emptyCount: number;
+  /** Fields nobody settled yet that are empty or have a doubt. */
+  openCount: number;
   estimatedSeconds: number | null;
   startedAt: string | null;
 }) {
@@ -344,7 +367,7 @@ function FillHeader({
         </p>
       )}
       <h2 className="text-[15px] font-semibold">
-        {emptyCount === 0 ? t("allFilled") : t("fieldsToFill", { count: emptyCount })}
+        {openCount === 0 ? t("allReviewed") : t("needALook", { count: openCount })}
       </h2>
       <p className="text-xs text-muted-foreground">{t("instructions")}</p>
     </header>
@@ -417,6 +440,12 @@ function withEntry(map: ReadonlyMap<number, string>, id: number, text: string | 
   if (text === null) next.delete(id);
   else next.set(id, text);
   return next;
+}
+
+/** The fields as the review queue lists them: groups in order, then signatures. */
+function queueOrder(fields: QueueField[]): QueueField[] {
+  const { groups, signatures } = groupFields(fields);
+  return [...groups.flatMap((group) => group.fields), ...signatures];
 }
 
 /** Where the preview draws a field, from the parser's locator. */

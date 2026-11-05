@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useRef, type FormEvent } from "react";
-import { PenLineIcon } from "lucide-react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { CheckIcon, PenLineIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { cn } from "@/shared/lib/utils";
 import type { Schema } from "@/shared/api";
 import { Button, buttonVariants } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { formatDate, formatTime } from "@/shared/utils/date";
+import { groupFields, isOpen, reviewGroup, settledAs, type ReviewGroup } from "./review";
 
 /** A field as the list shows it: what the user sees and edits, nothing of the file layout. */
 export type QueueField = {
@@ -41,90 +42,191 @@ export type FieldContext = { companyName: string; documentCount: number };
 /** Ask the list to move the keyboard focus to a field's input (changes on every request). */
 export type FocusRequest = { fieldId: number; at: number };
 
+type CardHandlers = {
+  onSelect: (fieldId: number) => void;
+  onSave: (fieldId: number, value: string | null) => void;
+  /** The user settles a field: keeps or chooses a value, or leaves it empty on purpose. */
+  onSettle: (fieldId: number, value: string | null) => void;
+  onNext: (fieldId: number) => void;
+  onDraft: (fieldId: number, text: string) => void;
+};
+
 /**
- * The fields of the form, in order, each with its input. A value is saved when the user leaves
- * the input or presses Enter (which also moves on to the next field). Every keystroke is reported
- * through `onDraft`, so the document can show the text while it is typed.
+ * The fields of the form, each with its input. A value is saved when the user leaves the input
+ * or presses Enter (which also moves on). Every keystroke is reported through `onDraft`, so the
+ * document can show the text while it is typed.
+ *
+ * Grouped (once the form is not filling any more), the review queue: doubts to check first, then
+ * fields without a value, then the automatic answers, collapsed; filters on top.
  */
 export function FieldList({
   fields,
+  grouped,
   selectedId,
   focusRequest,
   context,
-  onSelect,
-  onSave,
-  onNext,
-  onDraft,
+  ...handlers
 }: {
   context: FieldContext | undefined;
   fields: QueueField[];
+  grouped: boolean;
   selectedId: number | null;
   focusRequest: FocusRequest | null;
-  onSelect: (fieldId: number) => void;
-  onSave: (fieldId: number, value: string | null) => void;
-  onNext: (fieldId: number) => void;
-  onDraft: (fieldId: number, text: string) => void;
-}) {
+} & CardHandlers) {
   const t = useTranslations("fieldList");
   const inputs = useRef(new Map<number, HTMLInputElement>());
+  const [filter, setFilter] = useState<ReviewGroup | null>(null);
+  const [showAutomatic, setShowAutomatic] = useState(false);
 
   useEffect(() => {
     if (focusRequest) inputs.current.get(focusRequest.fieldId)?.focus();
   }, [focusRequest]);
 
+  const card = (field: QueueField) => (
+    <FieldCard
+      key={field.id}
+      field={field}
+      selected={field.id === selectedId}
+      context={context}
+      inputRef={(input) => {
+        if (input) inputs.current.set(field.id, input);
+        else inputs.current.delete(field.id);
+      }}
+      focusInput={() => {
+        const input = inputs.current.get(field.id);
+        input?.focus();
+        input?.select();
+      }}
+      {...handlers}
+    />
+  );
+
+  if (!grouped) {
+    return (
+      <ol aria-label={t("label")} className="flex flex-col gap-2">
+        {fields.map(card)}
+      </ol>
+    );
+  }
+
+  const { groups, signatures } = groupFields(fields);
+  const selected = fields.find((field) => field.id === selectedId);
+  // The automatic answers open when one of them is selected (from the document, for instance).
+  const automaticOpen =
+    showAutomatic || (selected !== undefined && reviewGroup(selected) === "automatic");
+  const shown = groups.filter(
+    ({ group, fields: inGroup }) => inGroup.length > 0 && (!filter || filter === group),
+  );
   return (
-    <ol aria-label={t("label")} className="flex flex-col gap-2">
-      {fields.map((field) => (
-        <li
-          key={field.id}
-          aria-label={field.label}
-          aria-current={field.id === selectedId ? "true" : undefined}
-          onClick={() => onSelect(field.id)}
-          className={cn(
-            "rounded-lg border bg-card px-3.5 py-3 transition-colors",
-            field.id === selectedId && "border-primary ring-3 ring-primary/15",
-          )}
-        >
-          {field.fillable && field.yesNo && (
-            <YesNoInput
-              field={field}
-              selected={field.id === selectedId}
-              context={context}
-              inputRef={(input) => {
-                if (input) inputs.current.set(field.id, input);
-                else inputs.current.delete(field.id);
-              }}
-              onFocus={() => onSelect(field.id)}
-              onSave={(value) => onSave(field.id, value)}
-            />
-          )}
-          {field.fillable && !field.yesNo && (
-            <FieldInput
-              field={field}
-              selected={field.id === selectedId}
-              context={context}
-              inputRef={(input) => {
-                if (input) inputs.current.set(field.id, input);
-                else inputs.current.delete(field.id);
-              }}
-              onFocus={() => onSelect(field.id)}
-              onSave={(value) => onSave(field.id, value)}
-              onNext={() => onNext(field.id)}
-              onDraft={(text) => onDraft(field.id, text)}
-            />
-          )}
-          {!field.fillable && (
-            <div className="flex flex-col gap-1">
-              <span className="text-sm font-medium">{field.label}</span>
-              <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <PenLineIcon className="size-3.5" aria-hidden />
-                {t("signByHand")}
-              </p>
-            </div>
-          )}
-        </li>
-      ))}
-    </ol>
+    <div className="flex flex-col gap-3">
+      <div role="group" aria-label={t("filter")} className="flex flex-wrap gap-1.5">
+        {groups.map(({ group, fields: inGroup, open }) => (
+          <Button
+            key={group}
+            size="xs"
+            variant="outline"
+            aria-pressed={filter === group}
+            onClick={() => setFilter((current) => (current === group ? null : group))}
+            className={cn("rounded-full", filter === group && "border-foreground bg-muted")}
+          >
+            <span aria-hidden className={cn("size-2 rounded-full", GROUP_DOT[group])} />
+            {t(`group.${group}.pill`, { count: group === "automatic" ? inGroup.length : open })}
+          </Button>
+        ))}
+      </div>
+      <ol aria-label={t("label")} className="flex flex-col gap-4">
+        {shown.map(({ group, fields: inGroup }) => (
+          <GroupSection
+            key={group}
+            title={t(`group.${group}.title`)}
+            action={
+              group === "automatic" && (
+                <Button variant="ghost" size="xs" onClick={() => setShowAutomatic(!automaticOpen)}>
+                  {automaticOpen ? t("hide") : t("show")}
+                </Button>
+              )
+            }
+          >
+            {group === "automatic" && !automaticOpen ? (
+              <li className="rounded-lg border border-dashed px-3.5 py-2.5 text-xs text-muted-foreground">
+                {t("automaticCollapsed", { count: inGroup.length })}
+              </li>
+            ) : (
+              inGroup.map(card)
+            )}
+          </GroupSection>
+        ))}
+        {signatures.length > 0 && !filter && (
+          <GroupSection title={t("group.signature.title")}>{signatures.map(card)}</GroupSection>
+        )}
+      </ol>
+    </div>
+  );
+}
+
+const GROUP_DOT: Record<ReviewGroup, string> = {
+  toCheck: "bg-warning",
+  noValue: "bg-destructive",
+  automatic: "bg-primary",
+};
+
+function GroupSection({
+  title,
+  action,
+  children,
+}: {
+  title: string;
+  action?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <li aria-label={title} className="flex flex-col gap-2">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+          {title}
+        </h3>
+        {action}
+      </div>
+      <ol aria-label={title} className="flex flex-col gap-2">
+        {children}
+      </ol>
+    </li>
+  );
+}
+
+type CardProps = {
+  field: QueueField;
+  selected: boolean;
+  context: FieldContext | undefined;
+  inputRef: (input: HTMLInputElement | null) => void;
+  focusInput: () => void;
+} & CardHandlers;
+
+function FieldCard(props: CardProps) {
+  const t = useTranslations("fieldList");
+  const { field, selected, onSelect } = props;
+  return (
+    <li
+      aria-label={field.label}
+      aria-current={selected ? "true" : undefined}
+      onClick={() => onSelect(field.id)}
+      className={cn(
+        "rounded-lg border bg-card px-3.5 py-3 transition-colors",
+        selected && "border-primary ring-3 ring-primary/15",
+      )}
+    >
+      {field.fillable && field.yesNo && <YesNoInput {...props} />}
+      {field.fillable && !field.yesNo && <FieldInput {...props} />}
+      {!field.fillable && (
+        <div className="flex flex-col gap-1">
+          <span className="text-sm font-medium">{field.label}</span>
+          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <PenLineIcon className="size-3.5" aria-hidden />
+            {t("signByHand")}
+          </p>
+        </div>
+      )}
+    </li>
   );
 }
 
@@ -133,20 +235,13 @@ function FieldInput({
   selected,
   context,
   inputRef,
-  onFocus,
+  focusInput,
+  onSelect,
   onSave,
+  onSettle,
   onNext,
   onDraft,
-}: {
-  field: QueueField;
-  selected: boolean;
-  context: FieldContext | undefined;
-  inputRef: (input: HTMLInputElement | null) => void;
-  onFocus: () => void;
-  onSave: (value: string | null) => void;
-  onNext: () => void;
-  onDraft: (text: string) => void;
-}) {
+}: CardProps) {
   const inputId = `field-${field.id}`;
   const input = useRef<HTMLInputElement | null>(null);
   // The last value sent (or saved), so Enter then leaving the input saves once. Back to the saved
@@ -162,15 +257,18 @@ function FieldInput({
   }, [shown, field.value]);
   const saveIfChanged = (element: HTMLInputElement) => {
     const value = element.value.trim();
-    if (value === lastSent.current) return;
+    if (value === lastSent.current) return false;
     lastSent.current = value;
-    onSave(value || null);
+    onSave(field.id, value || null);
+    return true;
   };
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const element = event.currentTarget.elements.namedItem("value");
-    if (element instanceof HTMLInputElement) saveIfChanged(element);
-    onNext();
+    const saved = element instanceof HTMLInputElement && saveIfChanged(element);
+    // Enter on a value to check, left as it is: the user keeps it.
+    if (!saved && field.value && isOpen(field)) onSettle(field.id, field.value);
+    onNext(field.id);
   };
 
   return (
@@ -187,12 +285,13 @@ function FieldInput({
         name="value"
         defaultValue={shown}
         autoComplete="off"
-        onFocus={onFocus}
-        onChange={(event) => onDraft(event.currentTarget.value)}
+        onFocus={() => onSelect(field.id)}
+        onChange={(event) => onDraft(field.id, event.currentTarget.value)}
         onBlur={(event) => saveIfChanged(event.currentTarget)}
       />
       <FieldStatus field={field} context={context} />
       <FieldSources field={field} expanded={selected} />
+      {selected && <ReviewActions field={field} onSettle={onSettle} focusInput={focusInput} />}
     </form>
   );
 }
@@ -203,16 +302,11 @@ function YesNoInput({
   selected,
   context,
   inputRef,
-  onFocus,
+  focusInput,
+  onSelect,
   onSave,
-}: {
-  field: QueueField;
-  selected: boolean;
-  context: FieldContext | undefined;
-  inputRef: (input: HTMLInputElement | null) => void;
-  onFocus: () => void;
-  onSave: (value: string | null) => void;
-}) {
+  onSettle,
+}: CardProps) {
   const t = useTranslations("fieldList");
   const name = `field-${field.id}`;
   // Stored "yes" / "no" (any case from older answers).
@@ -237,15 +331,15 @@ function YesNoInput({
                 name={name}
                 value={option}
                 checked={chosen === option}
-                onFocus={onFocus}
-                onChange={() => onSave(option)}
+                onFocus={() => onSelect(field.id)}
+                onChange={() => onSave(field.id, option)}
                 className="sr-only"
               />
               {t(option)}
             </label>
           ))}
           {chosen && (
-            <Button variant="ghost" size="sm" onClick={() => onSave(null)}>
+            <Button variant="ghost" size="sm" onClick={() => onSave(field.id, null)}>
               {t("clearAnswer")}
             </Button>
           )}
@@ -253,7 +347,98 @@ function YesNoInput({
       </fieldset>
       <FieldStatus field={field} context={context} />
       <FieldSources field={field} expanded={selected} />
+      {selected && <ReviewActions field={field} onSettle={onSettle} focusInput={focusInput} />}
     </div>
+  );
+}
+
+/** What the user can do to settle the selected field, while it is still open. */
+function ReviewActions({
+  field,
+  onSettle,
+  focusInput,
+}: {
+  field: QueueField;
+  onSettle: (fieldId: number, value: string | null) => void;
+  focusInput: () => void;
+}) {
+  const t = useTranslations("fieldList");
+  if (!isOpen(field) || field.state === "searching") return null;
+  if (!field.value) {
+    return (
+      <div className="flex justify-end">
+        <Button variant="outline" size="sm" onClick={() => onSettle(field.id, null)}>
+          {t("leaveEmpty")}
+        </Button>
+      </div>
+    );
+  }
+  if (field.type === "conflict" && field.candidates.length > 1) {
+    return <ConflictChoice field={field} onSettle={onSettle} />;
+  }
+  return (
+    <div className="flex justify-end gap-2">
+      <Button variant="ghost" size="sm" onClick={focusInput}>
+        {t("enterNewValue")}
+      </Button>
+      <Button size="sm" onClick={() => onSettle(field.id, field.value)}>
+        {t("keepValue")}
+      </Button>
+    </div>
+  );
+}
+
+/** Sources that disagree: one value each, the selected (most recent) one chosen first. */
+function ConflictChoice({
+  field,
+  onSettle,
+}: {
+  field: QueueField;
+  onSettle: (fieldId: number, value: string | null) => void;
+}) {
+  const t = useTranslations("fieldList");
+  const [chosen, setChosen] = useState(field.value ?? field.candidates[0].value);
+  const name = `choice-${field.id}`;
+  return (
+    <fieldset className="flex flex-col gap-1.5 border-t pt-2">
+      <legend className="mb-1 text-xs font-medium">{t("chooseValue")}</legend>
+      {field.candidates.map((candidate, index) => {
+        const first = candidate.citations[0];
+        return (
+          <label
+            key={candidate.value}
+            className={cn(
+              "flex cursor-pointer gap-2 rounded-md border px-2.5 py-2 text-xs",
+              chosen === candidate.value && "border-primary bg-primary/5",
+            )}
+          >
+            <input
+              type="radio"
+              name={name}
+              value={candidate.value}
+              checked={chosen === candidate.value}
+              onChange={() => setChosen(candidate.value)}
+              className="mt-0.5"
+            />
+            <span className="flex flex-col gap-0.5">
+              <span className="font-medium">{candidate.value}</span>
+              <span className="text-muted-foreground">
+                {first && <SourceName citation={first} />}
+                {candidate.source_date &&
+                  t("sourceDated", { date: formatDate(candidate.source_date.date) })}
+                {index === 0 && candidate.source_date && t("mostRecent")}
+              </span>
+            </span>
+          </label>
+        );
+      })}
+      <p className="text-xs text-muted-foreground">{t("orEnterAnother")}</p>
+      <div className="flex justify-end">
+        <Button size="sm" onClick={() => onSettle(field.id, chosen)}>
+          {t("useThisOne")}
+        </Button>
+      </div>
+    </fieldset>
   );
 }
 
@@ -264,10 +449,12 @@ function FieldStatus({ field, context }: { field: QueueField; context: FieldCont
     return <p className="text-xs text-destructive">{t("notSaved")}</p>;
   }
   // A value saved while the field is searched is the user's: the fill will not replace it.
-  if (field.resolvedBy === "user" && field.enteredAt) {
+  const settled = settledAs(field);
+  if (settled && field.enteredAt) {
     return (
-      <p className="text-xs text-muted-foreground">
-        {t("enteredByYou", { time: formatTime(field.enteredAt) })}
+      <p className="flex items-center gap-1 text-xs text-muted-foreground">
+        <CheckIcon className="size-3.5 text-success" aria-hidden />
+        {t(SETTLED_MESSAGE[settled], { time: formatTime(field.enteredAt) })}
       </p>
     );
   }
@@ -329,6 +516,12 @@ function FieldStatus({ field, context }: { field: QueueField; context: FieldCont
   }
   return <p className="text-xs text-muted-foreground">{t("filledAutomatically")}</p>;
 }
+
+const SETTLED_MESSAGE = {
+  kept: "keptByYou",
+  leftEmpty: "leftEmptyByYou",
+  entered: "enteredByYou",
+} as const;
 
 /**
  * Where the value comes from: every source when they disagree, else the selected one. Open for
