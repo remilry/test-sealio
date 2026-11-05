@@ -144,6 +144,7 @@ function FillWorkspace({
       state: fieldState(run, field.id),
       type: answer?.type ?? null,
       resolvedBy: answer?.resolved_by ?? null,
+      proposedValue: answer?.proposed_value ?? null,
       candidates: answer?.candidates ?? [],
       userOnlyReason: answer?.user_only_reason ?? null,
     };

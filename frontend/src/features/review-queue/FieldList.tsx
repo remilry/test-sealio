@@ -27,6 +27,8 @@ export type QueueField = {
   /** How sure the answer is (null for the user's own value or no answer). */
   type: Schema<"AnswerOut">["type"];
   resolvedBy: "ai" | "user" | null;
+  /** What the automatic fill wrote, kept when the user changes it (null when it never answered). */
+  proposedValue: string | null;
   /** The values found and the quotes supporting them; the selected one is the first. */
   candidates: Schema<"Candidate">[];
   /** Why only the user can fill this field. */
