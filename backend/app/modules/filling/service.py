@@ -4,6 +4,7 @@ Every function acts for one tenant: a form is shared, its fill and answers belon
 """
 
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
@@ -61,14 +62,72 @@ def running_forms(session: Session, tenant_id: int, form_ids: Sequence[int]) -> 
     )
 
 
+@dataclass(frozen=True)
+class OpenFields:
+    """Fields nobody settled yet, in the form's order (signatures never count).
+
+    A field is settled once the user saved it: kept, changed, chosen or left empty on purpose.
+    """
+
+    # Without a value.
+    empty: list[int]
+    # With a value the user still has to look at (conflict, outdated, unsure, suggested).
+    doubts: list[int]
+
+    @property
+    def count(self) -> int:
+        return len(self.empty) + len(self.doubts)
+
+
+def open_fields(session: Session, tenant_id: int, form_id: int) -> OpenFields:
+    fill = _get_fill(session, tenant_id, form_id)
+    return _open_fields(
+        forms_service.list_fields(session, form_id),
+        {} if fill is None else {a.field_id: a for a in _answers(session, fill.id)},
+    )
+
+
+def _open_fields(fields: Sequence[Any], by_field: dict[int, Answer]) -> OpenFields:
+    empty: list[int] = []
+    doubts: list[int] = []
+    for field in fields:
+        if field.kind == FieldKind.SIGNATURE:
+            continue
+        answer = by_field.get(field.id)
+        if answer is not None and answer.resolved_by == ResolvedBy.USER:
+            continue
+        if answer is None or not answer.value:
+            empty.append(field.id)
+        elif answer.needs_review:
+            doubts.append(field.id)
+    return OpenFields(empty=empty, doubts=doubts)
+
+
+def _answers(session: Session, fill_id: int) -> Sequence[Answer]:
+    # Fresh rows: answers are written with core upserts the session does not see.
+    return session.scalars(
+        select(Answer)
+        .where(Answer.form_fill_id == fill_id)
+        .execution_options(populate_existing=True)
+    ).all()
+
+
+def _refresh_status(session: Session, fill: FormFill) -> None:
+    """Ready once nothing is left open and the fill is not running; in review otherwise."""
+    if fill.ai_status == AiStatus.RUNNING:
+        fill.status = FillStatus.IN_REVIEW
+        return
+    by_field = {a.field_id: a for a in _answers(session, fill.id)}
+    nothing_open = (
+        _open_fields(forms_service.list_fields(session, fill.form_id), by_field).count == 0
+    )
+    fill.status = FillStatus.READY if nothing_open else FillStatus.IN_REVIEW
+
+
 def get_fill_state(session: Session, tenant_id: int, form_id: int) -> FillState:
     fields = forms_service.list_fields(session, form_id)
     fill = _get_fill(session, tenant_id, form_id)
-    answers = (
-        []
-        if fill is None
-        else session.scalars(select(Answer).where(Answer.form_fill_id == fill.id)).all()
-    )
+    answers = [] if fill is None else _answers(session, fill.id)
     by_field = {answer.field_id: answer for answer in answers}
     fillable = [field for field in fields if field.kind != FieldKind.SIGNATURE]
     filled = sum(1 for field in fillable if field.id in by_field and by_field[field.id].value)
@@ -79,7 +138,11 @@ def get_fill_state(session: Session, tenant_id: int, form_id: int) -> FillState:
     )
     return FillState(
         counts=FillCounts(
-            fillable=len(fillable), filled=filled, empty=len(fillable) - filled, doubts=doubts
+            fillable=len(fillable),
+            filled=filled,
+            empty=len(fillable) - filled,
+            doubts=doubts,
+            open=_open_fields(fields, by_field).count,
         ),
         # In the form's order.
         answers=[AnswerOut.model_validate(by_field[f.id]) for f in fields if f.id in by_field],
@@ -113,8 +176,6 @@ def set_answer(
             raise RuleViolationError("Answer Yes or No.")
         value = value.lower()
     fill = _start_fill(session, tenant_id, form_id)
-    if fill.status == FillStatus.NOT_STARTED:
-        fill.status = FillStatus.IN_REVIEW
     values = {
         "value": value,
         "resolved_by": ResolvedBy.USER,
@@ -127,6 +188,7 @@ def set_answer(
         .values(form_fill_id=fill.id, field_id=field_id, **values)
         .on_conflict_do_update(index_elements=["form_fill_id", "field_id"], set_=values)
     )
+    _refresh_status(session, fill)
     session.commit()
     return get_fill_state(session, tenant_id, form_id)
 
@@ -212,6 +274,7 @@ def record_ai_answer(session: Session, fill_id: int, field_id: int, decision: De
     """Write the AI's answer to a field, unless the user has set it meanwhile."""
     values = {
         "value": decision.value,
+        "proposed_value": decision.value,
         "resolved_by": ResolvedBy.AI,
         "resolved_at": datetime.now(UTC),
         "type": decision.type,
@@ -250,6 +313,7 @@ def finish_ai_fill(session: Session, fill_id: int, status: AiStatus) -> None:
     fill = session.get_one(FormFill, fill_id)
     fill.ai_status = status
     fill.ai_finished_at = datetime.now(UTC)
+    _refresh_status(session, fill)
 
 
 def events_after(

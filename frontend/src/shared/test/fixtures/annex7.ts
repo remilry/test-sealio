@@ -119,6 +119,7 @@ export function answer(fieldId: number, value: string | null, at = "2026-11-03T1
   return {
     field_id: fieldId,
     value,
+    proposed_value: null,
     resolved_by: "user",
     resolved_at: at,
     type: null,
@@ -136,7 +137,13 @@ export function aiAnswer(
   at = "2026-11-04T10:00:10Z",
   extra: Partial<Answer> = {},
 ): Answer {
-  return { ...answer(fieldId, value, at), resolved_by: "ai", type, ...extra };
+  return {
+    ...answer(fieldId, value, at),
+    resolved_by: "ai",
+    proposed_value: value,
+    type,
+    ...extra,
+  };
 }
 
 type Citation = Schema<"Citation">;
@@ -182,8 +189,20 @@ export function fillState(
   const filled = fillable.filter((field) =>
     answers.some((a) => a.field_id === field.id && a.value),
   ).length;
+  // Not settled by the user, and empty or with a value to check.
+  const open = fillable.filter((field) => {
+    const answer = answers.find((a) => a.field_id === field.id);
+    if (answer?.resolved_by === "user") return false;
+    return !answer?.value || answer.needs_review;
+  }).length;
   return {
-    counts: { fillable: fillable.length, filled, empty: fillable.length - filled, doubts: 0 },
+    counts: {
+      fillable: fillable.length,
+      filled,
+      empty: fillable.length - filled,
+      doubts: 0,
+      open,
+    },
     answers,
     ai_run,
   };
@@ -199,6 +218,10 @@ export function exportSummary(filledIds: number[] = [], overrides: Partial<Expor
     empty_fields: fillable
       .filter((field) => !filledIds.includes(field.id))
       .map(({ id, label }) => ({ id, label })),
+    unreviewed_doubts: [],
+    left_empty: 0,
+    automatic: 0,
+    reviewed: filledIds.length,
     sign_by_hand: [{ id: 10, label: "Signature(s)" }],
   };
   return { ...summary, ...overrides };

@@ -12,6 +12,8 @@ class AnswerOut(BaseModel):
 
     field_id: int
     value: str | None
+    # What the automatic fill wrote; null when it never answered this field.
+    proposed_value: str | None
     resolved_by: ResolvedBy
     resolved_at: datetime
     # What the AI found; null when the AI never answered this field.
@@ -32,6 +34,8 @@ class FillCounts(BaseModel):
     empty: int
     # Conflicts and outdated sources the user has not reviewed yet.
     doubts: int
+    # Left to review: fields nobody settled that are empty or have a doubt (suggested values too).
+    open: int
 
 
 class AiRun(BaseModel):

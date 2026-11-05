@@ -2,7 +2,7 @@
 
 > Document vivant. Chaque étape y est cochée et détaillée au fur et à mesure.
 > Contexte produit et priorités : voir `CLAUDE.md`. Échéance : jeudi 5 novembre.
-> Statut : étapes 0 à 4.5 faites ; étape 5 découpée en 5a–5d, 5a, 5b et 5c mergées, 5d faite (remplissage automatique dans l'UI, en attente de validation) ; en cours : étape 6 (Annex 4, découpée en 6a–6d ; 6a à 6d mergées ; prochaine : étape 7), avant la relecture (7) et les finitions (7.5). Parcours détaillé : `docs/USER_FLOW.md`. Les choix techniques marqués _proposition_ restent à confirmer à l'étape 3.
+> Statut : étapes 0 à 4.5 faites ; étape 5 découpée en 5a–5d, 5a, 5b et 5c mergées, 5d faite (remplissage automatique dans l'UI, en attente de validation) ; étape 6 (Annex 4, 6a à 6d) mergée ; étape 7 (relecture) faite sur `step-7-review`, en attente de validation ; prochaine : finitions (7.5). Parcours détaillé : `docs/USER_FLOW.md`. Les choix techniques marqués _proposition_ restent à confirmer à l'étape 3.
 
 ## 1. Ce qu'on a appris des deux formulaires
 
@@ -174,14 +174,19 @@ _Avancée avant la relecture et les finitions (décision 2026-11-05) : ses cas d
 - Tests : écran *Knowledge* (vrai rapport annuel DOCX rendu par le vrai `docx-preview` sous jsdom, fichier introuvable), handler MSW `documentFile` ; e2e : aperçu du rapport annuel après le dépôt des documents.
 - Hors périmètre : l'aperçu Word dans la vue *Source* vient avec cette vue (étape 7).
 
-### Étape 7 — Relecture et humain dans la boucle ⬜ _(testé)_
-- UI : relecture champ par champ avec source visible/cliquable, édition, validation individuelle ou en lot, tri par priorité (introuvables, conflits, déclarations engageantes).
-- Règles (voir `docs/USER_FLOW.md` §4) : export autorisé avec bandeau listant champs vides et doutes ; seule une déclaration Oui/Non sans réponse bloque l'export.
-- Tests : règles de blocage, e2e « corriger une réponse puis exporter » (déjà fait pour l'Annex 7 en 5d).
-- Reste à faire (constaté le 2026-11-05) : blocage de l'export par une déclaration Oui/Non sans réponse et bandeau des doutes non revus dans *Export* ; confirmer une réponse *To check* (« Keep this value ») ; onglet *Source* (passage cité ouvert à la page, citation surlignée) ; cartes Conflit / Périmé ; file groupée *No value* / *Doubt* / *Automatic* (repliée) avec pastilles-filtres.
+### Étape 7 — Relecture et humain dans la boucle ✅ _(testé, en attente de validation)_
+- Design : `docs/superpowers/specs/2026-11-05-7-review-design.md` ; plan : `docs/superpowers/plans/2026-11-05-7-review.md`. Branche `step-7-review`.
+- **Tranché** = enregistré par l'utilisateur (`answer.resolved_by = user`) : valeur gardée, candidat choisi, valeur saisie, ou champ **laissé vide volontairement** (Oui/Non compris). Nouvelle colonne `answer.proposed_value` (ce que le remplissage automatique a écrit, gardé quand l'utilisateur change la valeur) : « Kept by you » / « Entered by you » / « Left empty by you ».
+- **Back** : `FillCounts.open` (champs non tranchés vides ou à vérifier, valeurs suggérées comprises) ; statut `ready` quand plus rien n'est ouvert (après chaque enregistrement et à la fin d'un remplissage), `in_review` sinon ; résumé d'export : `empty_fields` = vides non tranchés, + `unreviewed_doubts`, `left_empty`, `automatic`, `reviewed`. **L'export n'est jamais bloqué** (décision utilisateur, remplace le blocage par une déclaration non tranchée).
+- **File de relecture** (une fois le remplissage fini ; ordre du formulaire pendant) : *To check* (conflit, périmé, incertain, valeur suggérée) → *No value* → *Filled automatically* (replié, « Show ») → signatures ; pastilles-filtres avec le nombre de champs ouverts ; titre « n fields need a look » / « Everything is reviewed » ; une carte tranchée reste à sa place (✓ + statut). Carte sélectionnée : conflit → choix des valeurs (source, date, *most recent*) + `Use this one` ; à vérifier → `Keep this value` · `Enter new value` ; sans valeur → `Leave empty`. `↵` dans le champ : garde la valeur à vérifier (ou enregistre la saisie) et passe au prochain champ ouvert ; premier champ ouvert sélectionné à l'ouverture.
+- **Export** : bandeaux « n fields still empty » et « n doubts not reviewed — the automatic answer will be used » avec leur liste et *Review empty fields* / *Review doubts* (ferme la modale sur le premier champ) ; « Ready to submit » si rien n'est ouvert ; résumé « x of y fields filled · n automatically from your documents · n reviewed by you ».
+- **Tests** : back (valeur proposée, comptes `open`, gardé / laissé vide, statut prêt ↔ en relecture, résumé d'export : laissé vide non signalé, doutes non revus, gardé ou autre candidat choisi) ; front (fonctions pures `reviewGroup` / `isOpen` / `settledAs` / `groupFields` / `nextOpen`, écran *Live fill* : groupes, automatiques repliés, garder, choisir l'autre source, laisser vide un texte et un Oui/Non, `↵`, filtres, ordre du formulaire pendant le remplissage ; *Export* : doutes, laissé vide, retour au champ) ; e2e Annex 4 : garder le montant d'assurance périmé, répondre la TVA, laisser vide la déclaration du contrat-type, nombre ouvert −3, export sans ces champs.
+- **Choix d'implémentation** (à revoir en 7.5 avec les maquettes) : chaque carte garde son champ de saisie (pas de carte réduite à une ligne) ; « Enter another value » d'un conflit = taper dans le champ ; `↵` hors du champ y place le curseur.
+- **Limites connues** : pas d'`Undo` d'une décision (la valeur reste modifiable ; `proposed_value` le permettra) ; pas de validation en lot ; « Replace certificate » non fait ; vider à la main une valeur automatique compte comme « laissé vide ».
 
 ### Étape 7.5 — Finitions de l'UI et du remplissage en direct ⬜ _(à détailler le moment venu)_
 - **UI plus proche des maquettes** (`docs/design/Formpilot.dc.html`), en particulier *Live fill* : périmètre et priorités à discuter en détail au début de l'étape.
+- **Onglet *Source*** de *Live fill* (déplacé de l'étape 7, décision utilisateur) : passage cité ouvert à la page (PDF et Word), citation surlignée.
 - **Texte qui arrive progressivement** : aujourd'hui une réponse apparaît d'un bloc, une fois le champ complet et validé (citations vérifiées) ; on veut voir la valeur s'écrire au fil du flux du modèle. À trancher : comment montrer une valeur encore non vérifiée (style « en cours d'écriture ») et ce qui se passe si la validation finale la rejette.
 
 ### Étape 8 — Durcissement ⬜
@@ -295,4 +300,5 @@ UI (relecture)  ──►  API locale
 | 2026-11-05 | 6c : une règle qui ne s'applique pas au soumissionnaire ne répond pas à une question Oui/Non (laissé vide) ; un chiffre d'un vieux document est proposé, signalé à vérifier (source de plus d'un an) | validé |
 | 2026-11-05 | 6c : « le modèle doit marcher à chaque essai » : corrections du système (validateur, prompt) puis deux exécutions par appel fusionnées, type `unsure` ; effort `medium` essayé et écarté (2× le coût, pas mieux) | validé |
 | 2026-11-05 | 6c : on garde l'état actuel (0 erreur silencieuse sur l'enregistrement versionné, erreurs communes aux deux exécutions possibles), améliorations plus tard | validé |
+| 2026-11-05 | 7 : file de relecture avec les doutes d'abord, puis les champs sans valeur, puis les réponses automatiques (repliées) ; tout champ vide (Oui/Non compris) peut être laissé vide volontairement ; l'export n'est jamais bloqué, il signale seulement ce que personne n'a tranché ; onglet *Source* déplacé en 7.5 | validé |
 | 2026-11-05 | Ordre inversé : l'Annex 4 passe avant la relecture et les finitions. Renumérotation : Annex 4 = étape 6, relecture = étape 7, finitions = étape 7.5 (les lignes précédentes du journal et les specs datées gardent l'ancienne numérotation) | validé |

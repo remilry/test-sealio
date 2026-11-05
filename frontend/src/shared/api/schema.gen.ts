@@ -347,6 +347,8 @@ export interface components {
             field_id: number;
             /** Value */
             value: string | null;
+            /** Proposed Value */
+            proposed_value: string | null;
             resolved_by: components["schemas"]["ResolvedBy"];
             /**
              * Resolved At
@@ -506,6 +508,14 @@ export interface components {
             filled: number;
             /** Empty Fields */
             empty_fields: components["schemas"]["FieldRef"][];
+            /** Unreviewed Doubts */
+            unreviewed_doubts: components["schemas"]["FieldRef"][];
+            /** Left Empty */
+            left_empty: number;
+            /** Automatic */
+            automatic: number;
+            /** Reviewed */
+            reviewed: number;
             /** Sign By Hand */
             sign_by_hand: components["schemas"]["FieldRef"][];
         };
@@ -565,6 +575,8 @@ export interface components {
             empty: number;
             /** Doubts */
             doubts: number;
+            /** Open */
+            open: number;
         };
         /**
          * FillState

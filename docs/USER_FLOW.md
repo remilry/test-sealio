@@ -75,29 +75,30 @@ But : un dernier coup d'œil, un clic pour lancer.
 
 - Titre : pendant le remplissage « Filling the form… » + phase en cours + barre de progression (qui ne s'arrête ni ne recule jamais) + `n / total` ; ensuite « n fields need a look ».
 - Rappel : « Confident answers are already in the form. Only doubts and empty fields are flagged. »
-- **3 pastilles-filtres** cliquables : `No value` (rose) · `To check` (ambre) · `Automatic` (bleu).
-- Liste groupée, dans cet ordre :
-  1. **No value** : introuvables, champs manuels, déclarations sans preuve ;
-  2. **Doubt** : conflits, valeurs issues d'un document périmé ;
+- **3 pastilles-filtres** cliquables : `To check` (ambre) · `No value` (rose) · `Automatic` (bleu), avec leur nombre (champs encore ouverts) ; un second clic remet tout.
+- Liste groupée une fois le remplissage fini (dans l'ordre du formulaire pendant le remplissage), dans cet ordre (décision 2026-11-05 : les doutes d'abord) :
+  1. **To check** : conflits, valeurs d'un document périmé ou ancien, trouvées par une seule des deux recherches, valeurs suggérées (lieu, date) ;
+  2. **No value** : introuvables, champs manuels sans suggestion, déclarations sans preuve ; chacun peut être rempli ou **laissé vide volontairement** (`Leave empty`, Oui/Non compris) ;
   3. **Filled automatically** : replié par défaut (« 19 answers sourced from your documents, already in the form · Show »).
+- Un champ tranché par l'utilisateur (gardé, choisi, saisi, laissé vide) reste à sa place, n'est plus compté comme ouvert ni signalé à l'export.
 - **Carte du champ sélectionné** (dépliée) selon le type :
 
 | Type | Ce que voit l'utilisateur | Action principale |
 |---|---|---|
 | Auto (sûr) | valeur + source + citation surlignée, « Filled automatically » | `Change` (édition) |
-| Introuvable | note « Not found in the passages searched in your 11 documents » (formulation honnête : la recherche RAG peut rater), champ de saisie | `Save` (ou laisser vide) |
+| Introuvable | note « Not found in the passages searched in your 11 documents » (formulation honnête : la recherche RAG peut rater), champ de saisie | `Save` · `Leave empty` |
 | Manuel (lieu/date…) | « Only you can fill this », valeur pré-écrite si possible (date du jour) | `Save` |
 | Périmé | valeur + note « The certificate expired on … » | `Keep this value` · `Enter new value` · `Replace certificate` (→ Knowledge) |
 | Conflit | 2 options radio, chacune avec source, page, date, citation ; la plus récente pré-sélectionnée et marquée *most recent* ; option « Enter another value » | `Use this one` |
 | Déclaration avec preuve | **cochée automatiquement**, preuve + citation, « You declare this on behalf of Alpenlogic AG » | `Change` |
-| Déclaration sans preuve | « No evidence. Your tax attestation covers direct taxes only, not VAT. » + boutons Yes / No | cocher puis `Save` |
+| Déclaration sans preuve | « No evidence. Your tax attestation covers direct taxes only, not VAT. » + boutons Yes / No | cocher (enregistré aussitôt) · `Leave empty` |
 
-- Chaque valeur résolue affiche qui l'a fixée : `Filled automatically` · `Edited by you · 14:32` · `Kept by you · 14:32`, avec `Undo` / `Change`.
+- Chaque valeur résolue affiche qui l'a fixée : `Filled automatically` · `Entered by you · 14:32` · `Kept by you · 14:32` · `Left empty by you · 14:32`, et reste modifiable (`Undo` : plus tard).
 - **Clavier** : `↑↓` (ou `j`/`k`) pour se déplacer, `↵` pour confirmer et passer au **prochain champ ouvert**.
 
 **Colonne droite — le document**
 
-- Onglets `Form` / `Source`.
+- Onglets `Form` / `Source` (*Source* : étape 7.5).
 - **Form** : aperçu fidèle du formulaire d'origine, mis à jour en direct. Légende : *Filled automatically* (bleu) · *To check* (ambre) · *Empty* (hachuré rose) · *Entered by you* (vert) · *Sign by hand*. Les Oui/Non montrent ☐/☒ et « awaiting you » si non tranchés. Zones signature / cachet visibles, jamais remplies.
 - **Source** : le passage du document cité, ouvert à la page, citation surlignée, « Used for: <champ> ». Si aucune source : « No source for this field — nothing relevant found in the passages searched ».
 - **Synchronisation** : cliquer un champ à gauche cadre et surligne sa zone à droite (défilement automatique), et inversement.
@@ -118,7 +119,7 @@ Modale ouverte par `⤓ Export …` au-dessus de *Live fill* (pas de page sépar
 
 - Titre : « Annex 4 is ready to submit » ou « Annex 4 — n fields still empty ».
 - Résumé : `x of y fields filled · n automatically from your documents · n reviewed by you`.
-- Bandeau si des champs restent ouverts : « n fields still empty — they will be exported blank » / « n doubts not reviewed — the automatic answer will be used » + *Back to review*.
+- Bandeau si des champs restent ouverts (ni revus ni laissés vides volontairement) : « n fields still empty — they will be exported blank » / « n doubts not reviewed — the automatic answer will be used », chacun avec sa liste et un bouton (*Review empty fields* / *Review doubts*) qui ferme la modale sur le premier champ concerné. L'export n'est jamais bloqué.
 - `⤓ Download DOCX` (Annex 4) ou `⤓ Download PDF` (Annex 7) : **format d'origine uniquement**. Mention « Buyer's original layout preserved · answers written into the existing fields ».
 - **Before you submit** : « Sign and stamp page n by hand — Signatory: … » ; si des valeurs d'un document périmé ont été gardées : « You kept n values from an expired certificate — attach a valid one » + *Upload new*.
 
@@ -142,12 +143,12 @@ Les exemples de ce document (assurance, AVS, TVA…) illustrent ces critères ; 
 |---|---|
 | Réponse sûre, sourcée, citation vérifiée | Écrite directement dans le formulaire, aucune action requise |
 | Déclaration Oui/Non **avec** preuve | **Cochée automatiquement**, preuve visible, modifiable : même règle que pour tout autre champ, y compris les déclarations légales (décision 2026-11-03, remplace le principe « toujours validée par un humain ») |
-| Déclaration Oui/Non **sans** preuve | Jamais cochée par l'IA ; reste dans *No value* |
+| Déclaration Oui/Non **sans** preuve | Jamais cochée par l'IA ; reste dans *No value* (l'utilisateur répond ou la laisse vide volontairement) |
 | Introuvable | Champ vide, jamais de valeur inventée ; l'utilisateur saisit ou laisse vide |
-| Conflit | Valeur la plus récente / la plus officielle pré-sélectionnée, les deux sources montrées, dans *Doubt* |
-| Source périmée | Valeur proposée, signalée *Outdated*, dans *Doubt* |
+| Conflit | Valeur la plus récente / la plus officielle pré-sélectionnée, les deux sources montrées, dans *To check* |
+| Source périmée | Valeur proposée, signalée *Outdated*, dans *To check* |
 | Signature, cachet | Jamais remplis ; rappel à l'export |
-| Export | **Autorisé** avec un bandeau listant champs vides et doutes. **Bloqué seulement** par une déclaration Oui/Non non tranchée (sans preuve et sans réponse de l'utilisateur) |
+| Export | **Toujours autorisé** (décision 2026-11-05, remplace le blocage par une déclaration non tranchée), avec un bandeau listant les champs vides et les doutes que personne n'a tranchés ; un champ laissé vide volontairement (Oui/Non compris) n'est plus signalé |
 | Format d'export | Format d'origine uniquement (DOCX → DOCX, PDF → PDF) |
 | Sauvegarde | Automatique à chaque modification (`✓ Saved`) ; reprise possible via *Continue review* |
 

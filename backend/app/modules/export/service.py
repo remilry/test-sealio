@@ -24,15 +24,25 @@ class ExportedFile:
 def export_summary(session: Session, tenant_id: int, form_id: int) -> ExportSummary:
     form = forms_service.get_form(session, form_id)
     fields = form.fields
-    values = filling_service.answer_values(session, tenant_id, form_id)
+    answers = {
+        answer.field_id: answer
+        for answer in filling_service.get_fill_state(session, tenant_id, form_id).answers
+    }
+    open_fields = filling_service.open_fields(session, tenant_id, form_id)
     fillable = [field for field in fields if field.kind != FieldKind.SIGNATURE]
+    filled = [answers[f.id] for f in fillable if f.id in answers and answers[f.id].value]
+    by_user = [a for a in answers.values() if a.resolved_by == "user"]
+    labels = {field.id: field.label for field in fields}
     return ExportSummary(
         file_format=form.file_format,
         fillable=len(fillable),
-        filled=sum(1 for field in fillable if field.id in values),
-        empty_fields=[
-            FieldRef(id=field.id, label=field.label) for field in fillable if field.id not in values
-        ],
+        filled=len(filled),
+        # Empty fields and doubts nobody settled: a field left empty on purpose is not warned of.
+        empty_fields=[FieldRef(id=i, label=labels[i]) for i in open_fields.empty],
+        unreviewed_doubts=[FieldRef(id=i, label=labels[i]) for i in open_fields.doubts],
+        left_empty=sum(1 for a in by_user if not a.value),
+        automatic=sum(1 for a in filled if a.resolved_by == "ai"),
+        reviewed=sum(1 for a in by_user if a.value),
         sign_by_hand=[
             FieldRef(id=field.id, label=field.label)
             for field in fields

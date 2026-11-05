@@ -10,7 +10,7 @@ def test_a_new_form_has_no_answers_and_everything_to_fill(client: TestClient) ->
 
     # 10 fields, the signature excluded.
     assert state == {
-        "counts": {"fillable": 9, "filled": 0, "empty": 9, "doubts": 0},
+        "counts": {"fillable": 9, "filled": 0, "empty": 9, "doubts": 0, "open": 9},
         "answers": [],
         "ai_run": None,
     }
@@ -26,7 +26,7 @@ def test_saving_a_value_records_it_as_entered_by_the_user(client: TestClient) ->
 
     assert response.status_code == 200
     state = response.json()
-    assert state["counts"] == {"fillable": 9, "filled": 1, "empty": 8, "doubts": 0}
+    assert state["counts"] == {"fillable": 9, "filled": 1, "empty": 8, "doubts": 0, "open": 8}
     [answer] = state["answers"]
     assert answer["field_id"] == telephone["id"]
     assert answer["value"] == "+41 44 512 38 00"

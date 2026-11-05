@@ -4,6 +4,8 @@ import pymupdf
 from docx import Document
 from fastapi.testclient import TestClient
 
+from app.modules.filling.rules import AnswerType
+from tests.modules.filling.test_review import ai_answers
 from tests.modules.helpers import fields_by_key, seeded_forms
 
 DOCX_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -88,3 +90,58 @@ def test_a_word_form_summary_lists_its_empty_fields_and_signature(client: TestCl
 def test_unknown_form_export_is_a_404(client: TestClient) -> None:
     assert client.get("/forms/999999/export").status_code == 404
     assert client.get("/forms/999999/export/file").status_code == 404
+
+
+def test_a_field_left_empty_on_purpose_is_not_warned_about(client: TestClient) -> None:
+    _, annex_7 = seeded_forms(client)
+    e_mail = fields_by_key(client, annex_7["id"])["e_mail"]
+
+    client.patch(f"/forms/{annex_7['id']}/fields/{e_mail['id']}", json={"value": None})
+    summary = client.get(f"/forms/{annex_7['id']}/export").json()
+
+    assert "E-mail" not in [f["label"] for f in summary["empty_fields"]]
+    assert len(summary["empty_fields"]) == 8
+    assert summary["left_empty"] == 1
+
+
+def test_unreviewed_doubts_are_listed_and_settled_ones_are_not(client: TestClient) -> None:
+    form_id = seeded_forms(client)[1]["id"]
+    ids = ai_answers(
+        client,
+        form_id,
+        {
+            "name_and_legal_form": (AnswerType.CONFLICT, "Alpenlogic AG"),
+            "telephone": (AnswerType.OUTDATED, "+41 44 512 38 00"),
+            "business_address": (AnswerType.UNSURE, "Zurich"),
+        },
+    )
+
+    # Kept as it is, and the other source of the conflict chosen.
+    client.patch(f"/forms/{form_id}/fields/{ids['telephone']}", json={"value": "+41 44 512 38 00"})
+    client.patch(
+        f"/forms/{form_id}/fields/{ids['name_and_legal_form']}",
+        json={"value": "Alpenlogic AG (other)"},
+    )
+    summary = client.get(f"/forms/{form_id}/export").json()
+
+    assert summary["unreviewed_doubts"] == [
+        {"id": ids["business_address"], "label": "Business address"}
+    ]
+
+
+def test_the_summary_counts_automatic_and_reviewed_answers(client: TestClient) -> None:
+    form_id = seeded_forms(client)[1]["id"]
+    ids = ai_answers(
+        client,
+        form_id,
+        {
+            "e_mail": (AnswerType.AUTO, "info@alpenlogic.ch"),
+            "contact_person": (AnswerType.AUTO, "Lena Brunner"),
+            "telephone": (AnswerType.OUTDATED, "+41 44 512 38 00"),
+        },
+    )
+
+    client.patch(f"/forms/{form_id}/fields/{ids['telephone']}", json={"value": "044"})
+    summary = client.get(f"/forms/{form_id}/export").json()
+
+    assert (summary["filled"], summary["automatic"], summary["reviewed"]) == (3, 2, 1)

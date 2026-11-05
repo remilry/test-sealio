@@ -67,7 +67,7 @@ test("I auto-fill Annex 7 from my documents, correct a field and download it in 
 
   // The form fills itself field by field; the recorded run answers all 9 fillable fields.
   const fields = page.getByRole("list", { name: "Fields" });
-  await expect(fields.getByRole("listitem", { name: /./ })).toHaveCount(10);
+  await expect(fields).toBeVisible();
   // (The "9 of 9 fields filled in N seconds" line only shows to a page watching the stream live; the
   // recorded fill ends in milliseconds, so the stable check is the review summary.)
   await expect(page.getByText("9 / 9 filled · 0 empty · 0 doubts")).toBeVisible({
@@ -77,7 +77,9 @@ test("I auto-fill Annex 7 from my documents, correct a field and download it in 
   await expect(preview.locator("canvas")).toBeVisible();
   await expect(preview.locator("[data-field-id]")).toHaveCount(10);
 
-  // An automatic answer shows its source: document name, page and quote.
+  // An automatic answer shows its source: document name, page and quote (automatic answers are
+  // collapsed at the end of the review queue).
+  await fields.getByRole("button", { name: "Show" }).click();
   const address = fields.getByRole("textbox", { name: "Business address" });
   await expect(address).toHaveValue("Pfingstweidstrasse 31, 8005 Zurich");
   await address.click();
@@ -156,8 +158,18 @@ test("I auto-fill Annex 7 from my documents, correct a field and download it in 
   const injury = page.getByRole("list", { name: "Fields" }).getByRole("listitem", {
     name: "Personal injury",
   });
+  // Review: the doubts come first in the queue, then the fields without a value.
+  const needALook = page.getByRole("heading", { name: /fields? needs? a look$/ });
+  const openCount = async () => Number((await needALook.textContent())?.match(/\d+/)?.[0]);
+  const openAtFirst = await openCount();
+  await expect(page.getByRole("list", { name: "To check" })).toBeVisible();
+  await expect(page.getByRole("list", { name: "No value" })).toBeVisible();
+
   await injury.getByRole("textbox").click();
   await expect(injury.getByText("Source expired on 31.10.2026")).toBeVisible();
+  // I keep the amount, as it is.
+  await injury.getByRole("button", { name: "Keep this value" }).click();
+  await expect(injury.getByText(/^Kept by you · /)).toBeVisible();
 
   // No document proves the VAT is paid: left empty, I answer it.
   const vat = page
@@ -168,9 +180,26 @@ test("I auto-fill Annex 7 from my documents, correct a field and download it in 
     wordPreview.getByLabel("Have you paid in full the VAT or sales tax due?"),
   ).toHaveText("Yes");
 
+  // No standard employment contract applies: I leave that declaration empty, on purpose.
+  const standardContract =
+    "Do you comply with the standard employment contract that applies to the activity carried out by your company?";
+  const contract = page.getByRole("list", { name: "Fields" }).getByRole("listitem", {
+    name: standardContract,
+  });
+  await contract.click();
+  await contract.getByRole("button", { name: "Leave empty" }).click();
+  await expect(contract.getByText(/^Left empty by you · /)).toBeVisible();
+  await expect.poll(openCount).toBe(openAtFirst - 3);
+
+  // The export warns only about what nobody settled.
   await page.getByRole("button", { name: "Export DOCX" }).click();
   const wordExport = page.getByRole("dialog");
   await expect(wordExport.getByText(/Sign by hand/)).toBeVisible();
+  await expect(wordExport.getByRole("list", { name: "Doubts not reviewed" })).toBeVisible();
+  await expect(
+    wordExport.getByRole("list", { name: "Doubts not reviewed" }).getByText("Personal injury"),
+  ).toHaveCount(0);
+  await expect(wordExport.getByText(standardContract)).toHaveCount(0);
   const [docx] = await Promise.all([
     page.waitForEvent("download"),
     wordExport.getByRole("link", { name: "Download DOCX" }).click(),

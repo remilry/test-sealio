@@ -10,7 +10,7 @@ import type { FillEvent } from "./fill-events";
 import type { FillState } from "./fill-session.api";
 import { fillKeys, useFillRun, useSaveAnswer } from "./fill-session.queries";
 
-const counts = { fillable: 3, filled: 1, empty: 2, doubts: 0 };
+const counts = { fillable: 3, filled: 1, empty: 2, doubts: 0, open: 2 };
 const answered = (id: number, value: string, resolved_by: "ai" | "user" = "ai"): FillEvent => ({
   id: 10 + id,
   type: "field",

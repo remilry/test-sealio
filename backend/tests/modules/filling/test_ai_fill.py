@@ -225,8 +225,9 @@ def test_the_signature_is_never_sent_to_the_model_nor_filled(
     assert (again.key, again.prompt) == (f"{request.key}--run-2", request.prompt)
     assert "signature_s" not in request.prompt
     state = client.get(f"/forms/{annex_7}/answers").json()
-    # 9 fillable: 7 with a value (6 sourced + the pre-written place and date).
-    assert state["counts"] == {"fillable": 9, "filled": 7, "empty": 2, "doubts": 0}
+    # 9 fillable: 7 with a value (6 sourced + the pre-written place and date); open: the 2 empty
+    # ones and the place and date to confirm.
+    assert state["counts"] == {"fillable": 9, "filled": 7, "empty": 2, "doubts": 0, "open": 3}
 
 
 def test_one_model_call_per_section_with_the_tender_and_the_passages(

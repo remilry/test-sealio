@@ -4,6 +4,7 @@ import type { Answer } from "./fill-session.api";
 const answer: Answer = {
   field_id: 2,
   value: "Alpenlogic AG",
+  proposed_value: "Alpenlogic AG",
   resolved_by: "ai",
   resolved_at: "2026-11-04T10:00:00Z",
   type: "auto",
@@ -11,7 +12,7 @@ const answer: Answer = {
   user_only_reason: null,
   needs_review: false,
 };
-const counts = { fillable: 3, filled: 1, empty: 2, doubts: 0 };
+const counts = { fillable: 3, filled: 1, empty: 2, doubts: 0, open: 2 };
 
 const events: FillEvent[] = [
   { id: 1, type: "phase", phase: "reading_form" },

@@ -41,6 +41,11 @@ beforeEach(() => {
 });
 
 const fieldList = () => within(screen.getByRole("list", { name: "Fields" }));
+/** The cards of the fields, in the order shown (group sections and their headings left out). */
+const fieldCards = () =>
+  fieldList()
+    .getAllByRole("listitem")
+    .filter((item) => item.hasAttribute("aria-label") && !item.querySelector("ol"));
 const preview = () => screen.getByRole("region", { name: "Form preview" });
 /** The zone drawn on the document for a field (the only place where data-field-id is used). */
 const zone = (fieldId: number) =>
@@ -58,7 +63,16 @@ function backWithAnswers(initial: FillState = fillState()) {
   let state = initial;
   const saved = handlers.saveField(2, (fieldId, { value }) => {
     const others = state.answers.filter((a) => a.field_id !== fieldId);
-    state = fillState([...others, answer(fieldId, value?.trim() || null, "2026-11-03T13:45:00Z")]);
+    const previous = state.answers.find((a) => a.field_id === fieldId);
+    // Like the back: the user's value, the evidence found automatically kept.
+    const saved: Answer = {
+      ...answer(fieldId, value?.trim() || null, "2026-11-03T13:45:00Z"),
+      type: previous?.type ?? null,
+      candidates: previous?.candidates ?? [],
+      proposed_value: previous?.proposed_value ?? null,
+      user_only_reason: previous?.user_only_reason ?? null,
+    };
+    state = fillState([...others, saved]);
     return state;
   });
   server.use(handlers.answers(2, state), saved.handler);
@@ -79,11 +93,8 @@ describe("Live fill (manual)", () => {
     given();
 
     // When the form opens, then its 10 fields are listed in order
-    const items = await screen.findAllByRole("listitem", { name: /./ });
-    const fields = items.filter(
-      (item) => item.closest("ol")?.getAttribute("aria-label") === "Fields",
-    );
-    expect(fields.map((item) => item.getAttribute("aria-label"))).toEqual([
+    await screen.findByRole("textbox", { name: "Telephone" });
+    expect(fieldCards().map((item) => item.getAttribute("aria-label"))).toEqual([
       "Project number/project title/project name",
       "Name of the contracting authority",
       "Name and legal form",
@@ -106,7 +117,7 @@ describe("Live fill (manual)", () => {
     given();
 
     // When the form opens
-    await screen.findByRole("heading", { name: "9 fields to fill" });
+    await screen.findByRole("heading", { name: "9 fields need a look" });
 
     // Then the original PDF is rendered (loaded lazily, so waited for) with one zone per field,
     // placed from the parser's box
@@ -280,7 +291,7 @@ describe("Live fill (manual)", () => {
   it("moves through the fields with the keyboard: ↓ ↑ j k, Enter to type", async () => {
     // Given the form is open, the first field selected
     const { user } = given();
-    const items = () => fieldList().getAllByRole("listitem");
+    const items = fieldCards;
     await screen.findByRole("textbox", { name: "Telephone" });
 
     // When I press ↓ ↓ k j j
@@ -532,7 +543,7 @@ describe("Live fill (watching the automatic fill)", () => {
     expect(await screen.findByText("8 of 9 fields filled in 23 seconds")).toBeInTheDocument();
     expect(await screen.findByRole("button", { name: "Export PDF" })).toBeEnabled();
     expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "1 field to fill" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "1 field needs a look" })).toBeInTheDocument();
     // And the field left open is selected
     expect(fieldList().getByRole("listitem", { name: "Business address" })).toHaveAttribute(
       "aria-current",
@@ -559,13 +570,16 @@ describe("Live fill (watching the automatic fill)", () => {
       "Auto-fill stopped: the documents could not be read",
     );
     expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+    // (found automatically: in the collapsed group of the review queue, shown on demand)
+    await userEvent.setup().click(screen.getByRole("button", { name: "Show" }));
     expect(fieldList().getByRole("textbox", { name: "Name and legal form" })).toHaveValue(
       "Alpenlogic AG",
     );
     expect(await screen.findByRole("button", { name: "Export PDF" })).toBeEnabled();
     // And the field it was searching is no longer shown as searched
-    expect(address.queryByText("Searching your documents…")).not.toBeInTheDocument();
-    expect(address.getByText("Empty — exported blank")).toBeInTheDocument();
+    const addressNow = within(fieldList().getByRole("listitem", { name: "Business address" }));
+    expect(addressNow.queryByText("Searching your documents…")).not.toBeInTheDocument();
+    expect(addressNow.getByText("Empty — exported blank")).toBeInTheDocument();
     expect((await findZone(4)).getAttribute("data-tone")).not.toBe("searching");
   });
 
@@ -655,7 +669,9 @@ describe("Live fill (watching the automatic fill)", () => {
     given();
 
     // When it opens, then the usual header shows and no stream is read
-    expect(await screen.findByRole("heading", { name: "9 fields to fill" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: "9 fields need a look" }),
+    ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Export PDF" })).toBeEnabled();
     expect(stream.connections()).toBe(0);
   });
@@ -680,7 +696,9 @@ describe("Export (dialog over the form)", () => {
     const panel = within(dialog);
     expect(await panel.findByRole("heading", { name: "Ready to submit" })).toBeInTheDocument();
     expect(
-      panel.getByText("Annex 7 — Sanctions self-declaration (Art. 29c) · 9 of 9 fields filled"),
+      panel.getByText(
+        "Annex 7 — Sanctions self-declaration (Art. 29c) · 9 of 9 fields filled · 0 automatically from your documents · 9 reviewed by you",
+      ),
     ).toBeInTheDocument();
     expect(panel.queryByRole("list", { name: "Empty fields" })).not.toBeInTheDocument();
   });
@@ -770,6 +788,10 @@ describe("Live fill (status and source of each answer)", () => {
     await screen.findByRole("list", { name: "Fields" });
     return card(label);
   };
+  /** Automatic answers are collapsed in the review queue: open them. */
+  const showAutomatic = async () => {
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Show" }));
+  };
 
   it("shows where an automatic answer comes from: document, page and quote", async () => {
     // Given a name found in the commercial register, page 2
@@ -785,6 +807,7 @@ describe("Live fill (status and source of each answer)", () => {
       ],
     });
     const { user } = given(annex7(), fillState([found]));
+    await showAutomatic();
 
     // When I open that field
     await user.click(await screen.findByRole("textbox", { name: "Name and legal form" }));
@@ -807,6 +830,7 @@ describe("Live fill (status and source of each answer)", () => {
       ],
     });
     const { user } = given(annex7(), fillState([found]));
+    await showAutomatic();
 
     // When I open that field
     await user.click(await screen.findByRole("textbox", { name: "Name and legal form" }));
@@ -830,6 +854,7 @@ describe("Live fill (status and source of each answer)", () => {
         withSource(4, "Bahnhofstrasse 1", "Register B"),
       ]),
     );
+    await showAutomatic();
     await screen.findByRole("textbox", { name: "Name and legal form" });
 
     // When I select the name
@@ -851,6 +876,7 @@ describe("Live fill (status and source of each answer)", () => {
       ],
     });
     const { user } = given(annex7(), fillState([found]));
+    await showAutomatic();
 
     // When I open that field
     await user.click(
@@ -869,6 +895,7 @@ describe("Live fill (status and source of each answer)", () => {
       candidates: [candidate("Yes")],
     });
     given(annex7(), fillState([declared]));
+    await showAutomatic();
 
     // Then the status names the company
     expect(
@@ -911,6 +938,7 @@ describe("Live fill (status and source of each answer)", () => {
     // Given the company knowledge unknown, with a declaration and a missing answer
     server.use(knowledgeHandler());
     given(annex7(), fillState([aiAnswer(3, "Yes", "declaration"), aiAnswer(4, null, "missing")]));
+    await showAutomatic();
 
     // Then the texts stay neutral
     expect(
@@ -941,8 +969,9 @@ describe("Live fill (status and source of each answer)", () => {
     // Then the status counts the sources and all are shown; the selected value is in the input
     const address = card("Business address");
     expect(address.getByText("2 sources disagree")).toBeInTheDocument();
-    expect(address.getByText("Register extract, page 1")).toBeInTheDocument();
-    expect(address.getByText("Annual report, page 1")).toBeInTheDocument();
+    const sources = within(address.getByRole("list", { name: "Sources" }));
+    expect(sources.getByText("Register extract, page 1")).toBeInTheDocument();
+    expect(sources.getByText("Annual report, page 1")).toBeInTheDocument();
     expect(address.getByRole("textbox")).toHaveValue("Bahnhofstrasse 1");
   });
 
@@ -1231,5 +1260,239 @@ describe("Live fill on a Word form", () => {
     const card = within(await screen.findByRole("listitem", { name: VAT.label }));
     expect(card.getByRole("radio", { name: "Yes" })).toBeChecked();
     expect(card.getByRole("radio", { name: "No" })).not.toBeChecked();
+  });
+});
+
+describe("Live fill (review)", () => {
+  const card = (label: string) => within(fieldList().getByRole("listitem", { name: label }));
+  const group = (title: string) => within(fieldList().getByRole("list", { name: title }));
+  const doubt = (fieldId: number, value: string, type: "conflict" | "outdated", other?: string) =>
+    aiAnswer(fieldId, value, type, undefined, {
+      needs_review: true,
+      candidates: [
+        candidate(value, [citation({ document_name: "Register extract", quote: value })]),
+        ...(other ? [candidate(other, [citation({ document_name: "Annual report" })])] : []),
+      ],
+    });
+  // A conflict on the name, an outdated telephone, a missing address, an automatic e-mail.
+  const reviewState = () =>
+    fillState([
+      doubt(3, "Alpenlogic AG", "conflict", "Alpenlogic GmbH"),
+      doubt(6, "+41 44 512 38 00", "outdated"),
+      aiAnswer(4, null, "missing", undefined, { needs_review: true }),
+      aiAnswer(7, "info@alpenlogic.ch", "auto"),
+    ]);
+
+  it("shows doubts first, then fields without a value, automatic answers collapsed", async () => {
+    // Given a form filled automatically
+    given(annex7(), reviewState());
+
+    // Then the queue is grouped, doubts first, and says how many fields need a look
+    expect(
+      await screen.findByRole("heading", { name: "8 fields need a look" }),
+    ).toBeInTheDocument();
+    const groups = fieldList()
+      .getAllByRole("listitem")
+      .filter((item) => item.querySelector("ol"))
+      .map((item) => item.getAttribute("aria-label"));
+    expect(groups).toEqual(["To check", "No value", "Filled automatically", "Sign by hand"]);
+    expect(
+      group("To check")
+        .getAllByRole("textbox")
+        .map((input) => input.getAttribute("id")),
+    ).toEqual(["field-3", "field-6"]);
+    expect(
+      group("Filled automatically").getByText(
+        "1 answer sourced from your documents, already in the form",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "E-mail" })).not.toBeInTheDocument();
+    // And the first doubt is selected
+    expect(fieldList().getByRole("listitem", { name: "Name and legal form" })).toHaveAttribute(
+      "aria-current",
+      "true",
+    );
+  });
+
+  it("shows the automatic answers on demand", async () => {
+    // Given the automatic answers collapsed
+    const { user } = given(annex7(), reviewState());
+
+    // When I ask to see them
+    await user.click(await screen.findByRole("button", { name: "Show" }));
+
+    // Then they are listed
+    expect(group("Filled automatically").getByRole("textbox", { name: "E-mail" })).toHaveValue(
+      "info@alpenlogic.ch",
+    );
+  });
+
+  it("keeps a value to check: it is mine and no longer counted", async () => {
+    // Given an outdated telephone
+    const { saved, user } = given(annex7(), reviewState());
+    await user.click(await screen.findByRole("textbox", { name: "Telephone" }));
+
+    // When I keep it
+    await user.click(card("Telephone").getByRole("button", { name: "Keep this value" }));
+
+    // Then the same value is saved as mine, and one field less needs a look
+    await waitFor(() =>
+      expect(saved.requests).toEqual([{ fieldId: 6, value: "+41 44 512 38 00" }]),
+    );
+    expect(await card("Telephone").findByText("Kept by you · 14:45")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "7 fields need a look" })).toBeInTheDocument();
+    // And it stays where it was
+    expect(group("To check").getByRole("textbox", { name: "Telephone" })).toBeInTheDocument();
+  });
+
+  it("chooses the other source of a conflict", async () => {
+    // Given two sources that disagree on the name (selected first)
+    const { saved, user } = given(annex7(), reviewState());
+    await screen.findByRole("textbox", { name: "Name and legal form" });
+    const name = card("Name and legal form");
+    expect(await name.findByRole("radio", { name: /Alpenlogic AG/ })).toBeChecked();
+
+    // When I pick the other one
+    await user.click(name.getByRole("radio", { name: /Alpenlogic GmbH/ }));
+    await user.click(name.getByRole("button", { name: "Use this one" }));
+
+    // Then it is saved, kept by me
+    await waitFor(() => expect(saved.requests).toEqual([{ fieldId: 3, value: "Alpenlogic GmbH" }]));
+    expect(await card("Name and legal form").findByText("Kept by you · 14:45")).toBeInTheDocument();
+    expect(card("Name and legal form").getByRole("textbox")).toHaveValue("Alpenlogic GmbH");
+  });
+
+  it("leaves a field empty on purpose", async () => {
+    // Given an address that was not found
+    const { saved, user } = given(annex7(), reviewState());
+    await user.click(await screen.findByRole("textbox", { name: "Business address" }));
+
+    // When I leave it empty
+    await user.click(card("Business address").getByRole("button", { name: "Leave empty" }));
+
+    // Then it is settled, empty
+    await waitFor(() => expect(saved.requests).toEqual([{ fieldId: 4, value: null }]));
+    expect(
+      await card("Business address").findByText("Left empty by you · 14:45"),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "7 fields need a look" })).toBeInTheDocument();
+  });
+
+  it("leaves a declaration empty on purpose", async () => {
+    // Given a Yes/No declaration without evidence
+    const form = annex7({
+      fields: annex7Fields.map((field) =>
+        field.id === 9 ? { ...field, kind: "yes_no" as const } : field,
+      ),
+    });
+    const { saved, user } = given(form, fillState([aiAnswer(9, null, "missing")], form.fields));
+    const declaration = await screen.findByRole("listitem", {
+      name: "First name(s) and surname(s)",
+    });
+    await user.click(declaration);
+
+    // When I leave it empty
+    await user.click(within(declaration).getByRole("button", { name: "Leave empty" }));
+
+    // Then my choice is saved: no answer
+    await waitFor(() => expect(saved.requests).toEqual([{ fieldId: 9, value: null }]));
+  });
+
+  it("Enter keeps the value to check and moves to the next open field", async () => {
+    // Given the telephone selected
+    const { saved, user } = given(annex7(), reviewState());
+    await user.click(await screen.findByRole("textbox", { name: "Telephone" }));
+
+    // When I press Enter without changing it
+    await user.keyboard("{Enter}");
+
+    // Then it is kept, and the next open field (the first without a value) has the focus
+    await waitFor(() =>
+      expect(saved.requests).toEqual([{ fieldId: 6, value: "+41 44 512 38 00" }]),
+    );
+    expect(
+      screen.getByRole("textbox", { name: "Project number/project title/project name" }),
+    ).toHaveFocus();
+  });
+
+  it("shows only one group with its filter, and everything again on a second click", async () => {
+    // Given the review queue
+    const { user } = given(annex7(), reviewState());
+    const filters = within(await screen.findByRole("group", { name: "Show only" }));
+
+    // When I filter on the fields without a value
+    await user.click(filters.getByRole("button", { name: "No value · 6" }));
+
+    // Then only they show
+    expect(filters.getByRole("button", { name: "No value · 6" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.queryByRole("list", { name: "To check" })).not.toBeInTheDocument();
+    expect(screen.getByRole("list", { name: "No value" })).toBeInTheDocument();
+
+    // And a second click shows everything again
+    await user.click(filters.getByRole("button", { name: "No value · 6" }));
+    expect(screen.getByRole("list", { name: "To check" })).toBeInTheDocument();
+    expect(filters.getByRole("button", { name: "To check · 2" })).toBeInTheDocument();
+    expect(filters.getByRole("button", { name: "Automatic · 1" })).toBeInTheDocument();
+  });
+
+  it("keeps the form order, without groups, while the form is filling", async () => {
+    // Given a fill under way
+    const { back } = watchFill();
+    startSearch(back);
+    back.answered(3, "Alpenlogic AG");
+
+    // Then the fields are listed as in the form
+    expect(await screen.findByText("1 / 9")).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Show only" })).not.toBeInTheDocument();
+    expect(fieldCards()[0]).toHaveAccessibleName("Project number/project title/project name");
+    back.stream.close();
+  });
+});
+
+describe("Export (what the review left open)", () => {
+  it("warns about doubts not reviewed: their automatic answer will be used", async () => {
+    // Given every field filled, the telephone still to check
+    const { dialog } = await openExport(
+      exportSummary(ALL_FILLED, { unreviewed_doubts: [{ id: 6, label: "Telephone" }] }),
+    );
+
+    // Then the export says so, and lists it
+    const panel = within(dialog);
+    expect(await panel.findByRole("heading", { name: "1 doubt not reviewed" })).toBeInTheDocument();
+    expect(
+      panel.getByText("1 doubt not reviewed — the automatic answer will be used"),
+    ).toBeVisible();
+    const doubts = within(panel.getByRole("list", { name: "Doubts not reviewed" }));
+    expect(doubts.getByText("Telephone")).toBeInTheDocument();
+    expect(panel.getByRole("link", { name: "Download PDF" })).toBeInTheDocument();
+  });
+
+  it("does not warn about a field I left empty on purpose", async () => {
+    // Given the e-mail left empty on purpose, everything else filled
+    const { dialog } = await openExport(
+      exportSummary([1, 2, 3, 4, 5, 6, 8, 9], { empty_fields: [], left_empty: 1 }),
+    );
+
+    // Then the form is ready, with no warning
+    const panel = within(dialog);
+    expect(await panel.findByRole("heading", { name: "Ready to submit" })).toBeInTheDocument();
+    expect(panel.queryByRole("list", { name: "Empty fields" })).not.toBeInTheDocument();
+  });
+
+  it("takes me back to the first field it warns about", async () => {
+    // Given the telephone still to check
+    const { dialog, user } = await openExport(
+      exportSummary(ALL_FILLED, { unreviewed_doubts: [{ id: 6, label: "Telephone" }] }),
+    );
+
+    // When I go back to review the doubts
+    await user.click(await within(dialog).findByRole("button", { name: "Review doubts" }));
+
+    // Then the export closes and the telephone is selected, its input focused
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(screen.getByRole("textbox", { name: "Telephone" })).toHaveFocus();
   });
 });
