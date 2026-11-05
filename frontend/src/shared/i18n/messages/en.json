@@ -57,8 +57,7 @@
     "moreActions": "More actions",
     "discardAnswers": "Discard answers",
     "continueReview": "Continue review",
-    "formatNotSupported": "This form format is not supported yet",
-    "wordAutoFillSoon": "Auto-fill for Word forms is coming soon"
+    "formatNotSupported": "This form format is not supported yet"
   },
   "autoFill": {
     "trigger": "Auto-fill",

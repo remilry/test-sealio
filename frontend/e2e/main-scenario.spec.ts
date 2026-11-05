@@ -124,10 +124,10 @@ test("I auto-fill Annex 7 from my documents, correct a field and download it in 
   await expect(started).toContainText("Not started");
   await expect(started.getByRole("button", { name: "Auto-fill" })).toBeVisible();
 
-  // Annex 4 (Word): detected, not auto-filled yet; filled by hand from its URL, then exported.
+  // Annex 4 (Word): detected; filled by hand from its URL (its auto-fill comes with step 6c), then exported.
   const word = page.getByRole("list", { name: "Forms to complete" }).getByRole("listitem").nth(0);
   await expect(word).toContainText("49 fields detected · 17 Yes/No declarations · 1 signature");
-  await expect(word.getByRole("button", { name: "Auto-fill" })).toBeDisabled();
+  await expect(word.getByRole("button", { name: "Auto-fill" })).toBeEnabled();
   const tenders = await (await page.request.get(`${API}/tenders`)).json();
   const detail = await (await page.request.get(`${API}/tenders/${tenders[0].id}`)).json();
   await page.goto(`/forms/${detail.forms[0].id}/fill`);

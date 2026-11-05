@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { MoreHorizontalIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { PdfViewer } from "@/features/document-preview";
+import { PdfViewer, WordViewer } from "@/features/document-preview";
 import { DiscardFillDialog, originalFileUrl, SetupDialog } from "@/features/fill-session";
 import type { FormSummary } from "@/features/tender";
 import { routes } from "@/shared/lib/routes";
@@ -16,7 +16,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 
 /**
  * The action of a form that can be filled: "Auto-fill" (Setup) while untouched; once started (or
@@ -35,23 +34,17 @@ export function FormAction({
   const [discarding, setDiscarding] = useState(false);
 
   if (form.status === "not_started" && !form.filling) {
-    // Temporary (step 6c): Word forms are not auto-filled yet; they open from their URL.
-    if (form.file_format === "docx") {
-      return (
-        <Tooltip>
-          {/* A disabled button takes no pointer nor focus: its wrapper shows why. */}
-          <TooltipTrigger delay={0} render={<span tabIndex={0} className="rounded-md" />}>
-            <Button disabled>{t("autoFill")}</Button>
-          </TooltipTrigger>
-          <TooltipContent>{t("wordAutoFillSoon")}</TooltipContent>
-        </Tooltip>
-      );
-    }
     return (
       <SetupDialog
         form={form}
         documentCount={documentCount}
-        preview={<PdfViewer fileUrl={originalFileUrl(form.id)} label={form.title} />}
+        preview={
+          form.file_format === "docx" ? (
+            <WordViewer fileUrl={originalFileUrl(form.id)} label={form.title} />
+          ) : (
+            <PdfViewer fileUrl={originalFileUrl(form.id)} label={form.title} />
+          )
+        }
         onStarted={() => router.push(routes.fillForm(form.id))}
       />
     );

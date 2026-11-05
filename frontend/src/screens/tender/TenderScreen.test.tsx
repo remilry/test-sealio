@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { delay, http, HttpResponse } from "msw";
 import { API_URL } from "@/shared/api";
 import { freezeToday, handlers, renderScreen, server } from "@/shared/test";
-import { form, knowledgeBase, knowledgeDocument, tender } from "@/shared/test/fixtures";
+import { annex4File, form, knowledgeBase, knowledgeDocument, tender } from "@/shared/test/fixtures";
 import { TenderScreen } from "./TenderScreen";
 
 const push = vi.fn();
@@ -95,25 +95,27 @@ describe("Tender", () => {
     expect(card.getByRole("button", { name: "Auto-fill" })).toBeDisabled();
   });
 
-  it("cannot auto-fill a Word form yet, says why, and lets me continue one I started", async () => {
-    // Given the Word form untouched, then started by hand
-    server.use(handlers.tender(tender()));
-    const { unmount } = renderScreen(<TenderScreen tenderId={1} />);
-
-    // Then its auto-fill is disabled, and pointing at it says it comes soon
-    const annex4 = within(await screen.findByRole("listitem", { name: /Annex 4/ }));
-    const autoFill = annex4.getByRole("button", { name: "Auto-fill" });
-    expect(autoFill).toBeDisabled();
-    // (the pointer lands on its wrapper: a disabled button takes no pointer events)
-    await userEvent.setup().hover(autoFill.parentElement!);
-    expect(await screen.findByText("Auto-fill for Word forms is coming soon")).toBeVisible();
-    unmount();
-
-    // And once I started it, I can continue it
-    server.use(handlers.tender(tender({ forms: [form({ status: "in_review" })] })));
+  it("shows a Word form, page by page, before auto-filling it", async () => {
+    // Given the Word form, untouched
+    server.use(
+      handlers.tender(tender()),
+      handlers.knowledge(knowledgeBase()),
+      handlers.formFile(1, annex4File()),
+    );
+    const user = userEvent.setup();
     renderScreen(<TenderScreen tenderId={1} />);
-    const started = within(await screen.findByRole("listitem", { name: /Annex 4/ }));
-    expect(started.getByRole("link", { name: "Continue review" })).toBeInTheDocument();
+
+    // When I open its auto-fill
+    const annex4 = within(await screen.findByRole("listitem", { name: /Annex 4/ }));
+    await user.click(annex4.getByRole("button", { name: "Auto-fill" }));
+
+    // Then the Setup shows the Word document itself
+    const preview = within(
+      await screen.findByRole("region", {
+        name: "Preview of Annex 4 — Conditions of participation and self-declaration",
+      }),
+    );
+    expect(await preview.findByText("Exact company name")).toBeInTheDocument();
   });
 
   describe("auto-fill", () => {
