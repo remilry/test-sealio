@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  itemInQuote,
+  quoteItems,
   markedItemHtml,
   markQuote,
   quotePieces,
@@ -27,23 +27,33 @@ describe("quotePieces", () => {
   });
 });
 
-describe("itemInQuote (PDF text items)", () => {
-  it("marks an item that is part of the quote, or that holds it", () => {
-    expect(itemInQuote("Alpenlogic AG", "Company: Alpenlogic AG, Zurich")).toBe(true);
-    expect(itemInQuote("Registered company: Alpenlogic AG, Zurich (CH)", "Alpenlogic AG")).toBe(
-      true,
-    );
+describe("quoteItems (PDF text items)", () => {
+  // A table row of the commercial register, then other rows naming Zurich again.
+  const items = [
+    "Registered office",
+    "Zurich (ZH)",
+    "Address",
+    "Pfingstweidstrasse 31, 8005 Zurich",
+    "Keller, Marc",
+    "Zurich",
+  ];
+
+  it("marks the items the quote runs over, across items", () => {
+    expect([...quoteItems(items, "Address Pfingstweidstrasse 31, 8005 Zurich")]).toEqual([2, 3]);
   });
 
-  it("leaves other items and short bits alone", () => {
-    expect(itemInQuote("Bern", "Alpenlogic AG, Zurich")).toBe(false);
-    expect(itemInQuote("AG", "Alpenlogic AG, Zurich")).toBe(false);
-    expect(itemInQuote("  ", "Alpenlogic AG")).toBe(false);
+  it("marks only where the quote is, not the same words elsewhere on the page", () => {
+    expect([...quoteItems(items, "Zurich (ZH)")]).toEqual([1]);
+  });
+
+  it("marks each piece of a quote cut by an ellipsis, and nothing when it is not there", () => {
+    expect([...quoteItems(items, "Registered office … Keller, Marc")]).toEqual([0, 4]);
+    expect(quoteItems(items, "Bern").size).toBe(0);
   });
 
   it("escapes the text it puts in the text layer", () => {
-    expect(markedItemHtml("<b>AG</b>", "Zurich")).toBe("&#60;b&#62;AG&#60;/b&#62;");
-    expect(markedItemHtml("Alpenlogic AG", "Alpenlogic AG")).toBe("<mark>Alpenlogic AG</mark>");
+    expect(markedItemHtml("<b>AG</b>", false)).toBe("&#60;b&#62;AG&#60;/b&#62;");
+    expect(markedItemHtml("Alpenlogic AG", true)).toBe("<mark>Alpenlogic AG</mark>");
   });
 });
 
@@ -63,6 +73,16 @@ describe("markQuote (rendered Word documents)", () => {
     const root = page("<p>Policy no. 4411</p><p>Sum insured: CHF 5 000 000</p>");
     markQuote(root, "Policy no. 4411 … CHF 5 000 000");
     expect(marked(root)).toBe("Policy no. 4411|CHF 5 000 000");
+  });
+
+  it("marks the cells of a table row quoted as one line, in their order", () => {
+    // Given "60 %" also earlier in the document
+    const root = page(
+      "<p>Growth 60 %</p><table><tr><td>Founders (Marc Keller)</td><td>60 %</td><td>Swiss</td></tr></table>",
+    );
+    markQuote(root, "Founders (Marc Keller) | 60 % | Swiss");
+    expect(marked(root)).toBe("Founders (Marc Keller)|60 %|Swiss");
+    expect(root.querySelector("p mark")).toBeNull();
   });
 
   it("finds nothing when the quote is not in the document, and can be undone", () => {

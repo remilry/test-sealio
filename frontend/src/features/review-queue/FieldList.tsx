@@ -270,8 +270,14 @@ type CardProps = {
 function FieldCard(props: CardProps) {
   const t = useTranslations("fieldList");
   const { field, selected, onSelect } = props;
+  const item = useRef<HTMLLIElement>(null);
+  // The selected card is kept in sight (chosen on the document, or the next open one).
+  useEffect(() => {
+    if (selected) item.current?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+  }, [selected]);
   return (
     <li
+      ref={item}
       aria-label={field.label}
       aria-current={selected ? "true" : undefined}
       onClick={() => onSelect(field.id)}
