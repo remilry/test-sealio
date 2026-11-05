@@ -223,6 +223,8 @@ def start_ai_fill(session: Session, tenant_id: int, form_id: int) -> int:
     fill.ai_status = AiStatus.RUNNING
     fill.ai_started_at = datetime.now(UTC)
     fill.ai_finished_at = None
+    fill.ai_failed_field_ids = []
+    fill.ai_error = None
     session.commit()
     return fill.id
 
@@ -309,10 +311,20 @@ def add_event(
     session.commit()
 
 
-def finish_ai_fill(session: Session, fill_id: int, status: AiStatus) -> None:
+def finish_ai_fill(
+    session: Session,
+    fill_id: int,
+    status: AiStatus,
+    *,
+    failed_field_ids: Sequence[int] = (),
+    error: str | None = None,
+) -> None:
+    """End the run; `failed_field_ids` and `error` stay on the fill for a reload and a retry."""
     fill = session.get_one(FormFill, fill_id)
     fill.ai_status = status
     fill.ai_finished_at = datetime.now(UTC)
+    fill.ai_failed_field_ids = sorted(failed_field_ids)
+    fill.ai_error = error
     _refresh_status(session, fill)
 
 
@@ -339,6 +351,7 @@ def fail_interrupted_fills(session: Session) -> None:
         )
         fill.ai_status = AiStatus.FAILED
         fill.ai_finished_at = datetime.now(UTC)
+        fill.ai_error = INTERRUPTED
     session.commit()
 
 
@@ -346,7 +359,11 @@ def _ai_run(fill: FormFill | None) -> AiRun | None:
     if fill is None or fill.ai_status is None or fill.ai_started_at is None:
         return None
     return AiRun(
-        status=fill.ai_status, started_at=fill.ai_started_at, finished_at=fill.ai_finished_at
+        status=fill.ai_status,
+        started_at=fill.ai_started_at,
+        finished_at=fill.ai_finished_at,
+        failed_field_ids=fill.ai_failed_field_ids,
+        error=fill.ai_error,
     )
 
 

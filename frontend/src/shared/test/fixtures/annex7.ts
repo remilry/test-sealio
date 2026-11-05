@@ -171,11 +171,14 @@ export function candidate(
 }
 
 /** An automatic fill run in progress (or over), as `FillState.ai_run`. */
-export function aiRun(status: AiRun["status"] = "running"): AiRun {
+export function aiRun(status: AiRun["status"] = "running", extra: Partial<AiRun> = {}): AiRun {
   return {
     status,
     started_at: "2026-11-04T10:00:00Z",
     finished_at: status === "running" ? null : "2026-11-04T10:00:23Z",
+    failed_field_ids: [],
+    error: null,
+    ...extra,
   };
 }
 

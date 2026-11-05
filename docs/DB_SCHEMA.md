@@ -89,6 +89,8 @@ erDiagram
         text ai_status "running | done | failed; nullable"
         timestamptz ai_started_at "nullable"
         timestamptz ai_finished_at "nullable"
+        jsonb ai_failed_field_ids
+        text ai_error "nullable"
     }
     tenant {
         bigint id PK

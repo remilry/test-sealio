@@ -59,6 +59,10 @@ class FormFill(TimestampMixin, Base):
     ai_status: Mapped[AiStatus | None] = mapped_column(str_enum(AiStatus))
     ai_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     ai_finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Fields the last AI fill could not answer (their model call kept failing): to retry.
+    ai_failed_field_ids: Mapped[list[int]] = mapped_column(JSONB, default=list, server_default="[]")
+    # Why the last AI fill failed or left fields out, for the user (shown again after a reload).
+    ai_error: Mapped[str | None]
 
 
 class Answer(TimestampMixin, Base):

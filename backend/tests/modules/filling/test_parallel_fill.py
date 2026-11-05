@@ -119,22 +119,29 @@ def test_every_field_is_searching_before_any_answer(client: TestClient, annex_4:
     assert states == ["searching"] * 48 + ["answered"] * 48
 
 
-def test_a_failing_group_ends_the_run_and_the_others_stop_publishing(
+def test_a_failed_group_does_not_stop_the_others(
     client: TestClient, annex_4: int, llm: SlowLLM
 ) -> None:
     key = annex_4_keys(client, annex_4)[0]
     # Both runs of the call fail (one alone would leave the other run's answers, to check).
     llm.failing = {key, f"{key}--run-2"}
+    fields = [f for f in fields_by_key(client, annex_4).values() if f["kind"] != "signature"]
+    group = [f["id"] for f in fields if f["section"] == fields[0]["section"]]
 
     client.post(f"/forms/{annex_4}/fill")
 
+    state = client.get(f"/forms/{annex_4}/answers").json()
+    assert state["ai_run"]["status"] == "done"
+    assert sorted(state["ai_run"]["failed_field_ids"]) == sorted(group)
+    assert state["ai_run"]["error"] == job.PARTIAL_ERROR
+    answered = {a["field_id"] for a in state["answers"]}
+    # Every other group's fields are answered, none of the failed group's.
+    assert answered == {f["id"] for f in fields} - set(group)
     events = read_events(client, annex_4)
-    kinds = [e["event"] for e in events]
-    assert kinds[-1] == "error"
-    assert "done" not in kinds
-    assert events[-1]["data"]["message"] == job.MODEL_ERROR
-    assert not any(e["event"] == "field" and e["data"]["state"] == "answered" for e in events)
-    assert client.get(f"/forms/{annex_4}/answers").json()["ai_run"]["status"] == "failed"
+    assert events[-1]["event"] == "done"
+    assert events[-1]["data"]["failed"] == len(group)
+    # Without an answer, the failed fields are still open.
+    assert state["counts"]["open"] >= len(group)
 
 
 def test_discard_while_groups_are_calling_writes_nothing(

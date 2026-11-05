@@ -7,7 +7,7 @@ from typing import Any
 import pytest
 from pydantic import BaseModel, ConfigDict
 
-from app.llm.facade import LLMError, LLMRequest, LLMResult, LLMUsage, OnPartial
+from app.llm.facade import LLMError, LLMRequest, LLMResult, LLMUsage, OnPartial, TransientLLMError
 from app.llm.fake_adapter import FakeLLM, RecordingLLM
 
 
@@ -143,3 +143,22 @@ def test_the_recorder_records_concurrent_calls_to_their_own_files(tmp_path: Path
         recording = json.loads((tmp_path / f"{key}.json").read_text())
         assert recording["value"] == value
         assert recording["timing"]["total_seconds"] >= 0.1
+
+
+def test_fake_llm_failures_fail_n_times_then_replay() -> None:
+    model = FakeLLM({"annex--page-1": {"value": "ok"}}, failures={"annex--page": 2})
+
+    for _ in range(2):
+        with pytest.raises(TransientLLMError, match="Simulated failure"):
+            model.generate_structured(request("annex--page-1"))
+
+    assert model.generate_structured(request("annex--page-1")).output == Answer(value="ok")
+
+
+def test_simulated_failures_are_counted_over_every_key_they_match() -> None:
+    model = FakeLLM({"k": {"value": "a"}, "k--run-2": {"value": "b"}}, failures={"k": 1})
+
+    with pytest.raises(TransientLLMError):
+        model.generate_structured(request("k--run-2"))
+
+    assert model.generate_structured(request("k")).output == Answer(value="a")

@@ -46,6 +46,10 @@ class AiRun(BaseModel):
     status: AiStatus
     started_at: datetime
     finished_at: datetime | None
+    # Fields the run could not answer (their model call kept failing): `POST …/fill/retry`.
+    failed_field_ids: list[int] = []
+    # What went wrong, in plain words; null when nothing did.
+    error: str | None = None
 
 
 class FillState(BaseModel):

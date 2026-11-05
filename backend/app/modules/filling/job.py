@@ -13,6 +13,7 @@ import time
 from collections import Counter
 from collections.abc import Callable, Sequence
 from concurrent.futures import ThreadPoolExecutor, wait
+from dataclasses import dataclass
 from datetime import date
 from itertools import groupby
 
@@ -40,6 +41,12 @@ UNEXPECTED_ERROR = (
 )
 # The model failed (rate limit, timeout, no usable answer): its details go to the logs only.
 MODEL_ERROR = "Answers could not be found right now. Discard the answers to auto-fill again."
+# Some calls kept failing after their retries: the other fields are answered.
+PARTIAL_ERROR = "Some fields couldn't be filled. Retry them, or enter them yourself."
+# Every call kept failing (the model is unreachable): nothing was answered.
+MODEL_UNAVAILABLE = (
+    "Automatic filling isn't available right now. Retry in a moment, or fill the form yourself."
+)
 # A value being written is sent at most this often per field (the live stream polls as often).
 WRITING_INTERVAL_SECONDS = 0.25
 
@@ -50,6 +57,14 @@ class _Discarded(Exception):
 
 class _Stopped(Exception):
     """Another group of the fill failed or saw it discarded: this one stops publishing."""
+
+
+@dataclass(frozen=True)
+class GroupFailure:
+    """A group whose model call kept failing: its fields that got no answer, and why."""
+
+    field_ids: list[int]
+    reason: str
 
 
 def run_groups[T, R](
@@ -137,7 +152,7 @@ def run_fill(fill_id: int, llm: LLM, today: date | None = None) -> None:
             else:
                 logger.exception("AI fill %s failed", fill_id)
                 message = UNEXPECTED_ERROR
-            service.finish_ai_fill(session, fill_id, AiStatus.FAILED)
+            service.finish_ai_fill(session, fill_id, AiStatus.FAILED, error=message)
             service.add_event(session, fill_id, FillEventType.ERROR, {"message": message})
 
 
@@ -218,7 +233,19 @@ def _run(session: Session, fill_id: int, llm: LLM, today: date) -> None:
     publishing = threading.Lock()
     stop = threading.Event()
 
-    def answer_group(group: CallGroup) -> SectionResult:
+    def answer_group(group: CallGroup) -> SectionResult | GroupFailure:
+        name = group.section if group.part is None else f"{group.section} (part {group.part})"
+        published: set[int] = set()
+        try:
+            result = _answer_group(group, published)
+        except LLMError as error:
+            # Its retries are spent: the other groups go on, its fields are left to retry.
+            logger.warning("AI fill %s, section %r failed: %s", fill_id, name, error)
+            return GroupFailure([f.id for f in group.fields if f.id not in published], str(error))
+        logger.info("AI fill %s, section %r: %s", fill_id, name, result.describe())
+        return result
+
+    def _answer_group(group: CallGroup, published: set[int]) -> SectionResult:
         with SessionLocal() as group_session:
             by_id = {f.id: f for f in group.fields}
             # When each field's value being written was last sent (monotonic seconds).
@@ -255,8 +282,9 @@ def _run(session: Session, fill_id: int, llm: LLM, today: date) -> None:
                         stop.set()
                         raise _Discarded
                     _publish(group_session, fill_id, tenant_id, form.id, field.id, decision, types)
+                    published.add(field.id)
 
-            result = answer_section(
+            return answer_section(
                 llm,
                 company=company,
                 form_title=form.title,
@@ -269,13 +297,12 @@ def _run(session: Session, fill_id: int, llm: LLM, today: date) -> None:
                 on_writing=on_writing,
                 runs=get_settings().fill_runs_per_call,
             )
-        name = group.section if group.part is None else f"{group.section} (part {group.part})"
-        logger.info("AI fill %s, section %r: %s", fill_id, name, result.describe())
-        return result
 
-    results = run_groups(
+    outcomes = run_groups(
         groups, answer_group, max_workers=get_settings().fill_max_parallel_calls, stop=stop
     )
+    results = [o for o in outcomes if isinstance(o, SectionResult)]
+    failed = [field_id for o in outcomes if isinstance(o, GroupFailure) for field_id in o.field_ids]
     usage = sum((r.usage for r in results), LLMUsage())
     search_seconds = sum(r.search_seconds for r in results)
 
@@ -296,7 +323,20 @@ def _run(session: Session, fill_id: int, llm: LLM, today: date) -> None:
         search_seconds,
         usage.describe(),
     )
-    service.finish_ai_fill(session, fill_id, AiStatus.DONE)
+    if failed and len(failed) == len(to_answer):
+        # Nothing could be answered: the model is out of reach.
+        service.finish_ai_fill(
+            session, fill_id, AiStatus.FAILED, failed_field_ids=failed, error=MODEL_UNAVAILABLE
+        )
+        service.add_event(session, fill_id, FillEventType.ERROR, {"message": MODEL_UNAVAILABLE})
+        return
+    service.finish_ai_fill(
+        session,
+        fill_id,
+        AiStatus.DONE,
+        failed_field_ids=failed,
+        error=PARTIAL_ERROR if failed else None,
+    )
     service.add_event(
         session,
         fill_id,
@@ -305,6 +345,7 @@ def _run(session: Session, fill_id: int, llm: LLM, today: date) -> None:
             "filled": counts.filled,
             "fillable": counts.fillable,
             "doubts": counts.doubts,
+            "failed": len(failed),
             "seconds": round(time.monotonic() - started, 1),
         },
     )

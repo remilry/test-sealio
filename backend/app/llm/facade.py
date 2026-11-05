@@ -132,4 +132,8 @@ def _provider() -> LLM:
         )
     from app.llm.fake_adapter import FakeLLM
 
-    return FakeLLM.from_dir(settings.llm_recordings_dir, latency=settings.fake_llm_latency)
+    return FakeLLM.from_dir(
+        settings.llm_recordings_dir,
+        latency=settings.fake_llm_latency,
+        failures=settings.fake_llm_failures,
+    )

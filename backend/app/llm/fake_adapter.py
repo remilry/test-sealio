@@ -7,6 +7,7 @@ replays when `latency="recorded"`.
 """
 
 import json
+import threading
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -15,7 +16,15 @@ from typing import Any, Literal
 from pydantic import BaseModel
 from pydantic_core import from_json
 
-from app.llm.facade import LLM, LLMError, LLMRequest, LLMResult, LLMUsage, OnPartial
+from app.llm.facade import (
+    LLM,
+    LLMError,
+    LLMRequest,
+    LLMResult,
+    LLMUsage,
+    OnPartial,
+    TransientLLMError,
+)
 
 # Fine enough for a value to show while it is written (the real model streams by tokens).
 CHUNKS = 60
@@ -28,22 +37,34 @@ class FakeLLM:
         *,
         latency: Literal["recorded", "none"] = "none",
         sleep: Callable[[float], None] = time.sleep,
+        failures: dict[str, int] | None = None,
     ) -> None:
         self._answers = answers
         self._latency = latency
         self._sleep = sleep
+        # Simulated passing failures (e2e, dev): a request whose key starts with a prefix fails
+        # until that prefix has failed its count of times, over every key it matches.
+        self._failures = dict(failures or {})
+        self._failures_lock = threading.Lock()
         # Every request received, for tests to look at the prompts.
         self.requests: list[LLMRequest[Any]] = []
 
     @classmethod
-    def from_dir(cls, directory: Path, *, latency: Literal["recorded", "none"] = "none") -> FakeLLM:
+    def from_dir(
+        cls,
+        directory: Path,
+        *,
+        latency: Literal["recorded", "none"] = "none",
+        failures: dict[str, int] | None = None,
+    ) -> FakeLLM:
         answers = {path.stem: json.loads(path.read_text()) for path in directory.glob("*.json")}
-        return cls(answers, latency=latency)
+        return cls(answers, latency=latency, failures=failures)
 
     def generate_structured[T: BaseModel](
         self, request: LLMRequest[T], on_partial: OnPartial | None = None
     ) -> LLMResult[T]:
         self.requests.append(request)
+        self._maybe_fail(request.key)
         recording = self._answers.get(request.key)
         if recording is None and "--run-" in request.key:
             # A further run of a call recorded once: replays that recording.
@@ -56,6 +77,16 @@ class FakeLLM:
             self._stream(answer, timing, on_partial)
         # A replay costs nothing.
         return LLMResult(output=request.schema.model_validate(answer), usage=LLMUsage(calls=1))
+
+    def _maybe_fail(self, key: str) -> None:
+        with self._failures_lock:
+            prefix = next(
+                (p for p, left in self._failures.items() if key.startswith(p) and left), None
+            )
+            if prefix is None:
+                return
+            self._failures[prefix] -= 1
+        raise TransientLLMError(f"Simulated failure of {key!r} (FORMPILOT_FAKE_LLM_FAILURES).")
 
     def _stream(
         self, answer: dict[str, Any], timing: dict[str, float] | None, on_partial: OnPartial

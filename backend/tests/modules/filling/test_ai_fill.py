@@ -368,19 +368,61 @@ def test_a_model_failure_ends_the_fill_with_a_product_message(
 
     state = client.get(f"/forms/{annex_7}/answers").json()
     assert state["ai_run"]["status"] == "failed"
+    unavailable = (
+        "Automatic filling isn't available right now. Retry in a moment, or fill the form yourself."
+    )
+    # Every field to answer failed (the signature is never answered); kept for a reload.
+    fillable = [
+        f["id"] for f in fields_by_key(client, annex_7).values() if f["kind"] != "signature"
+    ]
+    assert sorted(state["ai_run"]["failed_field_ids"]) == sorted(fillable)
+    assert state["ai_run"]["error"] == unavailable
+    assert state["answers"] == []
     last = read_events(client, annex_7)[-1]
-    assert last == {
-        "id": last["id"],
-        "event": "error",
-        "data": {
-            "message": (
-                "Answers could not be found right now. Discard the answers to auto-fill again."
-            )
-        },
-    }
+    assert last == {"id": last["id"], "event": "error", "data": {"message": unavailable}}
     # The technical details are only in the logs.
     warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
     assert any("Error code: 429" in r.getMessage() for r in warnings)
+
+
+class FailingAfterStream(ScriptedLLM):
+    """Streams its whole answer, then fails: the fields complete in the stream are published."""
+
+    def generate_structured(  # type: ignore[override]
+        self, request: LLMRequest[Any], on_partial: OnPartial | None = None
+    ) -> LLMResult[Any]:
+        super().generate_structured(request, on_partial)
+        raise LLMError("connection reset")
+
+
+def test_fields_published_before_a_group_failed_are_not_failed(client: TestClient) -> None:
+    annex_7 = seeded_forms(client)[1]["id"]
+    failing = FailingAfterStream({ANNEX_7_KEY: ANNEX_7_ANSWER})
+    app.dependency_overrides[filling_router.get_language_model] = lambda: failing
+
+    client.post(f"/forms/{annex_7}/fill")
+
+    state = client.get(f"/forms/{annex_7}/answers").json()
+    keys = fields_by_key(client, annex_7)
+    # The last answer of the stream is never complete (no answer follows it): only it failed.
+    assert state["ai_run"]["failed_field_ids"] == [keys["first_name_s_and_surname_s"]["id"]]
+    assert state["ai_run"]["status"] == "done"
+    assert state["ai_run"]["error"] == (
+        "Some fields couldn't be filled. Retry them, or enter them yourself."
+    )
+    assert answers_by_key(client, annex_7)["business_address"]["value"] == (
+        "Pfingstweidstrasse 31, 8005 Zurich"
+    )
+    done = read_events(client, annex_7)[-1]
+    assert (done["event"], done["data"]["failed"]) == ("done", 1)
+
+
+def test_a_fill_that_worked_has_no_error_nor_failed_field(client: TestClient, annex_7: int) -> None:
+    client.post(f"/forms/{annex_7}/fill")
+
+    run = client.get(f"/forms/{annex_7}/answers").json()["ai_run"]
+    assert (run["failed_field_ids"], run["error"]) == ([], None)
+    assert read_events(client, annex_7)[-1]["data"]["failed"] == 0
 
 
 def test_an_unexpected_failure_shows_a_generic_message(
@@ -392,12 +434,13 @@ def test_an_unexpected_failure_shows_a_generic_message(
     llm.while_thinking = crash
     client.post(f"/forms/{annex_7}/fill")
 
-    assert read_events(client, annex_7)[-1]["data"] == {
-        "message": (
-            "Something went wrong while filling this form. "
-            "Discard its answers to auto-fill it again."
-        )
-    }
+    message = (
+        "Something went wrong while filling this form. Discard its answers to auto-fill it again."
+    )
+    assert read_events(client, annex_7)[-1]["data"] == {"message": message}
+    # Shown again after a reload; nothing to retry.
+    run = client.get(f"/forms/{annex_7}/answers").json()["ai_run"]
+    assert (run["status"], run["error"], run["failed_field_ids"]) == ("failed", message, [])
 
 
 def test_a_fill_interrupted_by_a_server_stop_ends_as_failed(
@@ -407,10 +450,12 @@ def test_a_fill_interrupted_by_a_server_stop_ends_as_failed(
         service.start_ai_fill(session, tenants_service.get_current_tenant_id(session), annex_7)
         service.fail_interrupted_fills(session)
 
-    assert client.get(f"/forms/{annex_7}/answers").json()["ai_run"]["status"] == "failed"
-    assert read_events(client, annex_7)[-1]["data"]["message"] == (
+    run = client.get(f"/forms/{annex_7}/answers").json()["ai_run"]
+    message = (
         "The server stopped while filling this form. Discard its answers to auto-fill it again."
     )
+    assert (run["status"], run["error"]) == ("failed", message)
+    assert read_events(client, annex_7)[-1]["data"]["message"] == message
 
 
 def test_without_an_api_key_the_fill_is_refused_clearly(

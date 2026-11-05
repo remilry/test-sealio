@@ -156,8 +156,10 @@ export interface paths {
          * @description The events of the last automatic fill, from the start or after `Last-Event-ID`, then the new
          *     ones as they happen. Ends with the run ("done" or "error"); empty when no fill ever ran.
          *
-         *     Event types: `phase` ({phase, …}), `field` ({field_id, state: "searching" | "answered",
-         *     answer, counts}), `done` ({filled, fillable, doubts, seconds}), `error` ({message}).
+         *     Event types: `phase` ({phase, …}), `field` ({field_id, state: "searching"}, {field_id,
+         *     state: "writing", text}: the value the model is writing, not verified yet, {field_id, state:
+         *     "answered", answer, counts}), `done` ({filled, fillable, doubts, seconds}), `error`
+         *     ({message}).
          */
         get: operations["fill_events_forms__form_id__fill_events_get"];
         put?: never;
@@ -335,6 +337,13 @@ export interface components {
             started_at: string;
             /** Finished At */
             finished_at: string | null;
+            /**
+             * Failed Field Ids
+             * @default []
+             */
+            failed_field_ids: number[];
+            /** Error */
+            error?: string | null;
         };
         /**
          * AiStatus

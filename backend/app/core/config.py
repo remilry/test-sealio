@@ -32,6 +32,8 @@ class Settings(BaseSettings):
     llm_provider: Literal["openai", "fake"] = "fake"
     # "recorded": a replay takes the time of the recorded call; "none": instant (tests, e2e).
     fake_llm_latency: Literal["recorded", "none"] = "recorded"
+    # Simulated passing failures of the fake model, JSON {"<key prefix>": times} (e2e of Retry).
+    fake_llm_failures: dict[str, int] = {}
     llm_model: str = "gpt-5-mini"
     llm_reasoning_effort: Literal["minimal", "low", "medium", "high"] = "low"
     llm_recordings_dir: Path = REPO_ROOT / "backend" / "llm_recordings"
