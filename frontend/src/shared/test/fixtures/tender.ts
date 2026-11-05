@@ -11,9 +11,8 @@ export function form(overrides: Partial<FormSummary> = {}): FormSummary {
     file_name: "Annex_4_Conditions of Participation and Company Self-Declaration.docx",
     file_format: "docx",
     status: "not_started",
-    // Word forms are not parsed yet.
-    field_counts: null,
-    estimated_fill_seconds: null,
+    field_counts: { fields: 49, yes_no: 17, signatures: 1 },
+    estimated_fill_seconds: 200,
     filling: false,
     ...overrides,
   };

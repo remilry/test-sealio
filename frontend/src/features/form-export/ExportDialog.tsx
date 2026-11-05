@@ -54,7 +54,8 @@ export function ExportDialog({
         <DownloadIcon data-icon="inline-start" />
         {t("open", { format })}
       </DialogTrigger>
-      <DialogContent className="gap-5 sm:max-w-lg">
+      {/* Never taller than the window: a long list of empty fields scrolls, the download stays reachable. */}
+      <DialogContent className="max-h-[calc(100dvh-2rem)] gap-5 overflow-y-auto sm:max-w-lg">
         <ExportContent
           formId={formId}
           formTitle={formTitle}
@@ -155,7 +156,10 @@ function ExportReady({
           <TriangleAlertIcon className="text-warning" />
           <AlertTitle>{t("emptyWarning", { count: empty })}</AlertTitle>
           <AlertDescription>
-            <ul aria-label={t("emptyFields")} className="list-inside list-disc">
+            <ul
+              aria-label={t("emptyFields")}
+              className="max-h-48 list-inside list-disc overflow-y-auto"
+            >
               {summary.empty_fields.map((field) => (
                 <li key={field.id}>{field.label}</li>
               ))}

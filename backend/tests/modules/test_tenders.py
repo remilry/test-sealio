@@ -76,9 +76,9 @@ def test_unknown_form_file_is_a_404(client: TestClient) -> None:
 def test_cards_estimate_the_fill_duration_from_the_sections(client: TestClient) -> None:
     annex_4, annex_7 = seeded_forms(client)
 
-    # One section, 25 seconds each; a form that is not parsed has no estimate.
+    # 25 seconds per section: Annex 7 has one, Annex 4 eight (7 tables and the text after them).
     assert annex_7["estimated_fill_seconds"] == 25
-    assert annex_4["estimated_fill_seconds"] is None
+    assert annex_4["estimated_fill_seconds"] == 200
     assert client.get(f"/forms/{annex_7['id']}").json()["estimated_fill_seconds"] == 25
 
 

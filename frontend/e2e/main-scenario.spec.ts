@@ -4,13 +4,15 @@ import { expect, test } from "@playwright/test";
 
 // The main scenario, grown slice by slice (docs/PLAN.md): today it adds the company's documents
 // (the knowledge base is not seeded), previews one, auto-fills Annex 7, corrects a field, downloads the filled
-// PDF and discards the answers. It runs in a dedicated, clean environment (playwright.config.ts): empty database and data.
+// PDF and discards the answers, then fills the Word Annex 4 by hand and downloads it as Word. It runs in a dedicated, clean environment (playwright.config.ts): empty database and data.
 
 // The demo company's documents (Alpenlogic AG, knowledge-base/GROUND_TRUTH.md).
 const DEMO_DIR = path.resolve("../knowledge-base/documents");
+// The e2e back (playwright.config.ts).
+const API = "http://localhost:8100";
 const DEMO_FILES = readdirSync(DEMO_DIR).filter((name) => /\.(pdf|docx)$/.test(name));
 
-test("I auto-fill Annex 7 from my documents, correct a field and download it in its original PDF layout", async ({
+test("I auto-fill Annex 7 from my documents, correct a field and download it in its original PDF layout, then fill Annex 4 by hand", async ({
   page,
 }) => {
   await page.goto("/");
@@ -121,4 +123,44 @@ test("I auto-fill Annex 7 from my documents, correct a field and download it in 
   await page.getByRole("alertdialog").getByRole("button", { name: "Discard", exact: true }).click();
   await expect(started).toContainText("Not started");
   await expect(started.getByRole("button", { name: "Auto-fill" })).toBeVisible();
+
+  // Annex 4 (Word): detected; filled by hand from its URL (its auto-fill comes with step 6c), then exported.
+  const word = page.getByRole("list", { name: "Forms to complete" }).getByRole("listitem").nth(0);
+  await expect(word).toContainText("49 fields detected · 17 Yes/No declarations · 1 signature");
+  await expect(word.getByRole("button", { name: "Auto-fill" })).toBeEnabled();
+  const tenders = await (await page.request.get(`${API}/tenders`)).json();
+  const detail = await (await page.request.get(`${API}/tenders/${tenders[0].id}`)).json();
+  await page.goto(`/forms/${detail.forms[0].id}/fill`);
+
+  const wordPreview = page.getByRole("region", { name: "Form preview" });
+  await expect(wordPreview.locator("section.docx").first()).toBeVisible();
+  await expect(wordPreview).toContainText("Exact company name");
+  const company = page
+    .getByRole("list", { name: "Fields" })
+    .getByRole("textbox", { name: "Exact company name" });
+  await company.fill("Alpenlogic AG");
+  await company.press("Tab");
+  await expect(page.getByRole("status")).toHaveText(/saved/i);
+  await expect(wordPreview.getByLabel("Exact company name")).toHaveText("Alpenlogic AG");
+  const vat = page
+    .getByRole("list", { name: "Fields" })
+    .getByRole("listitem", { name: "Have you paid in full the VAT or sales tax due?" });
+  await vat.getByText("Yes", { exact: true }).click();
+  await expect(
+    wordPreview.getByLabel("Have you paid in full the VAT or sales tax due?"),
+  ).toHaveText("Yes");
+
+  await page.getByRole("button", { name: "Export DOCX" }).click();
+  const wordExport = page.getByRole("dialog");
+  await expect(wordExport.getByText(/Sign by hand/)).toBeVisible();
+  const [docx] = await Promise.all([
+    page.waitForEvent("download"),
+    wordExport.getByRole("link", { name: "Download DOCX" }).click(),
+  ]);
+  expect(docx.suggestedFilename()).toBe(
+    "Annex_4_Conditions of Participation and Company Self-Declaration.docx",
+  );
+  const docxChunks: Buffer[] = [];
+  for await (const chunk of await docx.createReadStream()) docxChunks.push(chunk as Buffer);
+  expect(Buffer.concat(docxChunks).subarray(0, 2).toString()).toBe("PK");
 });

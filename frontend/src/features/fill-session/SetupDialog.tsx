@@ -73,8 +73,10 @@ export function SetupDialog({
       >
         <div className={cn("grid", preview && "md:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]")}>
           {preview && (
-            <div className="hidden max-h-[70vh] overflow-y-auto border-r bg-muted/60 p-4 md:block">
-              {preview}
+            // One page high, whatever the form's length: the dialog is the same size for every
+            // form, a longer one scrolls in its column.
+            <div className="hidden border-r bg-muted/60 p-4 md:block">
+              <div className="aspect-[595/842] max-h-[70vh] overflow-y-auto">{preview}</div>
             </div>
           )}
           <div className="flex flex-col gap-5 p-6">

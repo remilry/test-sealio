@@ -15,10 +15,13 @@ Generic rules on the document's structure, with no knowledge of any specific for
 
 import io
 import re
+import zipfile
 from collections.abc import Callable
 from dataclasses import dataclass
 
 from docx import Document
+from docx.document import Document as DocumentObject
+from docx.oxml.ns import qn
 from docx.table import Table, _Cell
 from docx.text.paragraph import Paragraph
 
@@ -29,6 +32,7 @@ from app.modules.forms.parsing.schema import (
     DocxWriteMode,
     FieldKind,
     FormSchema,
+    PageSize,
     ParsedField,
 )
 
@@ -39,6 +43,8 @@ MAX_LABEL_CHARS = 120
 MAX_BARE_LABEL_WORDS = 12
 YES_NO_HEADER = re.compile(r"\byes\s*/\s*no\b", re.IGNORECASE)
 BODY_SECTION = "Text"
+APP_PROPERTIES = "docProps/app.xml"
+A4 = (595.3, 841.9)
 
 
 @dataclass
@@ -63,7 +69,7 @@ def parse_docx(data: bytes) -> FormSchema:
             table_index += 1
     seen: set[str] = set()
     return FormSchema(
-        pages=[],
+        pages=_pages(document, data),
         fields=[
             ParsedField(
                 key=unique_key(blank.label, seen),
@@ -74,6 +80,40 @@ def parse_docx(data: bytes) -> FormSchema:
             )
             for blank in blanks
         ],
+    )
+
+
+# --- Pages --------------------------------------------------------------------------------
+
+
+def _pages(document: DocumentObject, data: bytes) -> list[PageSize]:
+    """The pages as Word laid them out at its last save: Word documents keep no layout, but Word
+    writes the page count in docProps/app.xml and marks where it broke the pages."""
+    section = document.sections[0] if document.sections else None
+    width = section.page_width if section is not None else None
+    height = section.page_height if section is not None else None
+    size = (
+        PageSize(width=width.pt, height=height.pt)
+        if width is not None and height is not None
+        else PageSize(width=A4[0], height=A4[1])
+    )
+    return [size] * (_saved_page_count(data) or _rendered_breaks(document) + 1)
+
+
+def _saved_page_count(data: bytes) -> int | None:
+    with zipfile.ZipFile(io.BytesIO(data)) as package:
+        if APP_PROPERTIES not in package.namelist():
+            return None
+        match = re.search(rb"<(?:\w+:)?Pages>(\d+)</", package.read(APP_PROPERTIES))
+    return int(match.group(1)) if match and int(match.group(1)) > 0 else None
+
+
+def _rendered_breaks(document: DocumentObject) -> int:
+    """Paragraphs where Word started a new page (a paragraph counts once)."""
+    return sum(
+        1
+        for paragraph in document.element.body.iter(qn("w:p"))
+        if paragraph.find(f".//{qn('w:lastRenderedPageBreak')}") is not None
     )
 
 

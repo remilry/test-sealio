@@ -1,11 +1,14 @@
 """Word form parser: one synthetic document per generic rule, then the real Annex 4."""
 
 import io
+import re
+import zipfile
 from collections.abc import Callable
 
 import pytest
 from docx import Document
 from docx.document import Document as DocumentObject
+from docx.oxml import OxmlElement
 from docx.table import _Cell  # pyright: ignore[reportPrivateUsage]
 
 from app.core.config import get_settings
@@ -398,3 +401,40 @@ def test_a_yes_no_question_is_the_longest_cell_before_the_answer() -> None:
     assert [(f.label, f.kind, docx_locator(f).cell) for f in _parse(build).fields] == [
         ("Do you comply with the occupational health and safety rules?", YES_NO, 2)
     ]
+
+
+def test_annex_4_pages(annex_4: FormSchema) -> None:
+    assert [(round(p.width), round(p.height)) for p in annex_4.pages] == [(595, 842)] * 3
+
+
+def test_pages_without_app_properties_count_word_breaks() -> None:
+    def build(document: DocumentObject) -> None:
+        for text in ("First page", "Second page", "Third page"):
+            paragraph = document.add_paragraph()
+            if text != "First page":
+                paragraph.add_run()._r.append(OxmlElement("w:lastRenderedPageBreak"))  # pyright: ignore[reportPrivateUsage]
+            paragraph.add_run(text)
+
+    document = Document()
+    build(document)
+    buffer = io.BytesIO()
+    document.save(buffer)
+    stripped = io.BytesIO()
+    with (
+        zipfile.ZipFile(io.BytesIO(buffer.getvalue())) as source,
+        zipfile.ZipFile(stripped, "w") as target,
+    ):
+        for info in source.infolist():
+            # Word's own page count left out: the breaks it marked are counted instead.
+            content = source.read(info.filename)
+            if info.filename == "docProps/app.xml":
+                content = re.sub(rb"<Pages>\d+</Pages>", b"", content)
+            target.writestr(info, content)
+
+    pages = parse_docx(stripped.getvalue()).pages
+
+    section = document.sections[0]
+    assert section.page_width is not None
+    assert section.page_height is not None
+    size = (round(section.page_width.pt), round(section.page_height.pt))
+    assert [(round(p.width), round(p.height)) for p in pages] == [size] * 3

@@ -1,4 +1,4 @@
-import type { ReactElement } from "react";
+import type { ReactElement, ReactNode } from "react";
 import { render } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { NextIntlClientProvider } from "next-intl";
@@ -13,12 +13,11 @@ export function renderScreen(ui: ReactElement) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: Infinity }, mutations: { retry: false } },
   });
-  return {
-    queryClient,
-    ...render(
-      <NextIntlClientProvider locale={defaultLocale} timeZone={timeZone} messages={messages}>
-        <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
-      </NextIntlClientProvider>,
-    ),
-  };
+  // As a wrapper, so `rerender` keeps the same providers and cache.
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <NextIntlClientProvider locale={defaultLocale} timeZone={timeZone} messages={messages}>
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    </NextIntlClientProvider>
+  );
+  return { queryClient, ...render(ui, { wrapper }) };
 }

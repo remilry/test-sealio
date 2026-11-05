@@ -137,6 +137,7 @@ function FillWorkspace({
       id: field.id,
       label: field.label,
       fillable: field.kind !== "signature",
+      yesNo: field.kind === "yes_no",
       value: answer?.value ?? null,
       unsaved: unsaved.get(field.id) ?? null,
       enteredAt: answer?.resolved_by === "user" ? answer.resolved_at : null,
@@ -147,21 +148,15 @@ function FillWorkspace({
       userOnlyReason: answer?.user_only_reason ?? null,
     };
   });
-  // The preview draws PDF fields only (a Word form's preview comes with step 6b).
-  const zones: PreviewZone[] = form.fields.flatMap((field, index) => {
-    const { locator } = field;
-    if (locator.format !== "pdf") return [];
+  const zones: PreviewZone[] = form.fields.map((field, index) => {
     const draft = drafts.get(field.id);
     const value = (draft ?? fields[index].value ?? "").trim() || null;
     return {
       id: field.id,
       label: field.label,
-      page: locator.page,
-      box: locator.box,
-      fontSize: locator.font_size,
-      placeholders: locator.erase,
       value,
       tone: zoneTone(fields[index], value, draft === undefined ? answers.get(field.id) : undefined),
+      place: placeOf(field.locator),
     };
   });
   const fillable = fields.filter((field) => field.fillable);
@@ -285,6 +280,7 @@ function FillWorkspace({
           <div className="mx-auto max-w-[760px]">
             <DocumentPreview
               fileUrl={originalFileUrl(form.id)}
+              fileFormat={form.file_format}
               pages={form.pages}
               zones={zones}
               selectedId={selectedId}
@@ -420,6 +416,18 @@ function withEntry(map: ReadonlyMap<number, string>, id: number, text: string | 
   if (text === null) next.delete(id);
   else next.set(id, text);
   return next;
+}
+
+/** Where the preview draws a field, from the parser's locator. */
+function placeOf(locator: FormDetail["fields"][number]["locator"]): PreviewZone["place"] {
+  if (locator.format === "docx") return { format: "docx", locator };
+  return {
+    format: "pdf",
+    page: locator.page,
+    box: locator.box,
+    fontSize: locator.font_size,
+    placeholders: locator.erase,
+  };
 }
 
 function fieldState(run: FillRun, fieldId: number): QueueField["state"] {

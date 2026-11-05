@@ -112,6 +112,9 @@
     "label": "Fill progress"
   },
   "fieldList": {
+    "yes": "Yes",
+    "no": "No",
+    "clearAnswer": "Clear",
     "label": "Fields",
     "signByHand": "Sign by hand after export — never filled.",
     "notSaved": "Not saved — press Enter to try again",

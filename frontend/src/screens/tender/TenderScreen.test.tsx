@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { delay, http, HttpResponse } from "msw";
 import { API_URL } from "@/shared/api";
 import { freezeToday, handlers, renderScreen, server } from "@/shared/test";
-import { form, knowledgeBase, knowledgeDocument, tender } from "@/shared/test/fixtures";
+import { annex4File, form, knowledgeBase, knowledgeDocument, tender } from "@/shared/test/fixtures";
 import { TenderScreen } from "./TenderScreen";
 
 const push = vi.fn();
@@ -64,31 +64,58 @@ describe("Tender", () => {
   });
 
   it("shows what was detected in each form", async () => {
-    // Given the seeded tender: Annex 7 parsed, Annex 4 (Word) not parsed yet
+    // Given the seeded tender: both forms parsed
     server.use(handlers.tender(tender()));
 
     // When I open it
     renderScreen(<TenderScreen tenderId={1} />);
 
-    // Then the parsed form shows its counts, the other its file name
+    // Then each form shows its counts
     const annex7 = within(await screen.findByRole("listitem", { name: /Annex 7/ }));
     expect(annex7.getByText("10 fields detected · 1 signature")).toBeInTheDocument();
     const annex4 = within(forms().getByRole("listitem", { name: /Annex 4/ }));
     expect(
-      annex4.getByText("Annex_4_Conditions of Participation and Company Self-Declaration.docx"),
+      annex4.getByText("49 fields detected · 17 Yes/No declarations · 1 signature"),
     ).toBeInTheDocument();
   });
 
   it("cannot auto-fill a form whose format is not supported yet", async () => {
-    // Given the Word form, not parsed yet
-    server.use(handlers.tender(tender()));
+    // Given a form whose file could not be read into fields
+    const unread = form({ field_counts: null, estimated_fill_seconds: null });
+    server.use(handlers.tender(tender({ forms: [unread] })));
 
     // When I open the tender
     renderScreen(<TenderScreen tenderId={1} />);
 
-    // Then its auto-fill action is disabled
+    // Then it shows its file name and its auto-fill action is disabled
+    const card = within(await screen.findByRole("listitem", { name: /Annex 4/ }));
+    expect(
+      card.getByText("Annex_4_Conditions of Participation and Company Self-Declaration.docx"),
+    ).toBeInTheDocument();
+    expect(card.getByRole("button", { name: "Auto-fill" })).toBeDisabled();
+  });
+
+  it("shows a Word form, page by page, before auto-filling it", async () => {
+    // Given the Word form, untouched
+    server.use(
+      handlers.tender(tender()),
+      handlers.knowledge(knowledgeBase()),
+      handlers.formFile(1, annex4File()),
+    );
+    const user = userEvent.setup();
+    renderScreen(<TenderScreen tenderId={1} />);
+
+    // When I open its auto-fill
     const annex4 = within(await screen.findByRole("listitem", { name: /Annex 4/ }));
-    expect(annex4.getByRole("button", { name: "Auto-fill" })).toBeDisabled();
+    await user.click(annex4.getByRole("button", { name: "Auto-fill" }));
+
+    // Then the Setup shows the Word document itself
+    const preview = within(
+      await screen.findByRole("region", {
+        name: "Preview of Annex 4 — Conditions of participation and self-declaration",
+      }),
+    );
+    expect(await preview.findByText("Exact company name")).toBeInTheDocument();
   });
 
   describe("auto-fill", () => {
