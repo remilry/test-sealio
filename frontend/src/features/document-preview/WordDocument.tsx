@@ -68,18 +68,8 @@ export function WordDocument({
   // down to the column (never up), the text still laid out as on paper.
   useEffect(() => {
     const root = container.current;
-    const pages = root?.firstElementChild;
-    if (!ready || !root || !(pages instanceof HTMLElement)) return;
-    const width = pageWidth(pages);
-    if (!width) return;
-    const fit = () => {
-      pages.style.zoom = String(Math.min(1, root.clientWidth / width));
-    };
-    fit();
-    if (typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(fit);
-    observer.observe(root);
-    return () => observer.disconnect();
+    if (!ready || !root) return;
+    return fitToWidth(root);
   }, [ready]);
   useLayoutEffect(() => {
     const root = container.current;
@@ -125,6 +115,22 @@ export function WordDocument({
       />
     </>
   );
+}
+
+/** Scale the rendered pages to `root`'s width, now and when it changes; returns the cleanup. */
+function fitToWidth(root: HTMLElement): (() => void) | undefined {
+  const pages = root.firstElementChild;
+  if (!(pages instanceof HTMLElement)) return;
+  const width = pageWidth(pages);
+  if (!width) return;
+  const fit = () => {
+    pages.style.zoom = String(Math.min(1, root.clientWidth / width));
+  };
+  fit();
+  if (typeof ResizeObserver === "undefined") return;
+  const observer = new ResizeObserver(fit);
+  observer.observe(root);
+  return () => observer.disconnect();
 }
 
 /** The widest page, in CSS pixels, as docx-preview sizes it (`width: 595.3pt`). */
