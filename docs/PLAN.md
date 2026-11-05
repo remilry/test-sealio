@@ -2,7 +2,7 @@
 
 > Document vivant. Chaque étape y est cochée et détaillée au fur et à mesure.
 > Contexte produit et priorités : voir `CLAUDE.md`. Échéance : jeudi 5 novembre.
-> Statut : étapes 0 à 4.5 faites ; étape 5 découpée en 5a–5d, 5a, 5b et 5c mergées, 5d faite (remplissage automatique dans l'UI, en attente de validation) ; étape 6 (Annex 4, 6a à 6d) mergée ; étape 7 (relecture) mergée ; étape 7.5 (finitions) faite sur `step-7.5-finishing`, en attente de validation ; prochaine : durcissement (8). Parcours détaillé : `docs/USER_FLOW.md`. Les choix techniques marqués _proposition_ restent à confirmer à l'étape 3.
+> Statut : étapes 0 à 4.5 faites ; étape 5 découpée en 5a–5d, 5a, 5b et 5c mergées, 5d faite (remplissage automatique dans l'UI, en attente de validation) ; étape 6 (Annex 4, 6a à 6d) mergée ; étape 7 (relecture) mergée ; étape 7.5 (finitions) mergée ; prochaine : durcissement (8). Parcours détaillé : `docs/USER_FLOW.md`. Les choix techniques marqués _proposition_ restent à confirmer à l'étape 3.
 
 ## 1. Ce qu'on a appris des deux formulaires
 
@@ -184,7 +184,7 @@ _Avancée avant la relecture et les finitions (décision 2026-11-05) : ses cas d
 - **Choix d'implémentation** (à revoir en 7.5 avec les maquettes) : chaque carte garde son champ de saisie (pas de carte réduite à une ligne) ; « Enter another value » d'un conflit = taper dans le champ ; `↵` hors du champ y place le curseur.
 - **Limites connues** : pas d'`Undo` d'une décision (la valeur reste modifiable ; `proposed_value` le permettra) ; pas de validation en lot ; « Replace certificate » non fait ; vider à la main une valeur automatique compte comme « laissé vide ».
 
-### Étape 7.5 — Finitions de l'UI et du remplissage en direct ✅ _(testé, branche `step-7.5-finishing`, en attente de validation)_
+### Étape 7.5 — Finitions de l'UI et du remplissage en direct ✅ _(testé, mergée le 2026-11-05)_
 _Sans spec (décision utilisateur) ; périmètre tranché au début de l'étape : les quatre éléments de maquette ci-dessous, valeur grisée puis remplacée, document entier ouvert à la page._
 - **Texte qui s'écrit** : le moteur lit la réponse encore incomplète du modèle (`on_writing`) ; la valeur de la 1ʳᵉ exécution, pour un champ texte (pas Oui/Non), part en événement `field` à l'état `writing` (`{field_id, text}`, au plus toutes les 250 ms par champ, clé du champ complète). Le front la montre grisée en italique, dans le champ vide (texte d'aide) et sur le document (ton `writing`), statut « Writing… » ; la réponse vérifiée la remplace ; rejetée, le champ prend son statut final (vide, à vérifier) ; jamais par-dessus une valeur de l'utilisateur ; oubliée à la fin du remplissage. `FakeLLM` rejoue en 60 morceaux (20 avant) pour qu'on la voie s'écrire.
 - **Onglet *Source*** : barre au-dessus du document, *Form* | *Source*, ce qui est affiché et la légende des teintes (en mode Form). *Source* montre la source du champ sélectionné : en-tête (format, document, page, date, « Used for: … »), document entier ; PDF rendu à la largeur de la colonne, page citée avec sa couche de texte, citation marquée (cherchée dans le texte de la page, éléments joints, morceaux dans l'ordre : un mot de la citation trouvé ailleurs n'est pas marqué), défilement jusqu'à la page ; Word : citation enveloppée dans des `<mark>` là où elle est écrite (cellules d'un tableau comprises, « a | b » dans les passages), défilement jusqu'à elle. Plusieurs sources (conflit) : boutons, une à la fois. Sans source : « No source for this field » (et combien de documents ont été cherchés) ; détails de l'offre ou document retiré : la citation seule. Le nom d'une source dans une carte ouvre l'onglet. Le formulaire reste rendu derrière l'onglet *Source* (retour immédiat).
@@ -310,3 +310,4 @@ UI (relecture)  ──►  API locale
 | 2026-11-05 | Ordre inversé : l'Annex 4 passe avant la relecture et les finitions. Renumérotation : Annex 4 = étape 6, relecture = étape 7, finitions = étape 7.5 (les lignes précédentes du journal et les specs datées gardent l'ancienne numérotation) | validé |
 | 2026-11-05 | Étape 7 validée et mergée dans `main` | validé |
 | 2026-11-05 | Étape 7.5 sans spec : les quatre éléments de maquette (cartes repliées, tuiles, barre du document, barre du haut et pied de liste) ; valeur en cours d'écriture grisée puis remplacée ; *Source* = document entier ouvert à la page, citation surlignée | validé |
+| 2026-11-05 | Étape 7.5 validée et mergée dans `main` | validé |
