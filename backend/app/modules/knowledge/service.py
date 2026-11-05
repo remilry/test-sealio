@@ -165,6 +165,13 @@ def delete_document(session: Session, tenant_id: int, document_id: int, data_dir
     shutil.rmtree(folder, ignore_errors=True)
 
 
+def delete_all_documents(session: Session, tenant_id: int, data_dir: Path) -> None:
+    """Remove every document of the tenant, as `delete_document` does one by one."""
+    ids = list(session.scalars(select(Document.id).where(Document.tenant_id == tenant_id)))
+    for document_id in ids:
+        delete_document(session, tenant_id, document_id, data_dir)
+
+
 def pending_document_ids(session: Session) -> list[int]:
     """Documents left "processing" (the server stopped while indexing them): to index again."""
     return list(

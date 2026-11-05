@@ -169,6 +169,12 @@ def discard_fill(session: Session, tenant_id: int, form_id: int) -> None:
     session.commit()
 
 
+def discard_all_fills(session: Session, tenant_id: int) -> None:
+    """`discard_fill` for every form of the tenant: all its forms are "not started" again."""
+    session.execute(delete(FormFill).where(FormFill.tenant_id == tenant_id))
+    session.commit()
+
+
 def fill_exists(session: Session, fill_id: int) -> bool:
     """False once the fill was discarded. A plain read: it holds no row lock."""
     return session.scalar(select(FormFill.id).where(FormFill.id == fill_id)) is not None

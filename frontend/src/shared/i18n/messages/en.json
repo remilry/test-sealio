@@ -16,6 +16,14 @@
     "sidebarDescription": "Displays the mobile sidebar.",
     "toggleSidebar": "Toggle Sidebar"
   },
+  "devTools": {
+    "reset": "Reset demo",
+    "title": "Reset the demo?",
+    "description": "Deletes every company document and every form answer. The tender and its forms stay.",
+    "cancel": "Cancel",
+    "confirm": "Reset",
+    "failed": "The demo could not be reset. Is the API running with FORMPILOT_DEV_TOOLS=true (make dev)?"
+  },
   "shell": {
     "mainNav": "Main",
     "tenders": "Tenders",

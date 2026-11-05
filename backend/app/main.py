@@ -12,6 +12,7 @@ from app.core.db import SessionDep, SessionLocal
 from app.core.errors import register_error_handlers
 from app.core.logging import configure_logging
 from app.core.migrations import upgrade_to_head
+from app.modules.dev.router import router as dev_router
 from app.modules.export.router import router as export_router
 from app.modules.filling import service as filling_service
 from app.modules.filling.router import router as filling_router
@@ -54,6 +55,7 @@ app.include_router(forms_router)
 app.include_router(filling_router)
 app.include_router(export_router)
 app.include_router(knowledge_router)
+app.include_router(dev_router)
 
 
 class Health(BaseModel):

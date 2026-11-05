@@ -25,6 +25,8 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["http://localhost:3000"]
     # Slug of the tenant every request acts for, until real authentication (tenants/service.py).
     current_tenant: str = "alpenlogic"
+    # Development helpers (POST /dev/reset): off unless set, `make dev` turns them on.
+    dev_tools: bool = False
 
     # "fake": replays recorded answers (llm_recordings_dir), no key and no network (tests, e2e).
     llm_provider: Literal["openai", "fake"] = "fake"

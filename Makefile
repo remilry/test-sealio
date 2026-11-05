@@ -17,7 +17,7 @@ dev: db             ## Run the whole app: db, API on :8000, UI on :3000 (Ctrl-C 
 	$(MAKE) -j2 dev-back dev-front
 
 dev-back:
-	$(BACK) uv run fastapi dev
+	$(BACK) FORMPILOT_DEV_TOOLS=true uv run fastapi dev
 
 dev-front:
 	$(FRONT) pnpm dev

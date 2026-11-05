@@ -100,6 +100,16 @@ export const handlers = {
     return { handler, state };
   },
 
+  /** `POST /dev/reset`: counts the resets, answers 204. */
+  resetDemo: () => {
+    const state = { resets: 0 };
+    const handler = http.post(url("/dev/reset"), () => {
+      state.resets += 1;
+      return new HttpResponse(null, { status: 204 });
+    });
+    return { handler, state };
+  },
+
   /**
    * `GET /forms/{id}/fill/events`: an SSE stream driven by the test. `send(event)` writes an event;
    * `close()` ends the stream. Every request (a reload) first gets the events already sent, as the
