@@ -13,6 +13,7 @@ function field(overrides: Partial<QueueField> = {}): QueueField {
     unsaved: null,
     enteredAt: null,
     state: "answered",
+    writing: null,
     type: null,
     resolvedBy: null,
     proposedValue: null,

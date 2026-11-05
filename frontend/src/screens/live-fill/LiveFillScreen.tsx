@@ -3,9 +3,20 @@
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeftIcon, CircleAlertIcon, FileXIcon, MoreHorizontalIcon } from "lucide-react";
+import {
+  ArrowLeftIcon,
+  CheckIcon,
+  CircleAlertIcon,
+  FileXIcon,
+  MoreHorizontalIcon,
+} from "lucide-react";
 import { useTranslations } from "next-intl";
-import { DocumentPreview, type PreviewZone, type ZoneTone } from "@/features/document-preview";
+import {
+  DocumentPreview,
+  PreviewLegend,
+  type PreviewZone,
+  type ZoneTone,
+} from "@/features/document-preview";
 import {
   DiscardFillDialog,
   FillProgress,
@@ -43,6 +54,8 @@ import {
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu";
 import { Skeleton } from "@/shared/ui/skeleton";
+import { cn } from "@/shared/lib/utils";
+import { SourceView } from "./SourceView";
 
 /**
  * Live fill (docs/USER_FLOW.md §3.4): the fields on the left, the original form on the right,
@@ -148,6 +161,8 @@ function FillWorkspace({
       unsaved: unsaved.get(field.id) ?? null,
       enteredAt: answer?.resolved_by === "user" ? answer.resolved_at : null,
       state: fieldState(run, field.id),
+      // What the user saved is theirs: the fill does not write over it.
+      writing: answer?.resolved_by === "user" ? null : (run.writing.get(field.id) ?? null),
       type: answer?.type ?? null,
       resolvedBy: answer?.resolved_by ?? null,
       proposedValue: answer?.proposed_value ?? null,
@@ -158,11 +173,14 @@ function FillWorkspace({
   const zones: PreviewZone[] = form.fields.map((field, index) => {
     const draft = drafts.get(field.id);
     const value = (draft ?? fields[index].value ?? "").trim() || null;
+    const writing = value === null ? fields[index].writing : null;
     return {
       id: field.id,
       label: field.label,
-      value,
-      tone: zoneTone(fields[index], value, draft === undefined ? answers.get(field.id) : undefined),
+      value: value ?? writing,
+      tone: writing
+        ? "writing"
+        : zoneTone(fields[index], value, draft === undefined ? answers.get(field.id) : undefined),
       place: placeOf(field.locator),
     };
   });
@@ -177,6 +195,12 @@ function FillWorkspace({
   // the selection would jump at every answer).
   const firstOpen = nextOpen(fields, -1) ?? (fillable[0] ?? fields[0])?.id;
   const selectedId = chosenId ?? (filling ? null : (firstOpen ?? null));
+  const selectedField = fields.find((field) => field.id === selectedId);
+  // The right column shows the form, or where the selected field's value comes from.
+  const [viewer, setViewer] = useState<Viewer>("form");
+  const [exporting, setExporting] = useState(false);
+  // The source chosen among several for a field (the first one otherwise).
+  const [source, setSource] = useState<{ fieldId: number; index: number } | null>(null);
 
   const focusField = (fieldId: number) => {
     setChosenId(fieldId);
@@ -256,10 +280,10 @@ function FillWorkspace({
             }}
           />
           <SaveIndicator formId={form.id} />
-          <span className="text-xs whitespace-nowrap text-muted-foreground">
-            {t("progress", counts)}
-          </span>
+          <FilledMeter counts={counts} />
           <ExportDialog
+            open={exporting}
+            onOpenChange={setExporting}
             formId={form.id}
             formTitle={form.title}
             fileFormat={form.file_format}
@@ -271,45 +295,80 @@ function FillWorkspace({
       }
     >
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(320px,420px)_minmax(0,1fr)]">
-        <div className="flex min-h-0 flex-col gap-4 overflow-y-auto border-r bg-card/50 p-5">
-          <FillHeader
-            run={run}
-            filling={filling}
-            openCount={counts.open}
-            estimatedSeconds={form.estimated_fill_seconds}
-            startedAt={fill.ai_run?.started_at ?? null}
-          />
-          <FieldList
-            fields={fields}
-            grouped={grouped}
-            selectedId={selectedId}
-            focusRequest={focusRequest}
-            context={
-              knowledge && {
-                companyName: knowledge.company_name,
-                documentCount: knowledge.documents.length,
-              }
-            }
-            onSelect={setChosenId}
-            onSave={saveField}
-            onSettle={(fieldId, value) => {
-              saveField(fieldId, value);
-              focusNext(fieldId);
-            }}
-            onNext={focusNext}
-            onDraft={setDraft}
-          />
-        </div>
-        <div className="min-h-0 overflow-y-auto bg-muted/40 p-6">
-          <div className="mx-auto max-w-[760px]">
-            <DocumentPreview
-              fileUrl={originalFileUrl(form.id)}
-              fileFormat={form.file_format}
-              pages={form.pages}
-              zones={zones}
-              selectedId={selectedId}
-              onSelect={focusField}
+        <div className="flex min-h-0 flex-col border-r bg-card">
+          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
+            <FillHeader
+              run={run}
+              filling={filling}
+              openCount={counts.open}
+              documentCount={knowledge?.documents.length ?? null}
+              estimatedSeconds={form.estimated_fill_seconds}
+              startedAt={fill.ai_run?.started_at ?? null}
             />
+            {!filling && counts.open === 0 && (
+              <ReadyBanner fillable={counts.fillable} onExport={() => setExporting(true)} />
+            )}
+            <FieldList
+              fields={fields}
+              grouped={grouped}
+              selectedId={selectedId}
+              focusRequest={focusRequest}
+              context={
+                knowledge && {
+                  companyName: knowledge.company_name,
+                  documentCount: knowledge.documents.length,
+                  documentFormats: Object.fromEntries(
+                    knowledge.documents.map((document) => [document.id, document.file_format]),
+                  ),
+                }
+              }
+              onSelect={setChosenId}
+              onSave={saveField}
+              onSettle={(fieldId, value) => {
+                saveField(fieldId, value);
+                focusNext(fieldId);
+              }}
+              onNext={focusNext}
+              onDraft={setDraft}
+              onOpenSource={(fieldId, index) => {
+                setChosenId(fieldId);
+                setSource({ fieldId, index });
+                setViewer("source");
+              }}
+            />
+          </div>
+          <KeyHints />
+        </div>
+        <div className="flex min-h-0 flex-col bg-muted/40">
+          <ViewerBar
+            viewer={viewer}
+            onViewer={setViewer}
+            label={viewer === "form" ? form.title : (selectedField?.label ?? "")}
+          />
+          <div className="min-h-0 flex-1 overflow-y-auto p-6">
+            {/* The form stays rendered under the Source tab: back to it at once, as it was. */}
+            <div hidden={viewer !== "form"} className="mx-auto max-w-[760px]">
+              <DocumentPreview
+                fileUrl={originalFileUrl(form.id)}
+                fileFormat={form.file_format}
+                pages={form.pages}
+                zones={zones}
+                selectedId={selectedId}
+                onSelect={focusField}
+              />
+            </div>
+            {viewer === "source" && (
+              <div className="mx-auto max-w-[760px]">
+                <SourceView
+                  field={selectedField}
+                  sourceIndex={source?.fieldId === selectedId ? source.index : 0}
+                  onSourceIndex={(index) =>
+                    selectedId !== null && setSource({ fieldId: selectedId, index })
+                  }
+                  documents={knowledge?.documents}
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -322,6 +381,7 @@ function FillHeader({
   run,
   filling,
   openCount,
+  documentCount,
   estimatedSeconds,
   startedAt,
 }: {
@@ -329,6 +389,8 @@ function FillHeader({
   filling: boolean;
   /** Fields nobody settled yet that are empty or have a doubt. */
   openCount: number;
+  /** How many company documents the answers come from (null while unknown). */
+  documentCount: number | null;
   estimatedSeconds: number | null;
   startedAt: string | null;
 }) {
@@ -367,11 +429,134 @@ function FillHeader({
           })}
         </p>
       )}
-      <h2 className="text-[15px] font-semibold">
-        {openCount === 0 ? t("allReviewed") : t("needALook", { count: openCount })}
-      </h2>
+      <div className="flex items-baseline justify-between gap-2">
+        <h2 className="text-[15px] font-semibold">
+          {openCount === 0 ? t("allReviewed") : t("needALook", { count: openCount })}
+        </h2>
+        {documentCount !== null && (
+          <span className="text-[11.5px] whitespace-nowrap text-muted-foreground">
+            {t("fromDocuments", { count: documentCount })}
+          </span>
+        )}
+      </div>
       <p className="text-xs text-muted-foreground">{t("instructions")}</p>
     </header>
+  );
+}
+
+type Viewer = "form" | "source";
+
+/** Above the document: Form or Source, what is shown, and what the colours of the form mean. */
+function ViewerBar({
+  viewer,
+  onViewer,
+  label,
+}: {
+  viewer: Viewer;
+  onViewer: (viewer: Viewer) => void;
+  label: string;
+}) {
+  const t = useTranslations("source");
+  return (
+    <div className="flex h-11 flex-none items-center gap-3 overflow-hidden border-b bg-card px-4 text-xs text-muted-foreground">
+      <div
+        role="tablist"
+        aria-label={t("tabs")}
+        className="inline-flex flex-none gap-0.5 rounded-md border bg-muted/50 p-0.5"
+      >
+        {(["form", "source"] as const).map((option) => (
+          <button
+            key={option}
+            type="button"
+            role="tab"
+            aria-selected={viewer === option}
+            onClick={() => onViewer(option)}
+            className={cn(
+              "rounded-[5px] px-2.5 py-0.5 font-medium transition-colors",
+              viewer === option ? "bg-card text-foreground shadow-xs" : "hover:text-foreground",
+            )}
+          >
+            {t(option)}
+          </button>
+        ))}
+      </div>
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+      {viewer === "form" && <PreviewLegend className="hidden min-w-0 overflow-hidden xl:flex" />}
+    </div>
+  );
+}
+
+/** In the top bar: how much of the form is filled, and what is left to review. */
+function FilledMeter({ counts }: { counts: FillState["counts"] }) {
+  const t = useTranslations("liveFill");
+  const share = counts.fillable === 0 ? 0 : counts.filled / counts.fillable;
+  return (
+    <div className="flex items-center gap-2.5 text-xs whitespace-nowrap text-muted-foreground">
+      <div aria-hidden className="hidden h-1.5 w-28 overflow-hidden rounded-full bg-muted lg:block">
+        <div
+          className="h-full rounded-full bg-success transition-[width]"
+          style={{ width: `${Math.round(share * 100)}%` }}
+        />
+      </div>
+      <span>{t("progress", counts)}</span>
+      {counts.open > 0 && (
+        <span className="rounded-full bg-warning/12 px-2 py-0.5 text-[11.5px] font-semibold text-warning">
+          {t("toReview", { count: counts.open })}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** Nothing is left to look at: the form can go. */
+function ReadyBanner({ fillable, onExport }: { fillable: number; onExport: () => void }) {
+  const t = useTranslations("liveFill");
+  return (
+    <div className="flex items-center gap-3 rounded-lg bg-success/10 p-3.5 text-success">
+      <span
+        aria-hidden
+        className="grid size-7 flex-none place-items-center rounded-full bg-success text-background"
+      >
+        <CheckIcon className="size-4" />
+      </span>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <p className="text-sm font-semibold">{t("readyTitle")}</p>
+        <p className="text-xs">{t("readyDescription", { count: fillable })}</p>
+      </div>
+      <Button
+        size="sm"
+        onClick={onExport}
+        className="bg-success text-background hover:bg-success/90"
+      >
+        {t("readyExport")}
+      </Button>
+    </div>
+  );
+}
+
+/** Under the list: the keys that move through it. */
+function KeyHints() {
+  const t = useTranslations("liveFill");
+  return (
+    <div className="flex flex-none items-center gap-3.5 overflow-hidden border-t px-4 py-2 text-[11px] whitespace-nowrap text-muted-foreground">
+      <span className="flex items-center gap-1">
+        <Key>{t("keyUp")}</Key>
+        <Key>{t("keyDown")}</Key>
+        {t("keyMove")}
+      </span>
+      <span className="flex items-center gap-1">
+        <Key>{t("keyEnter")}</Key>
+        {t("keyConfirm")}
+      </span>
+    </div>
+  );
+}
+
+function Key({ children }: { children: string }) {
+  return (
+    <kbd className="rounded border border-b-2 px-1 font-mono text-[10.5px] text-muted-foreground">
+      {children}
+    </kbd>
   );
 }
 

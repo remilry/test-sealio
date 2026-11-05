@@ -17,7 +17,8 @@ from pydantic_core import from_json
 
 from app.llm.facade import LLM, LLMError, LLMRequest, LLMResult, LLMUsage, OnPartial
 
-CHUNKS = 20
+# Fine enough for a value to show while it is written (the real model streams by tokens).
+CHUNKS = 60
 
 
 class FakeLLM:

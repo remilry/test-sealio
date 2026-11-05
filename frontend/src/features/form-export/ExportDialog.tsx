@@ -30,6 +30,8 @@ export function ExportDialog({
   savePending,
   filling,
   onReview,
+  open: openProp,
+  onOpenChange,
 }: {
   formId: number;
   formTitle: string;
@@ -40,10 +42,18 @@ export function ExportDialog({
   filling: boolean;
   /** Back to the review, on a field the export warns about. */
   onReview: (fieldId: number) => void;
+  /** Open, when the screen opens it from elsewhere too (uncontrolled otherwise). */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
   const t = useTranslations("export");
   const format = fileFormat.toUpperCase();
-  const [open, setOpen] = useState(false);
+  const [ownOpen, setOwnOpen] = useState(false);
+  const open = openProp ?? ownOpen;
+  const setOpen = (next: boolean) => {
+    setOwnOpen(next);
+    onOpenChange?.(next);
+  };
   if (filling) {
     return (
       <Button disabled>

@@ -34,7 +34,7 @@ data/ (ignoré par git) : uploads, exports. Seed au démarrage : tenant, offre, 
 | Contrat | Modèles Pydantic → OpenAPI → `openapi-typescript` → types TS |
 | Communication | REST + SSE (remplissage). Corrections utilisateur en `PATCH` pendant le flux ; `DELETE /forms/{id}/fill` abandonne le remplissage (réponses de l'utilisateur comprises) |
 | Remplissage | Job asyncio côté back, événements persistés → SSE rejouable (rechargement), écrans de repli sur le même modèle |
-| LLM | OpenAI `gpt-5-mini` (décision 2026-11-04, Claude auparavant) via une façade `llm/` (`generate_structured`) ; aucun autre module n'importe le SDK. **Un appel par groupe de champs** (une section, coupée au-delà de 10 champs), fait deux fois en parallèle et fusionné, groupes en parallèle, lu en flux (`on_partial`) : événement SSE par champ, publié dès que le modèle l'a complet |
+| LLM | OpenAI `gpt-5-mini` (décision 2026-11-04, Claude auparavant) via une façade `llm/` (`generate_structured`) ; aucun autre module n'importe le SDK. **Un appel par groupe de champs** (une section, coupée au-delà de 10 champs), fait deux fois en parallèle et fusionné, groupes en parallèle, lu en flux (`on_partial`) : événement SSE par champ, publié dès que le modèle l'a complet ; avant cela, la valeur que la 1ʳᵉ exécution écrit (champs texte, non vérifiée, au plus toutes les 250 ms par champ) part en événement `writing`, que la réponse remplace |
 | Recherche | RAG hybride dans PostgreSQL : vecteurs (`fastembed` local + pgvector) + plein texte (`tsvector`), fusion des rangs (RRF). Passages = document + page + rectangle |
 | Fiabilité | Le LLM renvoie toutes les valeurs candidates avec leurs citations exactes, ou rien. Le code vérifie chaque citation et chaque valeur, détecte les conflits (valeurs normalisées divergentes) et la péremption (date de validité renvoyée avec sa citation, comparée à aujourd'hui). Plus aucun candidat vérifié → `missing` |
 | Ingestion V1 | Pas d'extraction de faits (coût) : *Company knowledge* liste les documents |
@@ -66,8 +66,8 @@ frontend/src/
 │  ├─ fill-session/      fill-session.{api,queries}.ts (useFormDetail, useFillState, useSaveAnswer ; SSE à l'étape 5) · SaveIndicator
 │  ├─ review-queue/      ReviewQueue · FilterChips · FieldCard/{Auto,NotFound,Manual,
 │  │                     Outdated,Conflict,Declaration} · useReviewKeyboard
-│  ├─ document-preview/  DocumentPreview · renderers/{pdf,docx} · FieldOverlay · locator.ts
-│  ├─ source-viewer/     source-viewer.{api,queries}.ts · SourceView
+│  ├─ document-preview/  DocumentPreview · PdfDocument / WordDocument · SourceViewer (document
+│  │                     ouvert à la citation, surlignée : quote-highlight.ts) · locator.ts
 │  └─ form-export/       form-export.{api,queries}.ts · ExportDialog (résumé, champs vides, téléchargement)
 │
 ├─ shared/
@@ -177,7 +177,7 @@ Toutes les tables héritent d'un `TimestampMixin` : `created_at` (`timestamptz`,
 | `field` | formulaire, section, ordre, libellé, nature (`text`/`number`/`date`/`yes_no`/`signature`), localisateur (JSONB), contexte (titre qui chapeaute le champ, pour la recherche et le prompt, jamais affiché) |
 | `form_fill` | tenant, formulaire (unique ensemble), statut (`not_started`/`in_review`/`ready`), dernier remplissage IA (`ai_status` `running`/`done`/`failed`, `ai_started_at`, `ai_finished_at`). Créé à la première réponse ou au premier remplissage |
 | `answer` | remplissage, champ (unique ensemble), valeur, candidats JSONB `[{value, citations: [{quote, document_name, document_id, chunk_id, page}], source_date, valid_until}]` (sélectionné en premier ; dates avec leur citation), type (`auto`/`missing`/`manual`/`outdated`/`conflict`/`declaration`, nul si jamais traité par l'IA), raison `user_only`, `needs_review`, `resolved_by`, `resolved_at` |
-| `fill_event` | remplissage, id croissant (= id SSE), type (`phase`/`field`/`done`/`error`), données JSONB. Événements du dernier remplissage seulement |
+| `fill_event` | remplissage, id croissant (= id SSE), type (`phase`/`field`/`done`/`error`), données JSONB (`field` : état `searching`, `writing` avec le texte en cours, `answered`). Événements du dernier remplissage seulement |
 
 ### Recherche hybride
 - **Vecteurs** : `fastembed` (`BAAI/bge-small-en-v1.5`, 384 dimensions, local) → pgvector, distance cosinus.

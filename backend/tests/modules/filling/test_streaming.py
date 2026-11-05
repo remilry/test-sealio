@@ -53,7 +53,10 @@ def _search(query: str, k: int) -> list[SourcePassage]:
 
 
 def _run(
-    answers: list[dict[str, Any]], on_field: Any = None, fields: list[FieldToAnswer] = FIELDS
+    answers: list[dict[str, Any]],
+    on_field: Any = None,
+    fields: list[FieldToAnswer] = FIELDS,
+    on_writing: Any = None,
 ) -> tuple[SectionResult, list[dict[str, Any]]]:
     """Runs a section; also returns the partials the model streamed (to know when things happen)."""
     llm = FakeLLM({request_key(FILE, SECTION): {"fields": answers}})
@@ -67,8 +70,58 @@ def _run(
         tender_details="Tender",
         today=date(2026, 11, 4),
         on_field=on_field,
+        on_writing=on_writing,
     )
     return result, []
+
+
+LONG_NAME = "Alpenlogic AG, cloud and platform services for public administrations"
+
+
+def test_the_value_being_written_is_reported_as_it_grows_before_the_field() -> None:
+    events: list[tuple[str, int, str]] = []
+    _run(
+        [_answer("name", LONG_NAME), _answer("city", "Zurich")],
+        lambda field_id, _: events.append(("field", field_id, "")),
+        on_writing=lambda field_id, text: events.append(("writing", field_id, text)),
+    )
+    writing = [e for e in events if e[0] == "writing" and e[1] == 1]
+    assert writing, events
+    texts = [e[2] for e in writing]
+    assert all(LONG_NAME.startswith(text) for text in texts)
+    assert len(set(texts)) == len(texts)
+    # Never reported once the field is complete (published).
+    assert events.index(writing[-1]) < events.index(("field", 1, ""))
+
+
+def test_yes_no_values_are_not_reported_while_written() -> None:
+    writing: list[int] = []
+    _run(
+        [_answer("decl", "yes " * 30), _answer("city", "Zurich")],
+        fields=[FieldToAnswer(1, "decl", "Declaration", FieldKind.YES_NO), FIELDS[1]],
+        on_writing=lambda field_id, _: writing.append(field_id),
+    )
+    assert 1 not in writing
+
+
+def test_only_the_first_run_reports_what_it_writes() -> None:
+    llm = FakeLLM({request_key(FILE, SECTION): {"fields": [_answer("name", LONG_NAME)]}})
+    writing: list[str] = []
+    answer_section(
+        llm,
+        company="Alpenlogic AG",
+        form_title="Annex",
+        form_file_name=FILE,
+        group=CallGroup(SECTION, None, FIELDS),
+        search=_search,
+        tender_details="Tender",
+        today=date(2026, 11, 4),
+        on_writing=lambda _, text: writing.append(text),
+        runs=2,
+    )
+    # Both runs replay the same answer: each partial text once, from one run.
+    assert writing
+    assert len(set(writing)) == len(writing)
 
 
 def test_complete_items_of_nothing_is_empty() -> None:
@@ -111,7 +164,7 @@ def test_fields_are_published_while_the_model_writes(monkeypatch: Any) -> None:
 
 
 def test_each_field_is_published_once() -> None:
-    # 3 answers: the JSON length is not a multiple of 20, chunks cut keys and strings.
+    # 3 answers: the JSON length is not a multiple of CHUNKS, chunks cut keys and strings.
     published: list[int] = []
     _run(
         [_answer("name", "Alpenlogic AG"), _answer("city", "Zurich"), _answer("uid", "CHE-1")],

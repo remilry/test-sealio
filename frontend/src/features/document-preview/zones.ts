@@ -1,10 +1,14 @@
 import type { DocxLocator } from "./docx-locator";
 import type { PdfBox } from "./locator";
 
-export type ZoneTone = "auto" | "toCheck" | "empty" | "entered" | "signature" | "searching";
+export type ZoneTone =
+  "auto" | "toCheck" | "empty" | "entered" | "signature" | "searching" | "writing";
 
 /** The tones explained under the document, in this order (a searched zone explains itself). */
 export const LEGEND = ["auto", "toCheck", "empty", "entered", "signature"] as const;
+
+/** A quoted passage to show in a document: its page (0-based, when known) and its words. */
+export type QuoteFocus = { page: number | null; quote: string };
 
 /** Where a field is on a PDF page. */
 export type PdfPlace = {
@@ -53,6 +57,11 @@ export const TONES: Record<ZoneTone, { zone: string; swatch: string }> = {
   },
   searching: {
     zone: "animate-pulse bg-primary/8 ring-primary/30",
+    swatch: "bg-primary/15",
+  },
+  // A value the model is writing, not verified yet: greyed until its answer replaces it.
+  writing: {
+    zone: "bg-primary/8 italic ring-primary/30 text-black/50!",
     swatch: "bg-primary/15",
   },
 };

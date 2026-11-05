@@ -32,6 +32,13 @@ export function Document({
   );
 }
 
-export function Page({ pageNumber }: { pageNumber: number }) {
-  return <div data-pdf-page={pageNumber} />;
+export function Page({
+  pageNumber,
+  renderTextLayer,
+}: {
+  pageNumber: number;
+  renderTextLayer?: boolean;
+}) {
+  // The text layer (where a quote is marked) is drawn only for the page that asks for it.
+  return <div data-pdf-page={pageNumber} data-text-layer={renderTextLayer ? "" : undefined} />;
 }

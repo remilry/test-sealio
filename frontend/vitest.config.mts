@@ -10,9 +10,15 @@ export default defineConfig({
   resolve: {
     tsconfigPaths: true,
     // PDF.js cannot render in jsdom: pages are stubbed, the field overlay stays real.
-    alias: {
-      "react-pdf": fileURLToPath(new URL("./src/shared/test/mocks/react-pdf.tsx", import.meta.url)),
-    },
+    alias: [
+      // The package itself only: its stylesheets (the text layer's) still load.
+      {
+        find: /^react-pdf$/,
+        replacement: fileURLToPath(
+          new URL("./src/shared/test/mocks/react-pdf.tsx", import.meta.url),
+        ),
+      },
+    ],
   },
   test: {
     environment: "jsdom",

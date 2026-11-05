@@ -61,3 +61,16 @@ export function nextOpen(fields: QueueField[], afterId: number): number | null {
   const rotated = [...queue.slice(index + 1), ...queue.slice(0, Math.max(index, 0))];
   return rotated.find((field) => field.id !== afterId && isOpen(field))?.id ?? null;
 }
+
+export type FieldSource = {
+  citation: QueueField["candidates"][number]["citations"][number];
+  candidate: QueueField["candidates"][number];
+};
+
+/** Where a field's value comes from: every source when they disagree, else the selected one's. */
+export function fieldSources(field: QueueField): FieldSource[] {
+  const candidates = field.type === "conflict" ? field.candidates : field.candidates.slice(0, 1);
+  return candidates.flatMap((candidate) =>
+    candidate.citations.map((citation) => ({ citation, candidate })),
+  );
+}

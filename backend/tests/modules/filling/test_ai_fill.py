@@ -263,11 +263,19 @@ def test_the_events_replay_the_five_phases_and_each_answer(
     detected = next(e["data"] for e in events if e["event"] == "phase")
     assert detected == {"phase": "reading_form", "file_format": "pdf", "pages": 1, "sections": 1}
     fields = [e["data"] for e in events if e["event"] == "field"]
+    writing = [f for f in fields if f["state"] == "writing"]
+    fields = [f for f in fields if f["state"] != "writing"]
     assert [f["state"] for f in fields] == ["searching"] * 9 + ["answered"] * 9
     assert fields[-1]["counts"]["filled"] == 7
     assert events[-1]["event"] == "done"
     assert events[-1]["data"]["filled"] == 7
     assert [e["id"] for e in events] == sorted(e["id"] for e in events)
+    # Values appear while the model writes them, before their answer.
+    assert writing
+    answered = {f["field_id"]: f["answer"]["value"] for f in fields if f["state"] == "answered"}
+    for written in writing:
+        assert set(written) == {"field_id", "state", "text"}
+        assert written["field_id"] in answered
 
 
 def test_the_events_resume_after_the_last_event_received(client: TestClient, annex_7: int) -> None:

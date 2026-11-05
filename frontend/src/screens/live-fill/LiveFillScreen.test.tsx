@@ -7,6 +7,7 @@ import { API_URL } from "@/shared/api";
 import { handlers, renderScreen, server } from "@/shared/test";
 import {
   aiAnswer,
+  annualReportFile,
   candidate,
   citation,
   knowledgeBase,
@@ -130,7 +131,10 @@ describe("Live fill (manual)", () => {
     expect(preview().querySelectorAll("[data-field-id]")).toHaveLength(10);
     expect(zone(6)).toHaveAccessibleName("Telephone");
     expect(zone(6).style.left).toBe(`${((143.9 - 2) / 595.3) * 100}%`);
-    expect(within(preview()).getByText("Sign by hand")).toBeInTheDocument();
+    // And the colours are explained above it
+    expect(
+      within(screen.getByRole("list", { name: "Legend" })).getByText("Sign by hand"),
+    ).toBeInTheDocument();
   });
 
   it("shows where I am: tender, form, how many fields are filled", async () => {
@@ -412,7 +416,9 @@ function fillingBack() {
       send({ type: "phase", phase, ...extra }),
     searching: (...fieldIds: number[]) =>
       fieldIds.forEach((fieldId) => send({ type: "field", field_id: fieldId, state: "searching" })),
-    answered: (fieldId: number, value: string, type: Answer["type"] = "auto") => {
+    writing: (fieldId: number, text: string) =>
+      send({ type: "field", field_id: fieldId, state: "writing", text }),
+    answered: (fieldId: number, value: string | null, type: Answer["type"] = "auto") => {
       const entry = aiAnswer(fieldId, value, type ?? "auto");
       // The back keeps the user's value: it only publishes the answer.
       if (state.answers.find((a) => a.field_id === fieldId)?.resolved_by !== "user") {
@@ -484,11 +490,9 @@ describe("Live fill (watching the automatic fill)", () => {
     // Then they show as searched
     await screen.findByRole("list", { name: "Fields" });
     const card = (label: string) => within(fieldList().getByRole("listitem", { name: label }));
-    expect(
-      await card("Name and legal form").findByText("Searching your documents…"),
-    ).toBeInTheDocument();
-    expect(card("Telephone").getByText("Searching your documents…")).toBeInTheDocument();
-    expect(card("E-mail").queryByText("Searching your documents…")).not.toBeInTheDocument();
+    expect(await card("Name and legal form").findByText("Searching…")).toBeInTheDocument();
+    expect(card("Telephone").getByText("Searching…")).toBeInTheDocument();
+    expect(card("E-mail").queryByText("Searching…")).not.toBeInTheDocument();
 
     // When the name is found
     back.answered(3, "Alpenlogic AG");
@@ -497,9 +501,9 @@ describe("Live fill (watching the automatic fill)", () => {
     await waitFor(() =>
       expect(card("Name and legal form").getByRole("textbox")).toHaveValue("Alpenlogic AG"),
     );
-    expect(card("Name and legal form").queryByText("Searching your documents…")).toBeNull();
+    expect(card("Name and legal form").queryByText("Searching…")).toBeNull();
     expect(within(await findZone(3)).getByText("Alpenlogic AG")).toBeInTheDocument();
-    const legend = within(within(preview()).getByRole("list", { name: "Legend" }));
+    const legend = within(screen.getByRole("list", { name: "Legend" }));
     expect(legend.getAllByRole("listitem").map((item) => item.textContent)).toEqual([
       "Filled automatically",
       "To check",
@@ -507,13 +511,61 @@ describe("Live fill (watching the automatic fill)", () => {
       "Entered by you",
       "Sign by hand",
     ]);
-    expect(card("Telephone").getByText("Searching your documents…")).toBeInTheDocument();
-    expect(card("Business address").getByText("Searching your documents…")).toBeInTheDocument();
+    expect(card("Telephone").getByText("Searching…")).toBeInTheDocument();
+    expect(card("Business address").getByText("Searching…")).toBeInTheDocument();
     expect(zone(3)).toHaveAttribute("data-tone", "auto");
     expect(zone(4)).toHaveAttribute("data-tone", "searching");
     // And the counters follow
     expect(screen.getByText("1 / 9 filled · 8 empty · 0 doubts")).toBeInTheDocument();
     expect(screen.getByText("1 / 9")).toBeInTheDocument();
+    back.stream.close();
+  });
+
+  it("shows a value greyed while it is written, then the checked answer instead", async () => {
+    // Given the fill searching the name
+    const { back } = watchFill();
+    startSearch(back);
+    back.searching(3, 4);
+    const card = within(await screen.findByRole("listitem", { name: "Name and legal form" }));
+
+    // When the model starts writing its value
+    back.writing(3, "Alpenlo");
+    back.writing(3, "Alpenlogic AG, Zur");
+
+    // Then it shows greyed in the empty input and on the form, as being written
+    expect(await card.findByText("Writing…")).toBeInTheDocument();
+    expect(card.getByRole("textbox")).toHaveValue("");
+    expect(card.getByRole("textbox")).toHaveAttribute("placeholder", "Alpenlogic AG, Zur");
+    expect(within(await findZone(3)).getByText("Alpenlogic AG, Zur")).toBeInTheDocument();
+    expect(zone(3)).toHaveAttribute("data-tone", "writing");
+
+    // When the checked answer arrives (shorter than what was written)
+    back.answered(3, "Alpenlogic AG");
+
+    // Then it replaces the value being written
+    await waitFor(() => expect(card.getByRole("textbox")).toHaveValue("Alpenlogic AG"));
+    expect(card.queryByText("Writing…")).toBeNull();
+    expect(zone(3)).toHaveAttribute("data-tone", "auto");
+    expect(within(zone(3)).queryByText("Alpenlogic AG, Zur")).toBeNull();
+    back.stream.close();
+  });
+
+  it("drops a value being written that the check rejects", async () => {
+    // Given the model writing an address
+    const { back } = watchFill();
+    startSearch(back);
+    back.searching(4);
+    back.writing(4, "Bahnhofstrasse 1");
+    expect(await within(await findZone(4)).findByText("Bahnhofstrasse 1")).toBeInTheDocument();
+
+    // When the check finds no quote for it: the field is answered without a value
+    back.answered(4, null, "missing");
+
+    // Then the unverified value is gone, the field is empty
+    await waitFor(() => expect(zone(4)).toHaveAttribute("data-tone", "empty"));
+    expect(within(zone(4)).queryByText("Bahnhofstrasse 1")).toBeNull();
+    const card = within(fieldList().getByRole("listitem", { name: "Business address" }));
+    expect(card.getByRole("textbox")).not.toHaveAttribute("placeholder", "Bahnhofstrasse 1");
     back.stream.close();
   });
 
@@ -560,7 +612,7 @@ describe("Live fill (watching the automatic fill)", () => {
     back.searching(4);
     expect(await screen.findByText("1 / 9")).toBeInTheDocument();
     const address = within(fieldList().getByRole("listitem", { name: "Business address" }));
-    expect(await address.findByText("Searching your documents…")).toBeInTheDocument();
+    expect(await address.findByText("Searching…")).toBeInTheDocument();
 
     // When it fails
     back.error("the documents could not be read");
@@ -578,8 +630,8 @@ describe("Live fill (watching the automatic fill)", () => {
     expect(await screen.findByRole("button", { name: "Export PDF" })).toBeEnabled();
     // And the field it was searching is no longer shown as searched
     const addressNow = within(fieldList().getByRole("listitem", { name: "Business address" }));
-    expect(addressNow.queryByText("Searching your documents…")).not.toBeInTheDocument();
-    expect(addressNow.getByText("Empty — exported blank")).toBeInTheDocument();
+    expect(addressNow.queryByText("Searching…")).not.toBeInTheDocument();
+    expect(addressNow.getByText("Empty")).toBeInTheDocument();
     expect((await findZone(4)).getAttribute("data-tone")).not.toBe("searching");
   });
 
@@ -595,9 +647,7 @@ describe("Live fill (watching the automatic fill)", () => {
     back.answered(6, "+41 44 512 38 00");
     await waitFor(() =>
       expect(
-        within(fieldList().getByRole("listitem", { name: "Telephone" })).queryByText(
-          "Searching your documents…",
-        ),
+        within(fieldList().getByRole("listitem", { name: "Telephone" })).queryByText("Searching…"),
       ).toBeNull(),
     );
 
@@ -619,15 +669,15 @@ describe("Live fill (watching the automatic fill)", () => {
     startSearch(back);
     back.searching(6);
     const card = within(await screen.findByRole("listitem", { name: "Telephone" }));
-    expect(await card.findByText("Searching your documents…")).toBeInTheDocument();
+    expect(await card.findByText("Searching…")).toBeInTheDocument();
 
     // When I type a value and leave the field, before the fill answers it
     await user.type(card.getByRole("textbox"), "044 000 11");
     await user.tab();
 
-    // Then it is shown as entered by me, in the list and on the form
-    expect(await card.findByText(/Entered by you/)).toBeInTheDocument();
-    expect(card.queryByText("Searching your documents…")).not.toBeInTheDocument();
+    // Then it is shown as mine, in the list and on the form
+    expect(await card.findByText("Yours")).toBeInTheDocument();
+    expect(card.queryByText("Searching…")).not.toBeInTheDocument();
     await waitFor(() => expect(zone(6)).toHaveAttribute("data-tone", "entered"));
     back.stream.close();
   });
@@ -654,9 +704,7 @@ describe("Live fill (watching the automatic fill)", () => {
     );
     expect(fieldList().getByRole("textbox", { name: "Telephone" })).toHaveValue("+41 44 512 38 00");
     expect(
-      within(fieldList().getByRole("listitem", { name: "E-mail" })).getByText(
-        "Searching your documents…",
-      ),
+      within(fieldList().getByRole("listitem", { name: "E-mail" })).getByText("Searching…"),
     ).toBeInTheDocument();
     expect(back.stream.connections()).toBe(2);
     back.stream.close();
@@ -788,6 +836,12 @@ describe("Live fill (status and source of each answer)", () => {
     await screen.findByRole("list", { name: "Fields" });
     return card(label);
   };
+  /** A field's card, selected: open, with its status, sources and actions. */
+  const openCard = async (label: string) => {
+    await findCard(label);
+    await userEvent.setup().click(fieldList().getByRole("listitem", { name: label }));
+    return card(label);
+  };
   /** Automatic answers are collapsed in the review queue: open them. */
   const showAutomatic = async () => {
     await userEvent.setup().click(await screen.findByRole("button", { name: "Show" }));
@@ -815,8 +869,12 @@ describe("Live fill (status and source of each answer)", () => {
     // Then it says it was filled automatically, with its source
     expect(card("Name and legal form").getByText("Filled automatically")).toBeInTheDocument();
     expect(
-      card("Name and legal form").getByText("Commercial register extract, page 2"),
+      card("Name and legal form").getByRole("button", {
+        name: "Open the source: Commercial register extract",
+      }),
     ).toBeInTheDocument();
+    expect(card("Name and legal form").getByText("pdf")).toBeInTheDocument();
+    expect(card("Name and legal form").getByText("· p.2")).toBeInTheDocument();
     expect(card("Name and legal form").getByText(/“?Alpenlogic AG, Zurich”?/)).toBeInTheDocument();
   });
 
@@ -836,9 +894,7 @@ describe("Live fill (status and source of each answer)", () => {
     await user.click(await screen.findByRole("textbox", { name: "Name and legal form" }));
 
     // Then the source reads page 1
-    expect(
-      card("Name and legal form").getByText("Commercial register extract, page 1"),
-    ).toBeInTheDocument();
+    expect(card("Name and legal form").getByText("· p.1")).toBeInTheDocument();
   });
 
   it("shows the source of the selected field only, the others are collapsed", async () => {
@@ -861,9 +917,12 @@ describe("Live fill (status and source of each answer)", () => {
     await user.click(screen.getByRole("textbox", { name: "Name and legal form" }));
 
     // Then only its source shows
-    expect(card("Name and legal form").getByText("Register A, page 1")).toBeInTheDocument();
-    expect(card("Business address").queryByText("Register B, page 1")).not.toBeInTheDocument();
-    expect(card("Business address").getByText("1 source")).toBeInTheDocument();
+    expect(
+      card("Name and legal form").getByRole("button", { name: "Open the source: Register A" }),
+    ).toBeInTheDocument();
+    expect(card("Business address").queryByRole("button", { name: /Open the source/ })).toBeNull();
+    // (its line only names its source)
+    expect(card("Business address").getByText("Register B")).toBeInTheDocument();
   });
 
   it("calls the tender documents by their name when the source is the tender", async () => {
@@ -897,11 +956,14 @@ describe("Live fill (status and source of each answer)", () => {
     given(annex7(), fillState([declared]));
     await showAutomatic();
 
+    // When I open it
+    const declaration = await openCard("Name and legal form");
+
     // Then the status names the company
     expect(
-      await (
-        await findCard("Name and legal form")
-      ).findByText("Filled automatically · you declare this on behalf of Alpenlogic AG"),
+      await declaration.findByText(
+        "Filled automatically · you declare this on behalf of Alpenlogic AG",
+      ),
     ).toBeInTheDocument();
   });
 
@@ -909,12 +971,20 @@ describe("Live fill (status and source of each answer)", () => {
     // Given a field the search found nothing for, with 2 documents in the company knowledge
     given(annex7(), fillState([aiAnswer(4, null, "missing")]));
 
+    // When I open it
+    const address = await openCard("Business address");
+
     // Then the status says so
     expect(
-      await (
-        await findCard("Business address")
-      ).findByText("Not found in the passages searched in your 2 documents"),
+      await address.findByText("Not found in the passages searched in your 2 documents"),
     ).toBeInTheDocument();
+    // (its line says it has no value)
+    await userEvent.setup().click(fieldList().getByRole("listitem", { name: "Telephone" }));
+    expect(card("Business address").getByText("Not found")).toBeInTheDocument();
+    expect(card("Business address").getByRole("textbox")).toHaveAttribute(
+      "placeholder",
+      "Not found in your documents",
+    );
   });
 
   it("says when only I can fill a field, why, and keeps the suggestion in the input", async () => {
@@ -942,22 +1012,31 @@ describe("Live fill (status and source of each answer)", () => {
 
     // Then the texts stay neutral
     expect(
-      await (await findCard("Business address")).findByText("Not found in your documents"),
+      await (await openCard("Business address")).findByText("Not found in your documents"),
     ).toBeInTheDocument();
-    expect(card("Name and legal form").getByText("Filled automatically")).toBeInTheDocument();
+    expect(
+      (await openCard("Name and legal form")).getByText("Filled automatically"),
+    ).toBeInTheDocument();
     expect(screen.queryByText(/0 documents/)).not.toBeInTheDocument();
     expect(screen.queryByText(/on behalf of/)).not.toBeInTheDocument();
   });
 
-  it("lists every source when sources disagree", async () => {
+  it("shows each value of a conflict with its own source, the chosen one with its quote", async () => {
     // Given two sources that disagree on the address
     const conflict = aiAnswer(4, "Bahnhofstrasse 1", "conflict", undefined, {
       candidates: [
-        candidate("Bahnhofstrasse 1", [
-          citation({ document_name: "Register extract", quote: "Bahnhofstrasse 1" }),
-        ]),
+        candidate(
+          "Bahnhofstrasse 1",
+          [citation({ document_name: "Register extract", quote: "Address Bahnhofstrasse 1" })],
+          { source_date: { date: "2026-10-20", citation: citation() } },
+        ),
         candidate("Seestrasse 9", [
-          citation({ document_name: "Annual report", quote: "Seestrasse 9" }),
+          citation({
+            document_id: 9,
+            document_name: "Annual report",
+            quote: "Seestrasse 9",
+            page: 2,
+          }),
         ]),
       ],
     });
@@ -966,13 +1045,37 @@ describe("Live fill (status and source of each answer)", () => {
     // When I open the field
     await user.click(await screen.findByRole("textbox", { name: "Business address" }));
 
-    // Then the status counts the sources and all are shown; the selected value is in the input
+    // Then the status counts the sources, the selected value is in the input
     const address = card("Business address");
     expect(address.getByText("2 sources disagree")).toBeInTheDocument();
-    const sources = within(address.getByRole("list", { name: "Sources" }));
-    expect(sources.getByText("Register extract, page 1")).toBeInTheDocument();
-    expect(sources.getByText("Annual report, page 1")).toBeInTheDocument();
     expect(address.getByRole("textbox")).toHaveValue("Bahnhofstrasse 1");
+    // And each value names its own source, with its format, page and date
+    const register = within(
+      address.getByRole("radio", { name: /Bahnhofstrasse 1/ }).closest("label")!,
+    );
+    expect(
+      register.getByRole("button", { name: "Open the source: Register extract" }),
+    ).toBeInTheDocument();
+    expect(register.getByText("pdf")).toBeInTheDocument();
+    expect(register.getByText("· p.1")).toBeInTheDocument();
+    expect(register.getByText("· 20.10.2026")).toBeInTheDocument();
+    expect(register.getByText("most recent")).toBeInTheDocument();
+    const report = within(address.getByRole("radio", { name: /Seestrasse 9/ }).closest("label")!);
+    expect(await report.findByText("docx")).toBeInTheDocument();
+    expect(report.getByText("· p.3")).toBeInTheDocument();
+    // And only the chosen value shows its quote, highlighted; no separate list of sources
+    expect(register.getByText("Address Bahnhofstrasse 1").tagName).toBe("MARK");
+    expect(report.queryByText("Seestrasse 9", { selector: "mark" })).toBeNull();
+    expect(address.queryByRole("list", { name: "Sources" })).toBeNull();
+
+    // When I choose the other value, its quote shows
+    await user.click(address.getByRole("radio", { name: /Seestrasse 9/ }));
+    expect(report.getByText("Seestrasse 9", { selector: "mark" })).toBeInTheDocument();
+
+    // And its source opens in the Source tab
+    await user.click(report.getByRole("button", { name: "Open the source: Annual report" }));
+    expect(screen.getByRole("tab", { name: "Source" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("heading", { name: "Annual report" })).toBeInTheDocument();
   });
 
   it("shows the expiry date of an outdated source in Swiss format", async () => {
@@ -999,10 +1102,12 @@ describe("Live fill (status and source of each answer)", () => {
     });
     given(annex7(), fillState([unsure]));
 
-    // Then the card asks me to check it, and the document shows it as to check
-    expect(
-      await (await findCard("Telephone")).findByText("Found in one of two searches, check it"),
-    ).toBeInTheDocument();
+    // Then the card asks me to check it, with no technical explanation, and the document shows
+    // it as to check
+    const telephone = await openCard("Telephone");
+    expect(telephone.getByText("To check")).toBeInTheDocument();
+    expect(telephone.getByRole("button", { name: "Keep this value" })).toBeInTheDocument();
+    expect(telephone.queryByText(/searches/)).toBeNull();
     expect(await findZone(6)).toHaveAttribute("data-tone", "toCheck");
   });
 
@@ -1038,7 +1143,9 @@ describe("Live fill (status and source of each answer)", () => {
 
     // Then it says I entered it, and the source is still there
     expect(card("Name and legal form").getByText(/Entered by you/)).toBeInTheDocument();
-    expect(card("Name and legal form").getByText("Register A, page 1")).toBeInTheDocument();
+    expect(
+      card("Name and legal form").getByRole("button", { name: "Open the source: Register A" }),
+    ).toBeInTheDocument();
   });
 
   describe("discarding the answers", () => {
@@ -1339,8 +1446,11 @@ describe("Live fill (review)", () => {
     await waitFor(() =>
       expect(saved.requests).toEqual([{ fieldId: 6, value: "+41 44 512 38 00" }]),
     );
-    expect(await card("Telephone").findByText("Kept by you · 14:45")).toBeInTheDocument();
+    expect(await card("Telephone").findByText("Kept")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "7 fields need a look" })).toBeInTheDocument();
+    // (opened again, it says when)
+    await user.click(fieldList().getByRole("listitem", { name: "Telephone" }));
+    expect(card("Telephone").getByText("Kept by you · 14:45")).toBeInTheDocument();
     // And it stays where it was
     expect(group("To check").getByRole("textbox", { name: "Telephone" })).toBeInTheDocument();
   });
@@ -1358,7 +1468,7 @@ describe("Live fill (review)", () => {
 
     // Then it is saved, kept by me
     await waitFor(() => expect(saved.requests).toEqual([{ fieldId: 3, value: "Alpenlogic GmbH" }]));
-    expect(await card("Name and legal form").findByText("Kept by you · 14:45")).toBeInTheDocument();
+    expect(await card("Name and legal form").findByText("Kept")).toBeInTheDocument();
     expect(card("Name and legal form").getByRole("textbox")).toHaveValue("Alpenlogic GmbH");
   });
 
@@ -1372,9 +1482,9 @@ describe("Live fill (review)", () => {
 
     // Then it is settled, empty
     await waitFor(() => expect(saved.requests).toEqual([{ fieldId: 4, value: null }]));
-    expect(
-      await card("Business address").findByText("Left empty by you · 14:45"),
-    ).toBeInTheDocument();
+    expect(await card("Business address").findByText("Left empty")).toBeInTheDocument();
+    await user.click(fieldList().getByRole("listitem", { name: "Business address" }));
+    expect(card("Business address").getByText("Left empty by you · 14:45")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "7 fields need a look" })).toBeInTheDocument();
   });
 
@@ -1494,5 +1604,182 @@ describe("Export (what the review left open)", () => {
     // Then the export closes and the telephone is selected, its input focused
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(screen.getByRole("textbox", { name: "Telephone" })).toHaveFocus();
+  });
+});
+
+describe("Live fill (Source tab)", () => {
+  const sourceTab = () => screen.getByRole("tab", { name: "Source" });
+  const formTab = () => screen.getByRole("tab", { name: "Form" });
+  const card = (label: string) => within(fieldList().getByRole("listitem", { name: label }));
+
+  /** Annex 7 with one answer, its company documents listed (the annual report readable). */
+  function givenAnswer(found: Answer) {
+    server.use(handlers.documentFile(9, annualReportFile()));
+    return given(annex7(), fillState([found]));
+  }
+
+  it("opens a Word source at the quote, highlighted, from the card", async () => {
+    // Given an address read in the annual report
+    const quote = "Pfingstweidstrasse 31, 8005 Zurich";
+    const { user } = givenAnswer(
+      aiAnswer(4, quote, "outdated", undefined, {
+        candidates: [
+          candidate(
+            quote,
+            [citation({ quote, document_id: 9, document_name: "Annual report 2024", page: null })],
+            {
+              source_date: { date: "2025-03-28", citation: citation() },
+            },
+          ),
+        ],
+      }),
+    );
+    await user.click(await screen.findByRole("textbox", { name: "Business address" }));
+
+    // When I open its source from the card
+    await user.click(
+      card("Business address").getByRole("button", { name: "Open the source: Annual report 2024" }),
+    );
+
+    // Then the Source tab shows the document, the quote highlighted, and what it is used for
+    expect(sourceTab()).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("heading", { name: "Annual report 2024" })).toBeInTheDocument();
+    expect(screen.getByText("Used for: Business address")).toBeInTheDocument();
+    expect(screen.getByText("dated 28.03.2025")).toBeInTheDocument();
+    const document = await screen.findByRole("region", { name: "Preview of Annual report 2024" });
+    await waitFor(() =>
+      expect([...document.querySelectorAll("mark")].map((mark) => mark.textContent).join("")).toBe(
+        quote,
+      ),
+    );
+    // And the form is still there, behind the Form tab
+    await user.click(formTab());
+    expect(preview()).toBeVisible();
+  });
+
+  it("opens a PDF source at the cited page", async () => {
+    // Given a name read on page 2 of the commercial register extract
+    const { user } = givenAnswer(
+      aiAnswer(3, "Alpenlogic AG", "conflict", undefined, {
+        candidates: [
+          candidate("Alpenlogic AG", [citation({ document_id: 1, page: 1 })]),
+          candidate("Alpenlogic SA", [
+            citation({
+              document_id: 9,
+              document_name: "Annual report 2024",
+              quote: "Alpenlogic AG - Annual Report 2024",
+            }),
+          ]),
+        ],
+      }),
+    );
+    await user.click(await screen.findByRole("textbox", { name: "Name and legal form" }));
+
+    // When I switch to the Source tab
+    await user.click(sourceTab());
+
+    // Then the extract is shown, its second page carrying the highlighted text
+    expect(
+      screen.getByRole("heading", { name: "Commercial register extract" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("page 2")).toBeInTheDocument();
+    const page2 = await screen.findByLabelText("Page 2");
+    expect(page2).toHaveAttribute("aria-current", "page");
+    expect(page2.querySelector("[data-text-layer]")).not.toBeNull();
+    expect(screen.getByLabelText("Page 1").querySelector("[data-text-layer]")).toBeNull();
+
+    // When I choose the other source of the conflict
+    await user.click(
+      within(screen.getByRole("group", { name: "Sources of this value" })).getByRole("button", {
+        name: "Alpenlogic SA",
+      }),
+    );
+
+    // Then that document is shown instead
+    expect(screen.getByRole("heading", { name: "Annual report 2024" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("region", { name: "Preview of Annual report 2024" }),
+    ).toBeInTheDocument();
+  });
+
+  it("says when a field has no source", async () => {
+    // Given a field nothing was found for
+    const { user } = givenAnswer(aiAnswer(4, null, "missing"));
+    await user.click(await screen.findByRole("textbox", { name: "Business address" }));
+
+    // When I look at its source
+    await user.click(sourceTab());
+
+    // Then I am told the documents were searched
+    expect(screen.getByRole("heading", { name: "No source for this field" })).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "We searched all 2 documents in your company knowledge and found nothing that answers “Business address”.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("shows a quote from the tender details as it is", async () => {
+    // Given a value read in the tender details
+    const { user } = givenAnswer(
+      aiAnswer(2, "Canton of Zurich", "auto", undefined, {
+        candidates: [
+          candidate("Canton of Zurich", [
+            citation({
+              document_id: null,
+              document_name: "Tender details",
+              quote: "Buyer: Canton of Zurich",
+              page: null,
+            }),
+          ]),
+        ],
+      }),
+    );
+    await user.click(await screen.findByRole("button", { name: "Show" }));
+    await user.click(screen.getByRole("textbox", { name: "Name of the contracting authority" }));
+
+    // When I look at its source
+    await user.click(sourceTab());
+
+    // Then the quote is shown
+    expect(screen.getByRole("heading", { name: "Tender details" })).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("figure")).getByText("Buyer: Canton of Zurich"),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("Live fill (layout)", () => {
+  it("tells me nothing is left to check, and lets me export from there", async () => {
+    // Given every field answered by me
+    server.use(handlers.exportSummary(2, exportSummary(ALL_FILLED)));
+    const answers = ALL_FILLED.map((id) => answer(id, `value ${id}`, "2026-11-03T13:45:00Z"));
+    const { user } = given(annex7(), fillState(answers));
+
+    // Then the list says so, how many documents the answers come from, and how to move
+    expect(await screen.findByText("Nothing left to check")).toBeInTheDocument();
+    expect(screen.getByText("All 9 fields are handled. Ready to export.")).toBeInTheDocument();
+    expect(await screen.findByText("from 2 documents")).toBeInTheDocument();
+    expect(screen.getByText("confirm & next")).toBeInTheDocument();
+    expect(screen.queryByText(/to review/)).not.toBeInTheDocument();
+
+    // When I export from the banner
+    await user.click(screen.getByRole("button", { name: "Export" }));
+
+    // Then the export opens
+    expect(
+      await within(await screen.findByRole("dialog")).findByRole("heading", {
+        name: "Ready to submit",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows how many fields are left to review in the top bar", async () => {
+    // Given the fill found nothing yet (9 fields to fill)
+    given();
+
+    // Then the top bar counts them
+    expect(await screen.findByText("9 to review")).toBeInTheDocument();
+    expect(screen.queryByText("Nothing left to check")).not.toBeInTheDocument();
   });
 });
