@@ -78,8 +78,8 @@ class ValidatedField:
     rejected: list[str] = field(default_factory=list)
 
 
-# Where a quote was shortened: "...", "…".
-ELLIPSIS = re.compile(r"\.{3,}|…")
+# Where a quote breaks into pieces: a line break, or where it was shortened ("...", "…").
+PIECE_BREAK = re.compile(r"\.{3,}|…|\n")
 
 
 def validate_field(
@@ -116,23 +116,39 @@ def validate_field(
 def find_citation(citation: LLMCitation, passages: list[SourcePassage]) -> Citation | None:
     """The citation if its quote is in a passage sent (the labelled one first), else None.
 
-    A quote shortened with an ellipsis ("Alpenlogic AG … has been assessed") is found when each
-    of its pieces is, in that order, in the same passage."""
-    pieces = [piece for piece in map(_letters, ELLIPSIS.split(citation.quote)) if piece]
+    A quote is made of pieces: its lines, and the parts of a line shortened with an ellipsis
+    ("Alpenlogic AG … has been assessed"). It is found when its pieces are, in that order, in one
+    passage, or else each in a passage of one same document (a quote over two neighbouring
+    passages); never over two documents."""
+    pieces = [piece for piece in map(_letters, PIECE_BREAK.split(citation.quote)) if piece]
     if sum(map(len, pieces)) < MIN_QUOTE_CHARS:
         return None
     labelled = [p for p in passages if p.label == citation.passage.strip()]
-    others = [p for p in passages if p.label != citation.passage.strip()]
-    for passage in labelled + others:
+    ordered = labelled + [p for p in passages if p.label != citation.passage.strip()]
+    for passage in ordered:
         if _contains_in_order(_letters(passage.text), pieces):
-            return Citation(
-                quote=citation.quote.strip(),
-                document_name=passage.document_name,
-                document_id=passage.document_id,
-                chunk_id=passage.chunk_id,
-                page=passage.page,
-            )
+            return _cited(citation, passage)
+    for passage in ordered:
+        if passage.document_id is None or pieces[0] not in _letters(passage.text):
+            continue
+        # The document's passages in reading order (chunks are numbered as they are cut).
+        same_document = sorted(
+            (p for p in passages if p.document_id == passage.document_id),
+            key=lambda p: p.chunk_id or 0,
+        )
+        if _contains_in_order(" ".join(_letters(p.text) for p in same_document), pieces):
+            return _cited(citation, passage)
     return None
+
+
+def _cited(citation: LLMCitation, passage: SourcePassage) -> Citation:
+    return Citation(
+        quote=citation.quote.strip(),
+        document_name=passage.document_name,
+        document_id=passage.document_id,
+        chunk_id=passage.chunk_id,
+        page=passage.page,
+    )
 
 
 def _contains_in_order(text: str, pieces: list[str]) -> bool:
@@ -184,10 +200,15 @@ def _validate_candidate(
     elif not value_is_supported(value, [c.quote for c in citations]):
         rejected.append(f"value not in its quotes: {value!r}")
         return None
+    source_date = _validate_date(proposed.source_date, passages, rejected)
+    if source_date is not None and _date_token(source_date.date) in _tokens(value):
+        # The date the value states (an incorporation, an entry) is not when the document was
+        # written: dropped, so an old fact from a recent document is not taken for old news.
+        source_date = None
     return Candidate(
         value=value,
         citations=citations,
-        source_date=_validate_date(proposed.source_date, passages, rejected),
+        source_date=source_date,
         valid_until=_validate_date(proposed.valid_until, passages, rejected),
     )
 
@@ -203,10 +224,21 @@ def _validate_date(
         rejected.append(f"not an ISO date: {proposed.date!r}")
         return None
     citation = find_citation(proposed.citation, passages)
-    if citation is None or _date_token(day) not in _tokens(citation.quote):
+    if citation is None or not _states(citation.quote, day):
         rejected.append(f"date not stated in its quote: {proposed.date!r}")
         return None
     return DatedCitation(date=day, citation=citation)
+
+
+def _states(quote: str, day: date) -> bool:
+    """The quote gives that date, or that month when the date is its first day ("June 2026")."""
+    if _date_token(day) in _tokens(quote):
+        return True
+    if day.day != 1:
+        return False
+    names = [name for name, number in MONTHS.items() if number == day.month]
+    folded = _fold(quote)
+    return any(re.search(rf"\b{name}\.?,?\s+{day.year}\b", folded) for name in names)
 
 
 def _latest(a: DatedCitation | None, b: DatedCitation | None) -> DatedCitation | None:

@@ -376,3 +376,93 @@ def test_the_pieces_of_a_shortened_quote_must_be_in_the_same_passage() -> None:
     )
 
     assert result.candidates == []
+
+
+CERTIFICATE_1 = SourcePassage(
+    label="P4",
+    text="The management system of Alpenlogic AG has been assessed and found to comply with the "
+    "requirements of ISO 9001:2015 (Quality management system).",
+    document_name="ISO certificates",
+    document_id=5,
+    chunk_id=51,
+    page=0,
+)
+CERTIFICATE_2 = SourcePassage(
+    label="P5",
+    text="Valid until\n12 March 2028\nAccreditation\nSAS 0xx",
+    document_name="ISO certificates",
+    document_id=5,
+    chunk_id=52,
+    page=0,
+)
+
+
+def test_a_quote_over_two_passages_of_the_same_document_is_kept() -> None:
+    quote = "found to comply with the requirements of ISO 9001:2015\nValid until\n12 March 2028"
+
+    [kept] = validate_field(
+        FieldKind.TEXT,
+        answer(candidate("ISO 9001:2015 valid until 12 March 2028", ("P4", quote))),
+        [*PASSAGES, CERTIFICATE_1, CERTIFICATE_2],
+    ).candidates
+
+    assert kept.citations[0].chunk_id == 51
+
+
+def test_a_quote_over_two_documents_is_rejected() -> None:
+    quote = "Company name: Alpenlogic AG\nValid until\n12 March 2028"
+
+    result = validate_field(
+        FieldKind.TEXT,
+        answer(candidate("Alpenlogic AG", ("P1", quote))),
+        [*PASSAGES, CERTIFICATE_1, CERTIFICATE_2],
+    )
+
+    assert result.candidates == []
+
+
+def test_a_document_dated_by_its_month_is_dated_the_first_of_that_month() -> None:
+    team = SourcePassage(
+        label="P6",
+        text="Team (June 2026)\n28 people: 14 with higher professional training",
+        document_name="Company brochure 2026",
+        document_id=4,
+        chunk_id=41,
+        page=0,
+    )
+    [kept] = validate_field(
+        FieldKind.TEXT,
+        answer(
+            candidate(
+                "14",
+                ("P6", "14 with higher professional training"),
+                source_date=LLMDate(
+                    date="2026-06-01", citation=LLMCitation(passage="P6", quote="Team (June 2026)")
+                ),
+            )
+        ),
+        [team],
+    ).candidates
+
+    assert kept.source_date is not None
+    assert kept.source_date.date == date(2026, 6, 1)
+
+
+def test_the_date_of_the_fact_itself_is_not_the_documents_date() -> None:
+    # "Legal form since 14.03.2016": that date is the answer, not when the extract was issued.
+    [kept] = validate_field(
+        FieldKind.TEXT,
+        answer(
+            candidate(
+                "14.03.2016",
+                ("P1", "Entered on 14.03.2016"),
+                source_date=LLMDate(
+                    date="2016-03-14",
+                    citation=LLMCitation(passage="P1", quote="Entered on 14.03.2016"),
+                ),
+            )
+        ),
+        PASSAGES,
+    ).candidates
+
+    assert kept.source_date is None

@@ -46,7 +46,8 @@ with one quote per fact; a field asking for an office, a company or a person wit
 gets the name and the address. When the passages list several people, numbers or addresses, \
 choose the one that fits the field: they are options, not a disagreement.
 - A number must count exactly what the field asks for: a broader or different category ("other \
-staff and apprentices" for auxiliary staff) is not an answer.
+staff and apprentices" for auxiliary staff) is not an answer. Likewise, a list holds only items of the kind the field \
+asks for (certificates are certifications, not insurance policies).
 - When different documents give different values for the same fact (two addresses for the same \
 office, two headcounts), give one candidate per value, each with its own quotes and its \
 document's date, even when you think one of them is out of date: do not choose between documents \
@@ -61,9 +62,10 @@ still give it, with that document's date.
 passage saying that the rule asked about does not apply to the bidder (no collective agreement \
 applies) does not answer whether the bidder complies with it: return no candidate.
 - For every candidate, return the date of the document it comes from and its end of validity \
-when the document states them (issue date, report year, insurance period, certificate expiry), \
-with the quote stating each, even when the value itself comes from a table or another part of \
-that document.
+when the document states them, with the quote stating each, even when the value itself comes \
+from a table or another part of that document. The document's date is when it was issued or \
+written (its "Issued:" line, the date in its letterhead, a report's year), never the date of an \
+event it records (an incorporation, a register entry, a capital increase).
 - When the passages do not contain the answer, return no candidate. Never guess, never infer \
 from general knowledge, never reuse a value given for another field unless the passage supports \
 it for this one.
