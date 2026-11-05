@@ -508,6 +508,14 @@ export interface components {
             filled: number;
             /** Empty Fields */
             empty_fields: components["schemas"]["FieldRef"][];
+            /** Unreviewed Doubts */
+            unreviewed_doubts: components["schemas"]["FieldRef"][];
+            /** Left Empty */
+            left_empty: number;
+            /** Automatic */
+            automatic: number;
+            /** Reviewed */
+            reviewed: number;
             /** Sign By Hand */
             sign_by_hand: components["schemas"]["FieldRef"][];
         };

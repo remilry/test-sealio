@@ -218,6 +218,10 @@ export function exportSummary(filledIds: number[] = [], overrides: Partial<Expor
     empty_fields: fillable
       .filter((field) => !filledIds.includes(field.id))
       .map(({ id, label }) => ({ id, label })),
+    unreviewed_doubts: [],
+    left_empty: 0,
+    automatic: 0,
+    reviewed: filledIds.length,
     sign_by_hand: [{ id: 10, label: "Signature(s)" }],
   };
   return { ...summary, ...overrides };
