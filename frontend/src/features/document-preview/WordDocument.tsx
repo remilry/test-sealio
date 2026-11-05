@@ -19,7 +19,9 @@ type WordZone = PreviewZone & { place: WordPlace };
 /**
  * A Word document rendered in the page (docx-preview), each field highlighted where the export
  * writes its value, the value shown there as it is typed. The document is rendered once per file;
- * the zones are then drawn onto it at every change.
+ * the zones are then drawn onto it at every change. Pages break where the document says (page
+ * breaks, sections), not at the marks Word leaves where it last broke them: those split a paragraph
+ * in two, and the paragraphs would no longer be counted as the export counts them.
  */
 export function WordDocument({
   fileUrl,
@@ -40,14 +42,19 @@ export function WordDocument({
 
   useEffect(() => {
     const target = container.current;
-    if (!file.data || !target) return;
+    const blob = file.data;
+    if (!blob || !target) return;
+    // Rendered apart, then put in place only if still wanted: a rendering that ends after a newer
+    // one (a new file, React running effects twice) never replaces it.
+    const pages = document.createElement("div");
+    pages.className = "flex flex-col gap-4";
     let current = true;
-    renderAsync(file.data, target, undefined, {
-      inWrapper: false,
-      ignoreLastRenderedPageBreak: false,
-      className: "docx",
-    })
-      .then(() => current && setRendered(file.data))
+    renderAsync(blob, pages, undefined, { inWrapper: false, className: "docx" })
+      .then(() => {
+        if (!current) return;
+        target.replaceChildren(pages);
+        setRendered(blob);
+      })
       .catch(() => current && setRenderFailed(true));
     return () => {
       current = false;
@@ -92,7 +99,7 @@ export function WordDocument({
         ref={container}
         onClick={select}
         className={cn(
-          "flex flex-col gap-4 text-black [&_section.docx]:bg-white [&_section.docx]:shadow-sm [&_section.docx]:ring-1 [&_section.docx]:ring-border",
+          "text-black [&_section.docx]:bg-white [&_section.docx]:shadow-sm [&_section.docx]:ring-1 [&_section.docx]:ring-border",
           "[&_[data-preview-empty]]:inline-block [&_[data-preview-empty]]:h-[1em] [&_[data-preview-empty]]:min-w-16 [&_[data-preview-empty]]:align-middle",
           !ready && "hidden",
         )}

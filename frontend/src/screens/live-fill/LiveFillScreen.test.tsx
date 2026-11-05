@@ -1,5 +1,6 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { StrictMode } from "react";
 import { renderAsync } from "docx-preview";
 import { delay, http } from "msw";
 import { API_URL } from "@/shared/api";
@@ -1035,7 +1036,8 @@ describe("Live fill on a Word form", () => {
   function givenWord({
     file = annex4File(),
     answers = [],
-  }: { file?: Uint8Array | null; answers?: Answer[] } = {}) {
+    strict = false,
+  }: { file?: Uint8Array | null; answers?: Answer[]; strict?: boolean } = {}) {
     let state = fillState(answers, annex4Fields);
     const saved = handlers.saveField(1, (fieldId, { value }) => {
       const others = state.answers.filter((a) => a.field_id !== fieldId);
@@ -1051,9 +1053,39 @@ describe("Live fill on a Word form", () => {
       saved.handler,
     );
     const user = userEvent.setup();
-    renderScreen(<LiveFillScreen formId={1} />);
-    return { saved, user };
+    const screenUi = <LiveFillScreen formId={1} />;
+    const { rerender } = renderScreen(strict ? <StrictMode>{screenUi}</StrictMode> : screenUi);
+    return { saved, user, rerender };
   }
+
+  it("keeps the zones when I come back and a first rendering ends after the last one", async () => {
+    // Given the Annex 4 seen once (its file is now cached)
+    const { rerender } = givenWord({ strict: true });
+    await findZone(COMPANY.id);
+    // And, coming back, a first rendering slower than the next one (React runs effects twice in
+    // development when a screen mounts with its data ready)
+    const render = vi.mocked(renderAsync);
+    const actual = render.getMockImplementation()!;
+    let release = () => {};
+    let late: Promise<unknown> = Promise.resolve();
+    render.mockImplementationOnce((...args) => {
+      late = new Promise<void>((resolve) => (release = resolve)).then(() => actual(...args));
+      return late as ReturnType<typeof renderAsync>;
+    });
+    rerender(
+      <StrictMode>
+        <LiveFillScreen key="again" formId={1} />
+      </StrictMode>,
+    );
+    await findZone(COMPANY.id);
+
+    // When the first one ends at last
+    release();
+    await late;
+
+    // Then the zones are still on the document
+    await waitFor(() => expect(preview().querySelectorAll("[data-field-id]")).toHaveLength(49));
+  });
 
   it("shows the Word form with each field highlighted where its answer goes", async () => {
     // Given the parsed Annex 4

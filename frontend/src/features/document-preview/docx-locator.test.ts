@@ -9,10 +9,7 @@ const ANNEX_4 = "../forms/Annex_4_Conditions of Participation and Company Self-D
 async function renderAnnex4(): Promise<HTMLElement> {
   const container = document.createElement("div");
   document.body.replaceChildren(container);
-  await renderAsync(new Blob([readFileSync(ANNEX_4)]), container, undefined, {
-    inWrapper: false,
-    ignoreLastRenderedPageBreak: false,
-  });
+  await renderAsync(new Blob([readFileSync(ANNEX_4)]), container, undefined, { inWrapper: false });
   return container;
 }
 
@@ -157,5 +154,42 @@ describe("the zone of a field", () => {
     expect(write(root, "exact_company_name", "Alpenlogic AG")).toBe(
       paragraphOf(root, "exact_company_name"),
     );
+  });
+});
+
+describe("counting what the export counts", () => {
+  /** A docx-preview rendering written by hand, for structures the Annex 4 does not have. */
+  function rendered(body: string): HTMLElement {
+    const root = document.createElement("div");
+    root.innerHTML = `<section class="docx"><article>${body}</article></section>`;
+    return root;
+  }
+  const at = (table: number | null, row: number | null, cell: number | null, paragraph: number) =>
+    ({ format: "docx", table, row, cell, paragraph, mode: "in_paragraph" }) as DocxLocator;
+
+  test("skips the cells of a vertical merge and the room before or after a row", () => {
+    // Row 0: a placeholder (w:gridBefore), then A, B. Row 1: the merge continuation, then C, D.
+    const root = rendered(
+      `<table><tr><td colspan="1" style="border: none;"></td><td><p>A</p></td><td><p>B</p></td></tr>` +
+        `<tr><td style="display: none;"><p></p></td><td><p>C</p></td><td><p>D</p></td></tr></table>`,
+    );
+
+    expect(findParagraph(root, at(0, 0, 0, 0))?.textContent).toBe("A");
+    expect(findParagraph(root, at(0, 0, 1, 0))?.textContent).toBe("B");
+    expect(findParagraph(root, at(0, 1, 0, 0))?.textContent).toBe("C");
+  });
+
+  test("a paragraph the preview added does not shift the next ones", () => {
+    const root = rendered(
+      `<p>Intro:</p><p>Place:</p><table><tr><td><p>Staff</p><p>Remarks:</p></td></tr></table>`,
+    );
+    const newParagraph = (table: number | null, cell: number | null) =>
+      ({ ...at(table, table === null ? null : 0, cell, 0), mode: "new_paragraph" }) as DocxLocator;
+
+    writePreviewValue(findParagraph(root, at(0, 0, 0, 0))!, newParagraph(0, 0), "9");
+    writePreviewValue(findParagraph(root, at(null, null, null, 0))!, newParagraph(null, null), "x");
+
+    expect(findParagraph(root, at(0, 0, 0, 1))?.textContent).toBe("Remarks:");
+    expect(findParagraph(root, at(null, null, null, 1))?.textContent).toBe("Place:");
   });
 });

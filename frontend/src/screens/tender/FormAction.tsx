@@ -16,6 +16,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 
 /**
  * The action of a form that can be filled: "Auto-fill" (Setup) while untouched; once started (or
@@ -37,9 +38,13 @@ export function FormAction({
     // Temporary (step 6c): Word forms are not auto-filled yet; they open from their URL.
     if (form.file_format === "docx") {
       return (
-        <Button disabled title={t("wordAutoFillSoon")}>
-          {t("autoFill")}
-        </Button>
+        <Tooltip>
+          {/* A disabled button takes no pointer nor focus: its wrapper shows why. */}
+          <TooltipTrigger delay={0} render={<span tabIndex={0} className="rounded-md" />}>
+            <Button disabled>{t("autoFill")}</Button>
+          </TooltipTrigger>
+          <TooltipContent>{t("wordAutoFillSoon")}</TooltipContent>
+        </Tooltip>
       );
     }
     return (

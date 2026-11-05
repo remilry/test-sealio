@@ -95,16 +95,18 @@ describe("Tender", () => {
     expect(card.getByRole("button", { name: "Auto-fill" })).toBeDisabled();
   });
 
-  it("cannot auto-fill a Word form yet, but lets me continue one I started", async () => {
+  it("cannot auto-fill a Word form yet, says why, and lets me continue one I started", async () => {
     // Given the Word form untouched, then started by hand
     server.use(handlers.tender(tender()));
     const { unmount } = renderScreen(<TenderScreen tenderId={1} />);
 
-    // Then its auto-fill is disabled, saying it comes soon
+    // Then its auto-fill is disabled, and pointing at it says it comes soon
     const annex4 = within(await screen.findByRole("listitem", { name: /Annex 4/ }));
     const autoFill = annex4.getByRole("button", { name: "Auto-fill" });
     expect(autoFill).toBeDisabled();
-    expect(autoFill).toHaveAttribute("title", "Auto-fill for Word forms is coming soon");
+    // (the pointer lands on its wrapper: a disabled button takes no pointer events)
+    await userEvent.setup().hover(autoFill.parentElement!);
+    expect(await screen.findByText("Auto-fill for Word forms is coming soon")).toBeVisible();
     unmount();
 
     // And once I started it, I can continue it

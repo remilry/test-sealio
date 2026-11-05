@@ -18,14 +18,32 @@ export function findParagraph(root: Element, locator: DocxLocator): HTMLElement 
     ...article.children,
   ]);
   if (locator.table === undefined || locator.table === null) {
-    return asElement(body.filter((node) => node.tagName === "P")[locator.paragraph]);
+    return asElement(paragraphsOf(body)[locator.paragraph]);
   }
   const table = body.filter((node) => node.tagName === "TABLE")[locator.table];
   const row = table && rowsOf(table)[locator.row ?? 0];
-  const cell = row && [...row.children].filter((node) => node.tagName === "TD")[locator.cell ?? 0];
-  const paragraph =
-    cell && [...cell.children].filter((node) => node.tagName === "P")[locator.paragraph];
-  return asElement(paragraph);
+  const cell = row && cellsOf(row)[locator.cell ?? 0];
+  return asElement(cell && paragraphsOf([...cell.children])[locator.paragraph]);
+}
+
+/** The document's own paragraphs, without those the preview added. */
+function paragraphsOf(nodes: Element[]): Element[] {
+  return nodes.filter((node) => node.tagName === "P" && !node.hasAttribute(VALUE));
+}
+
+/**
+ * The row's own cells, as python-docx counts them: without the continuation of a vertical merge
+ * (rendered hidden) nor the room docx-preview adds before or after the row (w:gridBefore /
+ * w:gridAfter, a cell with no paragraph, which a Word cell always has).
+ */
+function cellsOf(row: Element): HTMLElement[] {
+  return [...row.children].filter(
+    (node): node is HTMLElement =>
+      node instanceof HTMLElement &&
+      node.tagName === "TD" &&
+      node.style.display !== "none" &&
+      node.querySelector(":scope > p") !== null,
+  );
 }
 
 /**
