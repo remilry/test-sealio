@@ -118,3 +118,28 @@ def test_recording_writes_the_timing(tmp_path: Path) -> None:
     timing = json.loads((tmp_path / "k.json").read_text())["timing"]
     assert timing["first_output_seconds"] <= timing["total_seconds"]
     assert partials == [{"value": "CH"}]
+
+
+def test_the_recorder_records_concurrent_calls_to_their_own_files(tmp_path: Path) -> None:
+    import threading
+    import time
+
+    class Slow(FakeLLM):
+        def generate_structured(self, request, on_partial=None):  # type: ignore[override]
+            time.sleep(0.1)
+            return super().generate_structured(request, on_partial)
+
+    recorder = RecordingLLM(Slow({"a": {"value": "A"}, "b": {"value": "B"}}), tmp_path)
+    threads = [
+        threading.Thread(target=recorder.generate_structured, args=(request(key),))
+        for key in ("a", "b")
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    for key, value in (("a", "A"), ("b", "B")):
+        recording = json.loads((tmp_path / f"{key}.json").read_text())
+        assert recording["value"] == value
+        assert recording["timing"]["total_seconds"] >= 0.1
