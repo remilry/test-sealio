@@ -1,7 +1,8 @@
 import { markPageFields, numberPages } from "./docx-fields";
 
 /** A run of a parsed document (docx-preview's tree), with a field's parts. */
-const run = (...children: object[]) => ({ type: "run", children });
+type Node = { type: string; text?: string; charType?: string };
+const run = (...children: Node[]) => ({ type: "run", children });
 const text = (value: string) => ({ type: "text", text: value });
 const field = (charType: "begin" | "separate" | "end") => ({ type: "complexField", charType });
 const instruction = (value: string) => ({ type: "instruction", text: value });
@@ -33,7 +34,7 @@ describe("page numbers of a rendered Word document", () => {
     const shown = footer.children
       .flatMap((r) => r.children)
       .filter((c) => c.type === "text")
-      .map((c) => (c as { text: string }).text)
+      .map((c) => c.text)
       .join("");
     const root = document.createElement("div");
     root.innerHTML = [1, 2]
