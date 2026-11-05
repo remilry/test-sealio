@@ -220,7 +220,9 @@ def test_the_signature_is_never_sent_to_the_model_nor_filled(
     client.post(f"/forms/{annex_7}/fill")
 
     assert "signature_s" not in answers_by_key(client, annex_7)
-    [request] = llm.requests
+    request, again = sorted(llm.requests, key=lambda r: r.key)
+    # Each call is made twice (two runs, merged), with the same prompt.
+    assert (again.key, again.prompt) == (f"{request.key}--run-2", request.prompt)
     assert "signature_s" not in request.prompt
     state = client.get(f"/forms/{annex_7}/answers").json()
     # 9 fillable: 7 with a value (6 sourced + the pre-written place and date).
@@ -232,7 +234,9 @@ def test_one_model_call_per_section_with_the_tender_and_the_passages(
 ) -> None:
     client.post(f"/forms/{annex_7}/fill")
 
-    [request] = llm.requests
+    request, again = sorted(llm.requests, key=lambda r: r.key)
+    # Each call is made twice (two runs, merged), with the same prompt.
+    assert (again.key, again.prompt) == (f"{request.key}--run-2", request.prompt)
     assert request.key == "annex-7-self-declaration-art29c-ukraine-ordinance--page-1"
     assert "Alpenlogic AG" in request.instructions
     assert "[P1] Tender details\nProject title: Cloud Platform Services" in request.prompt
@@ -451,7 +455,7 @@ def test_the_cost_and_timing_of_the_fill_are_logged(
     messages = [r.getMessage() for r in caplog.records]
     [section] = [m for m in messages if "section 'Page 1'" in m]
     assert "search " in section
-    assert "passages) · model 1 call(s)" in section
+    assert "passages) · model 2 call(s)" in section
     [done] = [m for m in messages if " done in " in m]
     assert "7/9 filled" in done
     assert "$0.0000" in done

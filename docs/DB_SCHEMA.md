@@ -24,7 +24,7 @@ erDiagram
         text value "nullable"
         text resolved_by "ai | user"
         timestamptz resolved_at
-        text type "auto | missing | manual | outdated | conflict | declaration; nullable"
+        text type "auto | missing | manual | outdated | conflict | declaration | unsure; nullable"
         jsonb candidates
         text user_only_reason "nullable"
         boolean needs_review

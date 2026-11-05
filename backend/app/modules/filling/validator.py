@@ -14,7 +14,7 @@
 
 import re
 import unicodedata
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date
 
 from pydantic import BaseModel
@@ -76,6 +76,8 @@ class ValidatedField:
     suggested_value: str | None = None
     # Why parts of the model's answer were dropped (logged, never shown as an answer).
     rejected: list[str] = field(default_factory=list)
+    # Of two runs of the same call, only one found a value: proposed, for the user to check.
+    unsure: bool = False
 
 
 # Where a quote breaks into pieces: a line break, or where it was shortened ("...", "…").
@@ -99,18 +101,39 @@ def validate_field(
     result = ValidatedField(candidates=[])
     for proposed in answer.candidates:
         candidate = _validate_candidate(kind, proposed, passages, result.rejected)
-        if candidate is None:
-            continue
-        same = next((c for c in result.candidates if _same_answer(c.value, candidate.value)), None)
-        if same is None:
-            result.candidates.append(candidate)
-        else:
-            # The same answer from several sources is one candidate with all its evidence; the
-            # model's earlier choice keeps its wording.
-            same.citations += [c for c in candidate.citations if c not in same.citations]
-            same.source_date = _latest(same.source_date, candidate.source_date)
-            same.valid_until = same.valid_until or candidate.valid_until
+        if candidate is not None:
+            _add_candidate(result.candidates, candidate)
     return result
+
+
+def merge_runs(first: ValidatedField, second: ValidatedField) -> ValidatedField:
+    """The verified evidence of two runs of the same call, merged: the model does not answer the
+    same way every time, so what differs becomes a doubt instead of a silent error.
+
+    Same values → one candidate with the evidence of both; different values → both candidates
+    (a conflict); a value only one run found → kept, unsure; a field one run leaves to the user
+    → left to the user."""
+    rejected = first.rejected + second.rejected
+    for run in (first, second):
+        if run.user_only:
+            return replace(run, rejected=rejected)
+    merged = ValidatedField(candidates=[], rejected=rejected)
+    for candidate in [*first.candidates, *second.candidates]:
+        _add_candidate(merged.candidates, candidate.model_copy(deep=True))
+    merged.unsure = bool(first.candidates) != bool(second.candidates)
+    return merged
+
+
+def _add_candidate(candidates: list[Candidate], candidate: Candidate) -> None:
+    same = next((c for c in candidates if _same_answer(c.value, candidate.value)), None)
+    if same is None:
+        candidates.append(candidate)
+        return
+    # The same answer from several sources is one candidate with all its evidence; the earlier
+    # wording is kept.
+    same.citations += [c for c in candidate.citations if c not in same.citations]
+    same.source_date = _latest(same.source_date, candidate.source_date)
+    same.valid_until = same.valid_until or candidate.valid_until
 
 
 def find_citation(citation: LLMCitation, passages: list[SourcePassage]) -> Citation | None:

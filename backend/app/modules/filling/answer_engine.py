@@ -5,8 +5,10 @@ for each of them (deduplicated) and the tender details, and must quote what it a
 """
 
 import re
+import threading
 import time
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, replace
 from datetime import date
 from typing import Any
@@ -16,7 +18,12 @@ from pydantic import ValidationError
 from app.llm.facade import LLM, LLMRequest, LLMUsage
 from app.modules.filling.groups import CallGroup, FieldToAnswer
 from app.modules.filling.llm_schema import LLMFieldAnswer, LLMSectionAnswer
-from app.modules.filling.validator import SourcePassage, ValidatedField, validate_field
+from app.modules.filling.validator import (
+    SourcePassage,
+    ValidatedField,
+    merge_runs,
+    validate_field,
+)
 from app.modules.forms.parsing.schema import FieldKind
 
 # Passages searched per field (the search recall test measures this k, see test_search_recall).
@@ -124,12 +131,14 @@ def answer_section(
     tender_details: str,
     today: date,
     on_field: OnField | None = None,
+    runs: int = 1,
 ) -> SectionResult:
-    """The verified evidence of each field of the group (one model call), with what finding it
-    cost.
+    """The verified evidence of each field of the group, with what finding it cost.
 
-    With `on_field`, each field is published as soon as the model has written its answer; the
-    fields the model did not answer are published as not found at the end.
+    The call is made `runs` times at once (1 or 2) and the runs merged (`merge_runs`): the model
+    does not answer the same way every time, so what differs between runs becomes a doubt.
+    With `on_field`, each field is published as soon as every run has written its answer; the
+    fields a run did not answer count as not found for that run, at the end.
     """
     fields = group.fields
     started = time.monotonic()
@@ -145,19 +154,29 @@ def answer_section(
         passages=passages,
         today=today,
     )
-    evidence = _SectionEvidence(fields, passages, on_field)
-    if on_field is None:
-        result = llm.generate_structured(request)
+    merged = _MergedEvidence(fields, runs, on_field)
+    requests = [request] + [
+        replace(request, key=f"{request.key}--run-{run}") for run in range(2, runs + 1)
+    ]
+
+    def call(run: int) -> LLMUsage:
+        evidence = _SectionEvidence(fields, passages, lambda f, e: merged.add(run, f, e))
+        result = llm.generate_structured(requests[run], evidence.add_streamed)
+        evidence.add_all(result.output.fields)
+        evidence.add_not_found()
+        return result.usage
+
+    if runs == 1:
+        usage = call(0)
     else:
-        result = llm.generate_structured(request, evidence.add_streamed)
-    evidence.add_all(result.output.fields)
-    evidence.add_not_found()
+        with ThreadPoolExecutor(max_workers=runs) as pool:
+            usage = sum(pool.map(call, range(runs)), LLMUsage())
 
     return SectionResult(
-        evidence=evidence.by_field(),
+        evidence=merged.by_field(),
         passages=len(passages),
         search_seconds=search_seconds,
-        usage=result.usage,
+        usage=usage,
     )
 
 
@@ -215,6 +234,35 @@ class _SectionEvidence:
         self._evidence[field.id] = evidence
         if self._on_field is not None:
             self._on_field(field.id, evidence)
+
+
+class _MergedEvidence:
+    """The evidence of every run of a group's call: a field is merged and published once all the
+    runs have validated it (runs write from their own threads)."""
+
+    def __init__(self, fields: list[FieldToAnswer], runs: int, on_field: OnField | None) -> None:
+        self._fields = fields
+        self._runs = runs
+        self._on_field = on_field
+        self._by_run: dict[int, dict[int, ValidatedField]] = {}
+        self._merged: dict[int, ValidatedField] = {}
+        self._lock = threading.Lock()
+
+    def add(self, run: int, field_id: int, evidence: ValidatedField) -> None:
+        with self._lock:
+            self._by_run.setdefault(field_id, {})[run] = evidence
+            runs = self._by_run[field_id]
+            if len(runs) < self._runs:
+                return
+            merged = runs[0]
+            for other in range(1, self._runs):
+                merged = merge_runs(merged, runs[other])
+            self._merged[field_id] = merged
+            if self._on_field is not None:
+                self._on_field(field_id, merged)
+
+    def by_field(self) -> dict[int, ValidatedField]:
+        return {field.id: self._merged[field.id] for field in self._fields}
 
 
 def _complete_answers(partial: dict[str, Any]) -> list[LLMFieldAnswer]:

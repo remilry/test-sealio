@@ -244,6 +244,7 @@ def _run(session: Session, fill_id: int, llm: LLM, today: date) -> None:
                 tender_details=details,
                 today=today,
                 on_field=on_field,
+                runs=get_settings().fill_runs_per_call,
             )
         name = group.section if group.part is None else f"{group.section} (part {group.part})"
         logger.info("AI fill %s, section %r: %s", fill_id, name, result.describe())

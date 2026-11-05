@@ -99,8 +99,9 @@ def test_annex_4_is_answered_by_nine_calls(client: TestClient, annex_4: int) -> 
 def test_groups_are_called_in_parallel(client: TestClient, annex_4: int, llm: SlowLLM) -> None:
     client.post(f"/forms/{annex_4}/fill")
 
-    # Every call has started before the first one ends: they all run at the same time.
-    assert len(llm.spans) == 9
+    # Every call (9 groups, two runs each) has started before the first one ends: they all run
+    # at the same time.
+    assert len(llm.spans) == 18
     assert max(start for start, _ in llm.spans) < min(end for _, end in llm.spans)
     events = read_events(client, annex_4)
     answered = [e for e in events if e["event"] == "field" and e["data"]["state"] == "answered"]

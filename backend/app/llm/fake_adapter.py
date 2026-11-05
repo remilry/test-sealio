@@ -44,6 +44,9 @@ class FakeLLM:
     ) -> LLMResult[T]:
         self.requests.append(request)
         recording = self._answers.get(request.key)
+        if recording is None and "--run-" in request.key:
+            # A further run of a call recorded once: replays that recording.
+            recording = self._answers.get(request.key.rsplit("--run-", 1)[0])
         if recording is None:
             raise LLMError(f"No recorded answer for {request.key!r} (scripts/record_llm.py).")
         answer = dict(recording)

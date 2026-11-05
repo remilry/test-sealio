@@ -135,6 +135,7 @@ def main() -> None:
                 tender_details=details,
                 today=today,
                 on_field=on_field,
+                runs=settings.fill_runs_per_call,
             )
         return key, group, result
 

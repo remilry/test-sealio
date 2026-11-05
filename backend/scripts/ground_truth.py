@@ -91,7 +91,8 @@ ANNEX_4: dict[str, Expected] = {
     "do_you_comply_with_the_swiss_regulations_on_environmental_pr": YES,
     "only_for_services_to_be_performed_abroad_do_you_comply_with_": EMPTY,
     "do_you_confirm_that_you_have_included_or_will_include_the_ab": YES,
-    "remarks": EMPTY,
+    # Free remarks: empty, or left to the user.
+    "remarks": expect(MISSING, MANUAL),
     "place_and_date": expect(MANUAL),
 }
 

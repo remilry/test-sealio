@@ -315,6 +315,9 @@ function FieldStatus({ field, context }: { field: QueueField; context: FieldCont
       );
     }
   }
+  if (field.type === "unsure") {
+    return <p className="text-xs font-medium text-warning">{t("unsure")}</p>;
+  }
   if (field.type === "declaration" && context) {
     return (
       <p className="text-xs text-muted-foreground">

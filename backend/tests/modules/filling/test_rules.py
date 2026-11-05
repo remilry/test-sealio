@@ -170,3 +170,26 @@ def test_an_old_source_still_valid_is_not_outdated() -> None:
 
     assert decision is not None
     assert decision.type == AnswerType.AUTO
+
+
+def test_a_value_only_one_of_two_runs_found_is_proposed_to_check() -> None:
+    decision = decide(FieldKind.TEXT, ValidatedField([found("5")], unsure=True), TODAY)
+
+    assert decision is not None
+    assert (decision.type, decision.value, decision.needs_review) == (AnswerType.UNSURE, "5", True)
+
+
+def test_a_declaration_only_one_of_two_runs_found_is_ticked_to_check() -> None:
+    decision = decide(FieldKind.YES_NO, ValidatedField([found("yes")], unsure=True), TODAY)
+
+    assert decision is not None
+    assert (decision.type, decision.value) == (AnswerType.UNSURE, "yes")
+
+
+def test_an_expired_source_stays_outdated_even_when_unsure() -> None:
+    evidence = ValidatedField([found("10", valid_until=date(2026, 10, 31))], unsure=True)
+
+    decision = decide(FieldKind.TEXT, evidence, TODAY)
+
+    assert decision is not None
+    assert decision.type == AnswerType.OUTDATED

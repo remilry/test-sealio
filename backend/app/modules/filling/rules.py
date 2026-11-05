@@ -7,8 +7,9 @@ No rule knows a form or a field: they only look at the field's kind and at the e
 3. Two or more different values → conflict, the most recent one selected.
 4. Its source is no longer valid, or over a year old without a validity still running → outdated
    (proposed, for the user to check).
-5. Yes/No with evidence → declaration, ticked; without → missing.
-6. One value → automatic; none → missing.
+5. Only one of two runs of the call found it → unsure (proposed, to check).
+6. Yes/No with evidence → declaration, ticked; without → missing.
+7. One value → automatic; none → missing.
 """
 
 from dataclasses import dataclass
@@ -26,6 +27,8 @@ class AnswerType(StrEnum):
     OUTDATED = "outdated"
     CONFLICT = "conflict"
     DECLARATION = "declaration"
+    # Only one of two runs of the call found it: proposed, to check.
+    UNSURE = "unsure"
 
 
 # A source older than this, with no validity still running, may no longer be true.
@@ -33,7 +36,13 @@ OLD_SOURCE_DAYS = 365
 
 # Types the user has to look at; the others are already in the form.
 NEEDS_REVIEW = frozenset(
-    {AnswerType.MISSING, AnswerType.MANUAL, AnswerType.OUTDATED, AnswerType.CONFLICT}
+    {
+        AnswerType.MISSING,
+        AnswerType.MANUAL,
+        AnswerType.OUTDATED,
+        AnswerType.CONFLICT,
+        AnswerType.UNSURE,
+    }
 )
 
 
@@ -72,6 +81,8 @@ def decide(kind: FieldKind, evidence: ValidatedField, today: date) -> Decision |
     [candidate] = candidates
     if _outdated(candidate, today):
         return Decision(AnswerType.OUTDATED, candidate.value, candidates)
+    if evidence.unsure:
+        return Decision(AnswerType.UNSURE, candidate.value, candidates)
     if kind == FieldKind.YES_NO:
         return Decision(AnswerType.DECLARATION, candidate.value, candidates)
     return Decision(AnswerType.AUTO, candidate.value, candidates)

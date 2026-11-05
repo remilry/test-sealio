@@ -365,7 +365,7 @@ export interface components {
          * AnswerType
          * @enum {string}
          */
-        AnswerType: "auto" | "missing" | "manual" | "outdated" | "conflict" | "declaration";
+        AnswerType: "auto" | "missing" | "manual" | "outdated" | "conflict" | "declaration" | "unsure";
         /**
          * AnswerUpdate
          * @description A value entered by the user; null or blank leaves the field empty.

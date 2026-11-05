@@ -7,6 +7,8 @@ import pytest
 from app.modules.filling.llm_schema import LLMCandidate, LLMCitation, LLMDate, LLMFieldAnswer
 from app.modules.filling.validator import (
     SourcePassage,
+    ValidatedField,
+    merge_runs,
     normalize_value,
     validate_field,
     value_is_supported,
@@ -466,3 +468,61 @@ def test_the_date_of_the_fact_itself_is_not_the_documents_date() -> None:
     ).candidates
 
     assert kept.source_date is None
+
+
+# --- Two runs of the same call, merged --------------------------------------------------------
+
+
+def _found(value: str, quote: str) -> ValidatedField:
+    return validate_field(FieldKind.TEXT, answer(candidate(value, ("P1", quote))), PASSAGES)
+
+
+def test_two_runs_giving_the_same_value_make_one_sure_candidate() -> None:
+    merged = merge_runs(
+        _found("Alpenlogic AG", "Company name: Alpenlogic AG"),
+        _found("Alpenlogic AG", "Alpenlogic AG"),
+    )
+
+    assert [c.value for c in merged.candidates] == ["Alpenlogic AG"]
+    assert len(merged.candidates[0].citations) == 2
+    assert not merged.unsure
+
+
+def test_two_runs_giving_different_values_keep_both() -> None:
+    merged = merge_runs(
+        _found("Alpenlogic AG", "Company name: Alpenlogic AG"),
+        _found("CHF 500'000", "Share capital: CHF 500'000"),
+    )
+
+    assert [c.value for c in merged.candidates] == ["Alpenlogic AG", "CHF 500'000"]
+
+
+def test_a_value_found_by_one_run_only_is_unsure() -> None:
+    nothing = validate_field(FieldKind.TEXT, None, PASSAGES)
+
+    for merged in (
+        merge_runs(_found("Alpenlogic AG", "Alpenlogic AG"), nothing),
+        merge_runs(nothing, _found("Alpenlogic AG", "Alpenlogic AG")),
+    ):
+        assert [c.value for c in merged.candidates] == ["Alpenlogic AG"]
+        assert merged.unsure
+
+
+def test_two_runs_finding_nothing_find_nothing() -> None:
+    nothing = validate_field(FieldKind.TEXT, None, PASSAGES)
+
+    merged = merge_runs(nothing, nothing)
+
+    assert (merged.candidates, merged.unsure) == ([], False)
+
+
+def test_a_field_one_run_leaves_to_the_user_is_left_to_the_user() -> None:
+    mine = validate_field(
+        FieldKind.TEXT,
+        answer(user_only=True, user_only_reason="Yours", suggested_value="Zurich"),
+        PASSAGES,
+    )
+
+    merged = merge_runs(_found("Alpenlogic AG", "Alpenlogic AG"), mine)
+
+    assert (merged.user_only, merged.suggested_value) == (True, "Zurich")
