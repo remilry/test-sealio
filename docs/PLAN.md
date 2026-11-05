@@ -2,7 +2,7 @@
 
 > Document vivant. Chaque étape y est cochée et détaillée au fur et à mesure.
 > Contexte produit et priorités : voir `CLAUDE.md`. Échéance : jeudi 5 novembre.
-> Statut : étapes 0 à 4.5 faites ; étape 5 découpée en 5a–5d, 5a, 5b et 5c mergées, 5d faite (remplissage automatique dans l'UI, en attente de validation) ; prochaine : étape 6 (Annex 4), avant la relecture (7) et les finitions (7.5). Parcours détaillé : `docs/USER_FLOW.md`. Les choix techniques marqués _proposition_ restent à confirmer à l'étape 3.
+> Statut : étapes 0 à 4.5 faites ; étape 5 découpée en 5a–5d, 5a, 5b et 5c mergées, 5d faite (remplissage automatique dans l'UI, en attente de validation) ; en cours : étape 6 (Annex 4, découpée en 6a–6d ; 6a faite, en attente de validation), avant la relecture (7) et les finitions (7.5). Parcours détaillé : `docs/USER_FLOW.md`. Les choix techniques marqués _proposition_ restent à confirmer à l'étape 3.
 
 ## 1. Ce qu'on a appris des deux formulaires
 
@@ -125,6 +125,16 @@ Chaque étape à partir de la 4 livre une **fonctionnalité utilisable de bout e
 
 ### Étape 6 — Annex 4 (DOCX) de bout en bout ⬜ _(critique, testé)_
 _Avancée avant la relecture et les finitions (décision 2026-11-05) : ses cas difficiles (conflits, périmé, déclarations Oui/Non) donnent à la relecture de quoi travailler._
+- Découpée en 4 sous-étapes, chacune sur sa branche et validée avant la suivante : 6a parseur + export DOCX (back), 6b aperçu Word dans *Live fill* + saisie + export dans l'UI, 6c remplissage automatique (sections en parallèle, réponses enregistrées), 6d aperçu Word dans *Company knowledge*.
+
+#### 6a — Parseur et export DOCX (back) ✅ _(en attente de validation)_
+- Design : `docs/superpowers/specs/2026-11-05-6a-docx-parse-export-design.md`.
+- **Parseur générique** (`forms/parsing/docx_parser.py`, pur) : ligne « libellé | cellule vide » → la cellule ; dans une cellule, chaque paragraphe court est un libellé → le paragraphe vide en dessous, sinon à la suite s'il finit par `:`, sinon un nouveau paragraphe (12 mots au plus) ; tableau dont l'en-tête dit « Yes/No » → champs `yes_no` ; pointillés → remplacés (une cellule à pointillés n'a que ces champs) ; hors tableau : libellé `:` suivi de tabulations, signature/cachet. Pas des champs : texte long, ligne de titre, libellé qui chapeaute plusieurs libellés à sa droite. Sections `Table n` et `Text`. Annex 4 : 49 champs (17 Oui/Non, 1 signature), 8 sections.
+- **`DocxLocator`** (tableau, ligne, cellule distincte, paragraphe, mode `in_paragraph` / `new_paragraph` / `replace_leader`, run) ; `locator` = union discriminée par `format` dans l'API (types du front régénérés).
+- **Export** (`export/docx_exporter.py`, pur) : valeur sur une ligne dans un nouveau run qui copie la mise en forme du libellé (ou de la marque de paragraphe) ; Oui/Non en toutes lettres ; tabulations qui suivent le libellé absorbées quand du texte suit sur la ligne (« Place and date: ⇥⇥⇥ Company stamp… ») ; seul `word/document.xml` est réécrit, le reste du paquet copié à l'octet près. `export/service.py` choisit l'exporteur selon le format ; signatures jamais écrites.
+- Le parseur n'est **pas encore branché** au seed (`forms_service.PARSERS`) : l'Annex 4 reste « non lisible » dans l'app jusqu'à 6b.
+- Tests : une règle par document Word synthétique, schéma attendu de l'Annex 4 (clés, types, sections, modes, localisateurs distincts), export (valeur au bon endroit par mode, police du libellé, Oui/Non, tabulations, une ligne, valeurs vides = fichier identique, paragraphes / propriétés de tableaux et autres parties inchangés), API (DOCX téléchargé sous son nom d'origine, résumé).
+- Limites connues : pas de comparaison visuelle par rendu (pas de LibreOffice) ; largeur d'une valeur estimée (0,5 em par caractère) pour les tabulations ; les en-têtes (« Number of employees… », « Available amounts per claim ») ne sont pas ajoutés aux libellés des sous-champs (rappel à mesurer en 6c).
 - Parsing des tableaux Word (libellés, cellules, types texte / Oui-Non / nombre), export dans les cellules en préservant la mise en page, avec la même UI que l'Annex 7.
 - Aperçu des documents Word de la base de connaissances (`docx-preview`) dans la modale de *Company knowledge* et dans la vue *Source*.
 - Cas difficiles de la base de connaissances : donnée absente, documents contradictoires, extrait périmé, déclarations Oui/Non non documentées.

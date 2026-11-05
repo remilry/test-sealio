@@ -140,7 +140,7 @@ backend/
 │     ├─ tenants/             service (dépendance `CurrentTenantId`) · models
 │     ├─ tenders/             router · service · models
 │     ├─ forms/               router · service · models
-│     │  └─ parsing/          pdf_parser.py · docx_parser.py → FormSchema (pur)
+│     │  └─ parsing/          pdf_parser.py · docx_parser.py → FormSchema (pur) ; schema.py (localisateur `PdfLocator` | `DocxLocator`) · labels.py (libellés, clés, pointillés) · docx_layout.py (localisateur → paragraphe Word)
 │     ├─ filling/             router (lancer, SSE, PATCH champ) · service · models
 │     │  ├─ job.py            orchestration des 5 phases, émet les événements
 │     │  ├─ answer_engine.py  section → retrieve par champ → prompt → appel LLM
