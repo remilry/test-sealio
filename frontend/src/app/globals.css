@@ -137,6 +137,11 @@
   body {
     @apply bg-background text-foreground;
   }
+  /* Tailwind 4 leaves buttons on the default cursor: clickable things show the hand (pointer). */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
   html {
     @apply font-sans;
   }
