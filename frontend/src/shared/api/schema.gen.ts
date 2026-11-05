@@ -466,6 +466,33 @@ export interface components {
          */
         DocumentStatus: "processing" | "indexed" | "error";
         /**
+         * DocxLocator
+         * @description Where a field's answer goes in a Word document (python-docx indexes).
+         */
+        DocxLocator: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            format: "docx";
+            /** Table */
+            table?: number | null;
+            /** Row */
+            row?: number | null;
+            /** Cell */
+            cell?: number | null;
+            /** Paragraph */
+            paragraph: number;
+            mode: components["schemas"]["DocxWriteMode"];
+            /** After Run */
+            after_run?: number | null;
+        };
+        /**
+         * DocxWriteMode
+         * @enum {string}
+         */
+        DocxWriteMode: "in_paragraph" | "new_paragraph" | "replace_leader";
+        /**
          * ExportSummary
          * @description What the export will contain, and what the user should know before downloading.
          */
@@ -508,7 +535,8 @@ export interface components {
             /** Label */
             label: string;
             kind: components["schemas"]["FieldKind"];
-            locator: components["schemas"]["PdfLocator"];
+            /** Locator */
+            locator: components["schemas"]["PdfLocator"] | components["schemas"]["DocxLocator"];
         };
         /** FieldRef */
         FieldRef: {
@@ -626,9 +654,8 @@ export interface components {
          */
         PdfLocator: {
             /**
-             * Format
-             * @default pdf
-             * @constant
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
              */
             format: "pdf";
             /** Page */

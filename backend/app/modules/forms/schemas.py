@@ -1,7 +1,7 @@
 from pydantic import BaseModel, ConfigDict
 
 from app.modules.forms.models import FileFormat
-from app.modules.forms.parsing.schema import FieldKind, PageSize, PdfLocator
+from app.modules.forms.parsing.schema import FieldKind, Locator, PageSize
 
 
 class FieldCounts(BaseModel):
@@ -35,7 +35,7 @@ class FieldOut(BaseModel):
     section: str
     label: str
     kind: FieldKind
-    locator: PdfLocator
+    locator: Locator
 
 
 class FormDetail(FormInfo):

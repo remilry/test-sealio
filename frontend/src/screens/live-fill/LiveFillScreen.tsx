@@ -147,16 +147,19 @@ function FillWorkspace({
       userOnlyReason: answer?.user_only_reason ?? null,
     };
   });
-  const zones: PreviewZone[] = form.fields.map((field, index) => {
+  // The preview draws PDF fields only (a Word form's preview comes with step 6b).
+  const zones: PreviewZone[] = form.fields.flatMap((field, index) => {
+    const { locator } = field;
+    if (locator.format !== "pdf") return [];
     const draft = drafts.get(field.id);
     const value = (draft ?? fields[index].value ?? "").trim() || null;
     return {
       id: field.id,
       label: field.label,
-      page: field.locator.page,
-      box: field.locator.box,
-      fontSize: field.locator.font_size,
-      placeholders: field.locator.erase,
+      page: locator.page,
+      box: locator.box,
+      fontSize: locator.font_size,
+      placeholders: locator.erase,
       value,
       tone: zoneTone(fields[index], value, draft === undefined ? answers.get(field.id) : undefined),
     };

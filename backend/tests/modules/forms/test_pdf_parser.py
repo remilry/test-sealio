@@ -6,6 +6,7 @@ import pytest
 from app.core.config import get_settings
 from app.modules.forms.parsing.pdf_parser import parse_pdf
 from app.modules.forms.parsing.schema import FieldKind, FormSchema
+from tests.modules.helpers import pdf_locator
 
 ANNEX_7 = "Annex_7_Self-Declaration_Art29c_Ukraine_Ordinance.pdf"
 
@@ -56,8 +57,8 @@ def test_annex_7_fields_match_the_expected_schema(annex_7: FormSchema) -> None:
             field.key,
             field.label,
             field.kind,
-            tuple(round(v) for v in field.locator.box.model_dump().values()),
-            bool(field.locator.erase),
+            tuple(round(v) for v in pdf_locator(field).box.model_dump().values()),
+            bool(pdf_locator(field).erase),
         )
         for field in annex_7.fields
     ]
@@ -68,20 +69,20 @@ def test_annex_7_fields_match_the_expected_schema(annex_7: FormSchema) -> None:
 def test_annex_7_is_one_a4_page_and_one_section(annex_7: FormSchema) -> None:
     assert [(round(p.width), round(p.height)) for p in annex_7.pages] == [(595, 842)]
     assert {field.section for field in annex_7.fields} == {"Page 1"}
-    assert {field.locator.page for field in annex_7.fields} == {0}
+    assert {pdf_locator(field).page for field in annex_7.fields} == {0}
 
 
 def test_answers_sit_on_the_label_line_at_the_label_size(annex_7: FormSchema) -> None:
     for field in annex_7.fields:
-        box = field.locator.box
-        assert box.y0 < field.locator.baseline <= box.y1
-        assert field.locator.font_size == 10
+        box = pdf_locator(field).box
+        assert box.y0 < pdf_locator(field).baseline <= box.y1
+        assert pdf_locator(field).font_size == 10
 
 
 def test_dots_to_erase_are_inside_the_writable_box(annex_7: FormSchema) -> None:
     for field in annex_7.fields:
-        box = field.locator.box
-        for mark in field.locator.erase:
+        box = pdf_locator(field).box
+        for mark in pdf_locator(field).erase:
             assert box.x0 <= mark.x0 < mark.x1 <= box.x1
 
 
@@ -112,7 +113,7 @@ def test_detects_dot_leaders_with_the_label_before_or_above() -> None:
         ("Company name", FieldKind.TEXT),
         ("Registered office", FieldKind.TEXT),
     ]
-    assert schema.fields[0].locator.font_size == 11
+    assert pdf_locator(schema.fields[0]).font_size == 11
 
 
 def test_detects_an_empty_ruled_cell_but_not_a_filled_one() -> None:
@@ -127,8 +128,8 @@ def test_detects_an_empty_ruled_cell_but_not_a_filled_one() -> None:
 
     [cell] = schema.fields
     assert cell.label == "VAT number"
-    assert cell.locator.box.x1 < 520
-    assert cell.locator.erase == []
+    assert pdf_locator(cell).box.x1 < 520
+    assert pdf_locator(cell).erase == []
 
 
 def test_signature_and_stamp_blanks_are_signatures() -> None:

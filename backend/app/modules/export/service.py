@@ -11,7 +11,7 @@ from app.modules.export.schemas import ExportSummary, FieldRef
 from app.modules.filling import service as filling_service
 from app.modules.forms import service as forms_service
 from app.modules.forms.models import FileFormat
-from app.modules.forms.parsing.schema import FieldKind
+from app.modules.forms.parsing.schema import FieldKind, PdfLocator
 
 
 @dataclass(frozen=True)
@@ -50,7 +50,9 @@ def export_file(session: Session, tenant_id: int, form_id: int, data_dir: Path) 
     answers = [
         (field.locator, values[field.id])
         for field in forms_service.list_fields(session, form_id)
-        if field.id in values and field.kind != FieldKind.SIGNATURE
+        if field.id in values
+        and field.kind != FieldKind.SIGNATURE
+        and isinstance(field.locator, PdfLocator)
     ]
     return ExportedFile(
         content=export_pdf(form_file.path.read_bytes(), answers),
