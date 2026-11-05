@@ -5,13 +5,14 @@ No rule knows a form or a field: they only look at the field's kind and at the e
 1. Signature or stamp → never filled.
 2. Only the user can fill it → manual, with the suggested value pre-written.
 3. Two or more different values → conflict, the most recent one selected.
-4. Its source is no longer valid → outdated.
+4. Its source is no longer valid, or over a year old without a validity still running → outdated
+   (proposed, for the user to check).
 5. Yes/No with evidence → declaration, ticked; without → missing.
 6. One value → automatic; none → missing.
 """
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from enum import StrEnum
 
 from app.modules.filling.validator import Candidate, ValidatedField
@@ -26,6 +27,9 @@ class AnswerType(StrEnum):
     CONFLICT = "conflict"
     DECLARATION = "declaration"
 
+
+# A source older than this, with no validity still running, may no longer be true.
+OLD_SOURCE_DAYS = 365
 
 # Types the user has to look at; the others are already in the form.
 NEEDS_REVIEW = frozenset(
@@ -66,11 +70,19 @@ def decide(kind: FieldKind, evidence: ValidatedField, today: date) -> Decision |
         ordered = [selected, *(c for c in candidates if c is not selected)]
         return Decision(AnswerType.CONFLICT, selected.value, ordered)
     [candidate] = candidates
-    if candidate.valid_until is not None and candidate.valid_until.date < today:
+    if _outdated(candidate, today):
         return Decision(AnswerType.OUTDATED, candidate.value, candidates)
     if kind == FieldKind.YES_NO:
         return Decision(AnswerType.DECLARATION, candidate.value, candidates)
     return Decision(AnswerType.AUTO, candidate.value, candidates)
+
+
+def _outdated(candidate: Candidate, today: date) -> bool:
+    if candidate.valid_until is not None:
+        return candidate.valid_until.date < today
+    if candidate.source_date is not None:
+        return candidate.source_date.date < today - timedelta(days=OLD_SOURCE_DAYS)
+    return False
 
 
 def _most_recent(candidates: list[Candidate]) -> Candidate:

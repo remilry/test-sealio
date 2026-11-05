@@ -35,18 +35,32 @@ For each field:
 a personal choice), set user_only with a short reason for the user. You may suggest a value they \
 can confirm (for place and date: the city of the registered office and today's date, written \
 day.month.year).
+- If the field only applies to a case the passages show the bidder is not in (a question for \
+foreign bidders when the bidder is Swiss, services performed abroad when none are), return no \
+candidate.
 - Otherwise give one answer: the complete value the field asks for, on one line, as it should be \
-written in the form. When the field asks for several facts (a name and a legal form), combine \
-them in that one value, with one quote per fact. When the passages list several people, numbers \
-or addresses, choose the one that fits the field: they are options, not a disagreement.
+written in the form: the value only, without the document's labels or surrounding words ("14", \
+not "14 with higher professional training"; "+41 44 555 01 20", not "Reception +41 44 555 01 20"). \
+When the field asks for several facts (a name and a legal form), combine them in that one value, \
+with one quote per fact. When the passages list several people, numbers or addresses, choose the \
+one that fits the field: they are options, not a disagreement.
+- A number must count exactly what the field asks for: a broader or different category ("other \
+staff and apprentices" for auxiliary staff) is not an answer.
 - Give a second candidate only when the sources disagree about the same fact (two documents \
 giving two different addresses for the same office, two different headcounts), the most recent or \
 most official first.
 - Each value must be made only of words found in its quotes, and each quote copied exactly from \
-the passage it cites. Prefer the current state over history (superseded entries, former \
-addresses).
-- For a Yes/No field, answer "yes" or "no" only if a passage states it; quote that statement.
-- When a document gives its date or its end of validity, return it with the quote stating it.
+the passage it cites: a short excerpt taken from a single line of a single passage (quote two \
+lines as two quotes). Prefer the current state over history (superseded entries, former \
+addresses); when the only figure found comes from an older document (a past year's report), \
+still give it, with that document's date.
+- For a Yes/No field, answer "yes" or "no" only if a passage states it; quote that statement. A \
+passage saying that the rule asked about does not apply to the bidder (no collective agreement \
+applies) does not answer whether the bidder complies with it: return no candidate.
+- For every candidate, return the date of the document it comes from and its end of validity \
+when the document states them (issue date, report year, insurance period, certificate expiry), \
+with the quote stating each, even when the value itself comes from a table or another part of \
+that document.
 - When the passages do not contain the answer, return no candidate. Never guess, never infer \
 from general knowledge, never reuse a value given for another field unless the passage supports \
 it for this one.
