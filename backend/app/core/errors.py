@@ -2,6 +2,7 @@ import logging
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +43,36 @@ def register_error_handlers(app: FastAPI) -> None:
     async def _rule_violation(_request: Request, exc: RuleViolationError) -> JSONResponse:
         return JSONResponse(status_code=422, content={"detail": str(exc)})
 
-    @app.exception_handler(Exception)
-    async def _unexpected(request: Request, exc: Exception) -> JSONResponse:
-        logger.error("Unexpected error on %s %s", request.method, request.url.path, exc_info=exc)
-        return JSONResponse(status_code=500, content={"detail": GENERIC_ERROR})
+    # Not an exception handler for Exception: Starlette runs that one outside every middleware,
+    # so the 500 would lose its CORS headers and the browser would hide it. Must be added before
+    # CORSMiddleware (the last middleware added is the outermost).
+    app.add_middleware(_UnexpectedErrors)
+
+
+class _UnexpectedErrors:
+    """Any exception a route lets through: logged with its trace, answered with a plain 500
+    (unless the response had already started, e.g. a stream: then the connection just ends)."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self._app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self._app(scope, receive, send)
+            return
+        started = False
+
+        async def watch(message: Message) -> None:
+            nonlocal started
+            if message["type"] == "http.response.start":
+                started = True
+            await send(message)
+
+        try:
+            await self._app(scope, receive, watch)
+        except Exception:
+            logger.exception("Unexpected error on %s %s", scope["method"], scope["path"])
+            if started:
+                raise
+            response = JSONResponse(status_code=500, content={"detail": GENERIC_ERROR})
+            await response(scope, receive, send)

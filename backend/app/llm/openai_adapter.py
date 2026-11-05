@@ -63,8 +63,11 @@ class OpenAILLM:
                     if on_partial is not None:
                         partial = _parse_partial(text)
                         if partial:
-                            on_partial(partial)
+                            _forward(on_partial, partial)
                 response = stream.get_final_response()
+        except _CallerError as error:
+            # Raised by the caller's own code, not the model's: as it is, never retried.
+            raise error.original from None
         except (
             openai.APIConnectionError,  # APITimeoutError included
             openai.RateLimitError,
@@ -103,6 +106,22 @@ class OpenAILLM:
             ),
             seconds=seconds,
         )
+
+
+class _CallerError(Exception):
+    """Wraps what `on_partial` raised, so the model's error handling below never takes it for
+    a failure of the model (a ValueError there would be retried as an unreadable answer)."""
+
+    def __init__(self, original: BaseException) -> None:
+        super().__init__(str(original))
+        self.original = original
+
+
+def _forward(on_partial: OnPartial, partial: dict[str, Any]) -> None:
+    try:
+        on_partial(partial)
+    except Exception as error:
+        raise _CallerError(error) from error
 
 
 def _retry_after(error: openai.APIError) -> float | None:

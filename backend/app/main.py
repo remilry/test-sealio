@@ -43,13 +43,14 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="Formpilot API", lifespan=lifespan)
+# Before CORS: an unexpected error's 500 still gets the CORS headers (outermost = last added).
+register_error_handlers(app)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_settings().cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-register_error_handlers(app)
 app.include_router(tenders_router)
 app.include_router(forms_router)
 app.include_router(filling_router)

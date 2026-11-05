@@ -136,3 +136,23 @@ def test_the_sdk_does_not_retry_on_its_own_and_calls_are_bounded() -> None:
 
     assert client.max_retries == 0
     assert client.timeout == get_settings().llm_call_timeout_seconds == 90.0
+
+
+class _StreamWithText(_Stream):
+    def __iter__(self) -> Iterator[Any]:
+        return iter([SimpleNamespace(type="response.output_text.delta", delta='{"value": "ok"}')])
+
+
+def test_an_error_raised_by_the_caller_while_streaming_is_not_taken_for_the_models() -> None:
+    llm = adapter()
+    llm._client.responses.stream = lambda **_kwargs: _StreamWithText(  # type: ignore[method-assign]
+        Answer(value="ok"), None
+    )
+
+    def broken(_partial: dict[str, Any]) -> None:
+        raise ValueError("a bug of the caller")
+
+    # Not a TransientLLMError: retrying would hide the bug.
+    with pytest.raises(ValueError, match="a bug of the caller") as raised:
+        llm.generate_structured(REQUEST, broken)
+    assert not isinstance(raised.value, LLMError)
