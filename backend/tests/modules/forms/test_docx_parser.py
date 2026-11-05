@@ -3,10 +3,12 @@
 import io
 from collections.abc import Callable
 
+import pytest
 from docx import Document
 from docx.document import Document as DocumentObject
 from docx.table import _Cell  # pyright: ignore[reportPrivateUsage]
 
+from app.core.config import get_settings
 from app.modules.forms.parsing.docx_parser import parse_docx
 from app.modules.forms.parsing.schema import DocxWriteMode, FieldKind, FormSchema
 from tests.modules.helpers import docx_locator
@@ -250,3 +252,112 @@ def test_sections_follow_the_tables() -> None:
         ("Table 1", 0),
         ("Table 2", 1),
     ]
+
+
+def test_a_sentence_next_to_a_title_is_not_a_field() -> None:
+    def build(document: DocumentObject) -> None:
+        table = document.add_table(rows=1, cols=2)
+        _cell_paragraphs(table.cell(0, 0), ["Questionnaire for bidders", "", "Tender (No. ……)"])
+        table.cell(0, 1).text = (
+            "The information will be treated confidentially and used solely for the evaluation "
+            "of this tender"
+        )
+
+    assert [label for label, *_ in _fields(_parse(build))] == ["Tender (No. …)"]
+
+
+# --- The real Annex 4 ------------------------------------------------------------------------
+
+ANNEX_4 = "Annex_4_Conditions of Participation and Company Self-Declaration.docx"
+
+
+@pytest.fixture(scope="module")
+def annex_4() -> FormSchema:
+    return parse_docx((get_settings().seed_forms_dir / ANNEX_4).read_bytes())
+
+
+def test_annex_4_fields(annex_4: FormSchema) -> None:
+    assert [(f.key, f.kind, f.section, docx_locator(f).mode) for f in annex_4.fields] == [
+        ("tender_no_type_of_work", TEXT, "Table 1", LEADER),
+        ("exact_company_name", TEXT, "Table 2", IN),
+        ("street_postcode_city_country", TEXT, "Table 2", IN),
+        ("telephone_e_mail", TEXT, "Table 2", IN),
+        ("responsible_person_contact_person", TEXT, "Table 2", IN),
+        ("uid", TEXT, "Table 2", IN),
+        ("legal_form", TEXT, "Table 3", IN),
+        ("registered_office", TEXT, "Table 3", IN),
+        ("company_has_had_this_legal_form_since", TEXT, "Table 3", IN),
+        ("ownership_structure_incl_own_shareholdings", TEXT, "Table 3", IN),
+        ("share_capital", TEXT, "Table 3", IN),
+        ("business_purpose", TEXT, "Table 3", IN),
+        ("main_activity", TEXT, "Table 3", IN),
+        ("secondary_activities", TEXT, "Table 3", IN),
+        ("certificates", TEXT, "Table 3", IN),
+        ("with_higher_professional_training", TEXT, "Table 4", IN),
+        ("with_professional_training", TEXT, "Table 4", NEW),
+        ("auxiliary_staff", TEXT, "Table 4", NEW),
+        ("apprentices", TEXT, "Table 4", NEW),
+        ("insurance_coverage_details", TEXT, "Table 5", IN),
+        ("insurance_company", TEXT, "Table 5", IN),
+        ("personal_injury", TEXT, "Table 5", IN),
+        ("property_damage", TEXT, "Table 5", IN),
+        ("financial_loss", TEXT, "Table 5", IN),
+        ("competent_tax_office_exact_address", TEXT, "Table 6", IN),
+        ("ahv_compensation_office_exact_address", TEXT, "Table 6", IN),
+        ("for_foreign_bidders_details_of_the_pension_scheme_exact_addr", TEXT, "Table 6", NEW),
+        ("bvg_pension_fund_exact_address_and_details", TEXT, "Table 6", IN),
+        ("for_foreign_bidders_details_of_the_pension_scheme_exact_addr_2", TEXT, "Table 6", IN),
+        ("do_you_comply_with_the_applicable_occupational_health_and_sa", YES_NO, "Table 7", IN),
+        ("do_you_comply_with_the_collective_employment_agreement_that_", YES_NO, "Table 7", IN),
+        ("do_you_comply_with_the_standard_employment_contract_that_app", YES_NO, "Table 7", IN),
+        ("do_you_comply_with_the_customary_wage_and_working_conditions", YES_NO, "Table 7", IN),
+        ("only_for_services_to_be_performed_abroad_for_the_services_to", YES_NO, "Table 7", IN),
+        ("do_you_comply_with_the_principle_of_non_discrimination_in_pa", YES_NO, "Table 7", IN),
+        ("have_you_paid_in_full_the_taxes_due_at_your_place_of_busines", YES_NO, "Table 7", IN),
+        ("have_you_paid_in_full_the_vat_or_sales_tax_due", YES_NO, "Table 7", IN),
+        ("have_you_paid_in_full_the_social_security_contributions_due_", YES_NO, "Table 7", IN),
+        ("have_you_paid_in_full_the_contributions_due_under_generally_", YES_NO, "Table 7", IN),
+        ("are_you_subject_to_debt_enforcement_or_bankruptcy_proceeding", YES_NO, "Table 7", IN),
+        ("have_any_seizures_been_carried_out_against_you_in_the_past_t", YES_NO, "Table 7", IN),
+        ("have_you_entered_into_any_agreements_or_taken_other_measures", YES_NO, "Table 7", IN),
+        ("do_you_confirm_that_you_are_not_on_the_list_of_sanctioned_bi", YES_NO, "Table 7", IN),
+        ("do_you_comply_with_the_swiss_regulations_on_environmental_pr", YES_NO, "Table 7", IN),
+        ("only_for_services_to_be_performed_abroad_do_you_comply_with_", YES_NO, "Table 7", IN),
+        ("do_you_confirm_that_you_have_included_or_will_include_the_ab", YES_NO, "Table 7", IN),
+        ("remarks", TEXT, "Table 7", IN),
+        ("place_and_date", TEXT, "Text", IN),
+        ("company_stamp_and_legally_valid_signature_s", SIGNATURE, "Text", IN),
+    ]
+
+
+def test_annex_4_labels_read_as_in_the_form(annex_4: FormSchema) -> None:
+    labels = {f.key: f.label for f in annex_4.fields}
+
+    assert labels["tender_no_type_of_work"] == "Tender (No. …, type of work)"
+    assert labels["legal_form"] == "Legal form"
+    assert labels["ownership_structure_incl_own_shareholdings"] == (
+        "Ownership structure (incl. own shareholdings)"
+    )
+    assert labels["have_you_paid_in_full_the_vat_or_sales_tax_due"] == (
+        "Have you paid in full the VAT or sales tax due?"
+    )
+    assert labels["company_stamp_and_legally_valid_signature_s"] == (
+        "Company stamp and legally valid signature(s)"
+    )
+
+
+def test_annex_4_locators_are_distinct(annex_4: FormSchema) -> None:
+    places = [
+        (loc.table, loc.row, loc.cell, loc.paragraph, loc.mode, loc.after_run)
+        for loc in map(docx_locator, annex_4.fields)
+    ]
+
+    assert len(places) == len(set(places))
+
+
+def test_annex_4_counts(annex_4: FormSchema) -> None:
+    kinds = [f.kind for f in annex_4.fields]
+
+    assert len(kinds) == 49
+    assert kinds.count(YES_NO) == 17
+    assert kinds.count(SIGNATURE) == 1

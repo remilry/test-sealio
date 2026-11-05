@@ -33,6 +33,9 @@ from app.modules.forms.parsing.schema import (
 
 # A label is a short paragraph: longer text is an explanation, never a field.
 MAX_LABEL_CHARS = 120
+# A label with nothing marking room for its answer (no ":", no empty paragraph below) must also be
+# short: a longer one is a sentence (a notice next to a title).
+MAX_BARE_LABEL_WORDS = 12
 YES_NO_HEADER = re.compile(r"\byes\s*/\s*no\b", re.IGNORECASE)
 BODY_SECTION = "Text"
 
@@ -281,7 +284,9 @@ def _in_cell_blanks(
             locator = locate(
                 cell_index, index, DocxWriteMode.IN_PARAGRAPH, _last_text_run(paragraph)
             )
-        else:
+        elif len(text.split()) <= MAX_BARE_LABEL_WORDS:
             locator = locate(cell_index, index, DocxWriteMode.NEW_PARAGRAPH)
+        else:
+            continue
         blanks.append(_Blank(label, section, _kind(label), locator))
     return blanks
