@@ -137,6 +137,7 @@ function FillWorkspace({
       id: field.id,
       label: field.label,
       fillable: field.kind !== "signature",
+      yesNo: field.kind === "yes_no",
       value: answer?.value ?? null,
       unsaved: unsaved.get(field.id) ?? null,
       enteredAt: answer?.resolved_by === "user" ? answer.resolved_at : null,

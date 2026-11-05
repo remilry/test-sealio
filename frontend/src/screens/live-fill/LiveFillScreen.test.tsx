@@ -1032,8 +1032,11 @@ describe("Live fill on a Word form", () => {
   const COMPANY = annex4Field("exact_company_name");
   const INSURER = annex4Field("insurance_company");
 
-  function givenWord({ file = annex4File() }: { file?: Uint8Array | null } = {}) {
-    let state = fillState([], annex4Fields);
+  function givenWord({
+    file = annex4File(),
+    answers = [],
+  }: { file?: Uint8Array | null; answers?: Answer[] } = {}) {
+    let state = fillState(answers, annex4Fields);
     const saved = handlers.saveField(1, (fieldId, { value }) => {
       const others = state.answers.filter((a) => a.field_id !== fieldId);
       const entered = answer(fieldId, value?.trim() || null, "2026-11-05T09:00:00Z");
@@ -1131,5 +1134,37 @@ describe("Live fill on a Word form", () => {
     // Then I download a DOCX
     const link = await screen.findByRole("link", { name: "Download DOCX" });
     expect(link).toHaveAttribute("href", "http://localhost:8000/forms/1/export/file");
+  });
+
+  const VAT = annex4Field("have_you_paid_in_full_the_vat_or_sales_tax_due");
+
+  it("lets me answer a declaration with Yes or No, and clear it", async () => {
+    // Given the Annex 4 open
+    const { saved, user } = givenWord();
+    await findZone(VAT.id);
+    const card = within(fieldList().getByRole("listitem", { name: VAT.label }));
+
+    // When I answer Yes
+    await user.click(card.getByRole("radio", { name: "Yes" }));
+
+    // Then it is saved and shows on the document, written in full
+    await waitFor(() => expect(saved.requests).toEqual([{ fieldId: VAT.id, value: "yes" }]));
+    await waitFor(() => expect(zone(VAT.id)).toHaveTextContent("Yes"));
+    expect(card.getByRole("radio", { name: "Yes" })).toBeChecked();
+
+    // And clearing it leaves the declaration unanswered
+    await user.click(card.getByRole("button", { name: "Clear" }));
+    await waitFor(() => expect(saved.requests.at(-1)).toEqual({ fieldId: VAT.id, value: null }));
+    await waitFor(() => expect(card.getByRole("radio", { name: "Yes" })).not.toBeChecked());
+  });
+
+  it("shows a declaration answered Yes, however it was written", async () => {
+    // Given a declaration already answered "Yes"
+    givenWord({ answers: [answer(VAT.id, "Yes")] });
+
+    // Then Yes is selected
+    const card = within(await screen.findByRole("listitem", { name: VAT.label }));
+    expect(card.getByRole("radio", { name: "Yes" })).toBeChecked();
+    expect(card.getByRole("radio", { name: "No" })).not.toBeChecked();
   });
 });

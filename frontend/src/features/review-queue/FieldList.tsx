@@ -5,6 +5,7 @@ import { PenLineIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { cn } from "@/shared/lib/utils";
 import type { Schema } from "@/shared/api";
+import { Button, buttonVariants } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { formatDate, formatTime } from "@/shared/utils/date";
 
@@ -14,6 +15,8 @@ export type QueueField = {
   label: string;
   /** Signatures and stamps are shown but never filled. */
   fillable: boolean;
+  /** A Yes/No declaration is answered with two choices instead of text. */
+  yesNo: boolean;
   value: string | null;
   /** What the user typed but could not be saved: kept in the input so they can try again. */
   unsaved: string | null;
@@ -80,7 +83,20 @@ export function FieldList({
             field.id === selectedId && "border-primary ring-3 ring-primary/15",
           )}
         >
-          {field.fillable ? (
+          {field.fillable && field.yesNo && (
+            <YesNoInput
+              field={field}
+              selected={field.id === selectedId}
+              context={context}
+              inputRef={(input) => {
+                if (input) inputs.current.set(field.id, input);
+                else inputs.current.delete(field.id);
+              }}
+              onFocus={() => onSelect(field.id)}
+              onSave={(value) => onSave(field.id, value)}
+            />
+          )}
+          {field.fillable && !field.yesNo && (
             <FieldInput
               field={field}
               selected={field.id === selectedId}
@@ -94,7 +110,8 @@ export function FieldList({
               onNext={() => onNext(field.id)}
               onDraft={(text) => onDraft(field.id, text)}
             />
-          ) : (
+          )}
+          {!field.fillable && (
             <div className="flex flex-col gap-1">
               <span className="text-sm font-medium">{field.label}</span>
               <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -175,6 +192,65 @@ function FieldInput({
       <FieldStatus field={field} context={context} />
       <FieldSources field={field} expanded={selected} />
     </form>
+  );
+}
+
+/** A Yes/No declaration: two choices, saved at once, and a way back to no answer. */
+function YesNoInput({
+  field,
+  selected,
+  context,
+  inputRef,
+  onFocus,
+  onSave,
+}: {
+  field: QueueField;
+  selected: boolean;
+  context: FieldContext | undefined;
+  inputRef: (input: HTMLInputElement | null) => void;
+  onFocus: () => void;
+  onSave: (value: string | null) => void;
+}) {
+  const t = useTranslations("fieldList");
+  const name = `field-${field.id}`;
+  // Stored "yes" / "no" (any case from older answers).
+  const chosen = (field.unsaved ?? field.value ?? "").toLowerCase();
+  return (
+    <div className="flex flex-col gap-1.5">
+      <fieldset className="flex flex-col gap-1.5">
+        <legend className="mb-1.5 text-sm font-medium">{field.label}</legend>
+        <div className="flex items-center gap-2">
+          {(["yes", "no"] as const).map((option, index) => (
+            <label
+              key={option}
+              className={cn(
+                buttonVariants({ variant: chosen === option ? "default" : "outline", size: "sm" }),
+                "has-focus-visible:ring-3 has-focus-visible:ring-ring/50",
+              )}
+            >
+              <input
+                ref={index === 0 ? inputRef : undefined}
+                type="radio"
+                name={name}
+                value={option}
+                checked={chosen === option}
+                onFocus={onFocus}
+                onChange={() => onSave(option)}
+                className="sr-only"
+              />
+              {t(option)}
+            </label>
+          ))}
+          {chosen && (
+            <Button variant="ghost" size="sm" onClick={() => onSave(null)}>
+              {t("clearAnswer")}
+            </Button>
+          )}
+        </div>
+      </fieldset>
+      <FieldStatus field={field} context={context} />
+      <FieldSources field={field} expanded={selected} />
+    </div>
   );
 }
 
