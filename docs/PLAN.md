@@ -128,6 +128,10 @@ Chaque étape à partir de la 4 livre une **fonctionnalité utilisable de bout e
 - Règles (voir `docs/USER_FLOW.md` §4) : export autorisé avec bandeau listant champs vides et doutes ; seule une déclaration Oui/Non sans réponse bloque l'export.
 - Tests : règles de blocage, e2e « corriger une réponse puis exporter ».
 
+### Étape 6.5 — Finitions de l'UI et du remplissage en direct ⬜ _(à détailler le moment venu)_
+- **UI plus proche des maquettes** (`docs/design/Formpilot.dc.html`), en particulier *Live fill* : périmètre et priorités à discuter en détail au début de l'étape.
+- **Texte qui arrive progressivement** : aujourd'hui une réponse apparaît d'un bloc, une fois le champ complet et validé (citations vérifiées) ; on veut voir la valeur s'écrire au fil du flux du modèle. À trancher : comment montrer une valeur encore non vérifiée (style « en cours d'écriture ») et ce qui se passe si la validation finale la rejette.
+
 ### Étape 7 — Annex 4 (DOCX) de bout en bout ⬜ _(critique, testé)_
 - Parsing des tableaux Word (libellés, cellules, types texte / Oui-Non / nombre), export dans les cellules en préservant la mise en page, avec la même UI que l'Annex 7.
 - Aperçu des documents Word de la base de connaissances (`docx-preview`) dans la modale de *Company knowledge* et dans la vue *Source*.
@@ -238,3 +242,4 @@ UI (relecture)  ──►  API locale
 | 2026-11-04 | 5d : vocabulaire produit, pas de « IA » dans l'interface (« Auto-fill », « Filled automatically », pas de ✦) | validé |
 | 2026-11-04 | 5d : onglet *Source* gardé pour l'étape 6 | validé |
 | 2026-11-04 | 5d : pas de nouveau remplissage sur un formulaire commencé : `Discard answers` (supprime toutes les réponses, celles de l'utilisateur aussi, même pendant un remplissage) puis `Auto-fill` ; un meilleur nouveau remplissage en V2 | validé |
+| 2026-11-05 | Nouvelle étape 6.5 : UI plus proche des maquettes (à discuter en détail) et texte des réponses qui arrive progressivement pendant le remplissage | validé |
