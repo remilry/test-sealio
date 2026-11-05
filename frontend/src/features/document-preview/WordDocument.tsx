@@ -52,6 +52,7 @@ export function WordDocument({
     renderAsync(blob, pages, undefined, { inWrapper: false, className: "docx" })
       .then(() => {
         if (!current) return;
+        hideUnreadableImages(pages);
         target.replaceChildren(pages);
         setRendered(blob);
       })
@@ -62,6 +63,24 @@ export function WordDocument({
   }, [file.data]);
 
   const ready = rendered !== null && rendered === file.data;
+
+  // Pages keep their real width (an A4 page is ~794 px): narrower than that, they are scaled
+  // down to the column (never up), the text still laid out as on paper.
+  useEffect(() => {
+    const root = container.current;
+    const pages = root?.firstElementChild;
+    if (!ready || !root || !(pages instanceof HTMLElement)) return;
+    const width = pageWidth(pages);
+    if (!width) return;
+    const fit = () => {
+      pages.style.zoom = String(Math.min(1, root.clientWidth / width));
+    };
+    fit();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(fit);
+    observer.observe(root);
+    return () => observer.disconnect();
+  }, [ready]);
   useLayoutEffect(() => {
     const root = container.current;
     if (!ready || !root) return;
@@ -106,6 +125,27 @@ export function WordDocument({
       />
     </>
   );
+}
+
+/** The widest page, in CSS pixels, as docx-preview sizes it (`width: 595.3pt`). */
+function pageWidth(pages: HTMLElement): number {
+  const widths = [...pages.querySelectorAll<HTMLElement>("section.docx")].map((section) => {
+    const match = /^([\d.]+)(pt|px)$/.exec(section.style.width);
+    if (!match) return 0;
+    return match[2] === "pt" ? (Number(match[1]) * 4) / 3 : Number(match[1]);
+  });
+  return Math.max(0, ...widths);
+}
+
+/** An image the browser cannot show (a TIFF, for instance) keeps its room, without the broken icon. */
+function hideUnreadableImages(pages: HTMLElement) {
+  for (const image of pages.querySelectorAll("img")) {
+    const hide = () => {
+      image.style.visibility = "hidden";
+    };
+    if (image.complete && image.naturalWidth === 0 && image.src) hide();
+    else image.addEventListener("error", hide, { once: true });
+  }
 }
 
 /** Write each zone's value into the rendered document and mark where each field is. */
