@@ -53,6 +53,7 @@ class _Blank:
     section: str
     kind: FieldKind
     locator: DocxLocator
+    context: str | None = None
 
 
 def parse_docx(data: bytes) -> FormSchema:
@@ -77,6 +78,7 @@ def parse_docx(data: bytes) -> FormSchema:
                 label=blank.label,
                 kind=blank.kind,
                 locator=blank.locator,
+                context=blank.context,
             )
             for blank in blanks
         ],
@@ -210,6 +212,8 @@ def _table_blanks(table: Table, table_index: int) -> list[_Blank]:
         YES_NO_HEADER.search(_text(p)) for c in rows[0] for p in c.paragraphs
     )
     blanks: list[_Blank] = []
+    # The last heading row: the context of the rows below it.
+    table_heading: str | None = None
     for row_index, cells in enumerate(rows):
         if yes_no and row_index == 0:
             continue
@@ -223,7 +227,11 @@ def _table_blanks(table: Table, table_index: int) -> list[_Blank]:
             continue
         heading_row = widths[row_index] == 1 and _is_heading(cells[0])
         if heading_row:
+            table_heading = clean_label(_labels(cells[0])[0])
             continue
+        row_start = len(blanks)
+        # A label heading the labels on its right: their context.
+        row_heading: str | None = None
         for cell_index, cell in enumerate(cells):
             if _cell_blank(cell):
                 continue
@@ -236,8 +244,15 @@ def _table_blanks(table: Table, table_index: int) -> list[_Blank]:
                     blanks.append(_Blank(label, section, _kind(label), locator))
                 continue
             if following is not None and len(_labels(following)) > 1:
+                row_heading = clean_label(" ".join(_labels(cell)))
                 continue  # heads the labels on its right
-            blanks.extend(_in_cell_blanks(cell, cell_index, section, locate))
+            cell_blanks = _in_cell_blanks(cell, cell_index, section, locate)
+            for blank in cell_blanks:
+                blank.context = row_heading
+            row_heading = None
+            blanks.extend(cell_blanks)
+        for blank in blanks[row_start:]:
+            blank.context = " > ".join(c for c in (table_heading, blank.context) if c) or None
     return blanks
 
 

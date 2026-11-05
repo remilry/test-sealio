@@ -269,6 +269,63 @@ def test_a_sentence_next_to_a_title_is_not_a_field() -> None:
     assert [label for label, *_ in _fields(_parse(build))] == ["Tender (No. …)"]
 
 
+def _heading_row(table: object, row: int, text: str) -> None:
+    cells = table.rows[row].cells  # pyright: ignore[reportAttributeAccessIssue]
+    cells[0].merge(cells[-1]).text = text
+
+
+def test_a_heading_row_is_the_context_of_the_rows_below() -> None:
+    def build(document: DocumentObject) -> None:
+        table = document.add_table(rows=4, cols=2)
+        _heading_row(table, 0, "Number of employees\tin the area")
+        _cell_paragraphs(table.cell(1, 0), ["Apprentices", ""])
+        _cell_paragraphs(table.cell(1, 1), ["Auxiliary staff", ""])
+        _heading_row(table, 2, "Other")
+        table.cell(3, 0).text = "UID"
+
+    assert [(f.label, f.context) for f in _parse(build).fields] == [
+        ("Apprentices", "Number of employees in the area"),
+        ("Auxiliary staff", "Number of employees in the area"),
+        ("UID", "Other"),
+    ]
+
+
+def test_a_label_heading_labels_on_its_right_is_their_context() -> None:
+    def build(document: DocumentObject) -> None:
+        table = document.add_table(rows=2, cols=2)
+        table.cell(0, 0).text = "Available amounts per claim:"
+        _cell_paragraphs(table.cell(0, 1), ["Personal injury:", "Property damage:"])
+        table.cell(1, 0).text = "Insurance company"
+
+    assert [(f.label, f.context) for f in _parse(build).fields] == [
+        ("Personal injury", "Available amounts per claim"),
+        ("Property damage", "Available amounts per claim"),
+        ("Insurance company", None),
+    ]
+
+
+def test_a_heading_row_and_a_heading_label_chain() -> None:
+    def build(document: DocumentObject) -> None:
+        table = document.add_table(rows=2, cols=2)
+        _heading_row(table, 0, "Insurance")
+        table.cell(1, 0).text = "Available amounts per claim:"
+        _cell_paragraphs(table.cell(1, 1), ["Personal injury:", "Property damage:"])
+
+    assert {f.context for f in _parse(build).fields} == {"Insurance > Available amounts per claim"}
+
+
+def test_fields_without_a_heading_have_no_context() -> None:
+    def build(document: DocumentObject) -> None:
+        table = document.add_table(rows=2, cols=2)
+        table.cell(0, 0).text = "Exact company name"
+        table.cell(1, 0).text = "UID"
+        paragraph = document.add_paragraph()
+        paragraph.add_run("Place and date: \t\t")
+        paragraph.add_run("Company stamp and legally valid signature(s):")
+
+    assert [f.context for f in _parse(build).fields] == [None, None, None, None]
+
+
 # --- The real Annex 4 ------------------------------------------------------------------------
 
 ANNEX_4 = "Annex_4_Conditions of Participation and Company Self-Declaration.docx"
@@ -347,6 +404,21 @@ def test_annex_4_labels_read_as_in_the_form(annex_4: FormSchema) -> None:
     assert labels["company_stamp_and_legally_valid_signature_s"] == (
         "Company stamp and legally valid signature(s)"
     )
+
+
+def test_annex_4_contexts_come_from_its_headings(annex_4: FormSchema) -> None:
+    employees = "Number of employees in the area essential to performing the tendered contract"
+    per_claim = "Available amounts per claim"
+
+    assert {f.key: f.context for f in annex_4.fields if f.context is not None} == {
+        "with_higher_professional_training": employees,
+        "with_professional_training": employees,
+        "auxiliary_staff": employees,
+        "apprentices": employees,
+        "personal_injury": per_claim,
+        "property_damage": per_claim,
+        "financial_loss": per_claim,
+    }
 
 
 def test_annex_4_locators_are_distinct(annex_4: FormSchema) -> None:

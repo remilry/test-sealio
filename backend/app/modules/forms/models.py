@@ -59,3 +59,5 @@ class Field(TimestampMixin, Base):
     kind: Mapped[FieldKind] = mapped_column(str_enum(FieldKind))
     # Where the answer goes in the original file (PdfLocator or DocxLocator), see parsing/schema.py.
     locator: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    # The heading that covers the field in the form, for the search and the model; never shown.
+    context: Mapped[str | None]

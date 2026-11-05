@@ -61,6 +61,7 @@ erDiagram
         text label
         text kind "text | number | date | yes_no | signature"
         jsonb locator
+        text context "nullable"
     }
     fill_event {
         bigint id PK

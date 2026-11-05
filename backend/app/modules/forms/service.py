@@ -119,8 +119,12 @@ def import_form(
         shutil.copyfile(source, target)
     form.file_path = relative.as_posix()
     parser = PARSERS.get(form.file_format)
-    if form.parsed_at is None and parser is not None:
-        _store_schema(session, form, parser(target.read_bytes()))
+    if parser is not None:
+        schema = parser(target.read_bytes())
+        if form.parsed_at is None:
+            _store_schema(session, form, schema)
+        else:
+            _update_contexts(session, form, schema)
     return form
 
 
@@ -136,9 +140,20 @@ def _store_schema(session: Session, form: Form, schema: FormSchema) -> None:
                 label=parsed.label,
                 kind=parsed.kind,
                 locator=parsed.locator.model_dump(),
+                context=parsed.context,
             )
         )
     form.parsed_at = datetime.now(UTC)
+
+
+def _update_contexts(session: Session, form: Form, schema: FormSchema) -> None:
+    """A form parsed before the parser gave headings (step 6b): its fields get their context,
+    matched by key; no field and no answer is touched otherwise."""
+    contexts = {parsed.key: parsed.context for parsed in schema.fields}
+    for field in session.scalars(select(Field).where(Field.form_id == form.id)):
+        context = contexts.get(field.key)
+        if field.key in contexts and field.context != context:
+            field.context = context
 
 
 def _get(session: Session, form_id: int) -> Form:

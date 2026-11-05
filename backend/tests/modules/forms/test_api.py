@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from tests.modules.helpers import seeded_forms
+from tests.modules.helpers import fields_by_key, seeded_forms
 
 
 def test_tender_cards_show_what_was_detected_in_each_form(client: TestClient) -> None:
@@ -49,3 +49,36 @@ def test_a_word_form_is_parsed_at_seed(client: TestClient) -> None:
 
 def test_unknown_form_is_a_404(client: TestClient) -> None:
     assert client.get("/forms/999999").status_code == 404
+
+
+def test_startup_adds_the_heading_context_to_a_form_parsed_without_it(client: TestClient) -> None:
+    from sqlalchemy import select, update
+
+    from app.core.config import get_settings
+    from app.core.db import SessionLocal
+    from app.modules.forms.models import Field
+    from app.seed import seed
+
+    annex_4, _ = seeded_forms(client)
+    fields = fields_by_key(client, annex_4["id"])
+    company = fields["exact_company_name"]["id"]
+    client.patch(f"/forms/{annex_4['id']}/fields/{company}", json={"value": "Alpenlogic AG"})
+    with SessionLocal() as session:
+        # As in a database parsed before the context existed (step 6b).
+        session.execute(update(Field).values(context=None))
+        session.commit()
+
+        seed(session, get_settings())
+
+        contexts = dict(
+            session.execute(
+                select(Field.key, Field.context).where(Field.form_id == annex_4["id"])
+            ).all()
+        )
+    assert contexts["personal_injury"] == "Available amounts per claim"
+    assert str(contexts["apprentices"]).startswith("Number of employees")
+    assert {k: f["id"] for k, f in fields_by_key(client, annex_4["id"]).items()} == {
+        k: f["id"] for k, f in fields.items()
+    }
+    state = client.get(f"/forms/{annex_4['id']}/answers").json()
+    assert [(a["field_id"], a["value"]) for a in state["answers"]] == [(company, "Alpenlogic AG")]
