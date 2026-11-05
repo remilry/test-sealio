@@ -1098,10 +1098,12 @@ describe("Live fill (status and source of each answer)", () => {
     });
     given(annex7(), fillState([unsure]));
 
-    // Then the card asks me to check it, and the document shows it as to check
-    expect(
-      await (await findCard("Telephone")).findByText("Found in one of two searches, check it"),
-    ).toBeInTheDocument();
+    // Then the card asks me to check it, with no technical explanation, and the document shows
+    // it as to check
+    const telephone = await openCard("Telephone");
+    expect(telephone.getByText("To check")).toBeInTheDocument();
+    expect(telephone.getByRole("button", { name: "Keep this value" })).toBeInTheDocument();
+    expect(telephone.queryByText(/searches/)).toBeNull();
     expect(await findZone(6)).toHaveAttribute("data-tone", "toCheck");
   });
 

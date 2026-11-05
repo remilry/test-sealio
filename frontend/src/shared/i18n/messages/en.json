@@ -193,7 +193,6 @@
     "conflict": "{count} sources disagree",
     "outdated": "Source expired on {date}",
     "outdatedOld": "Source dated {date}, check it is still current",
-    "unsure": "Found in one of two searches, check it",
     "source": "{document}, page {page}",
     "sourceNoPage": "{document}",
     "tenderDetails": "Tender details",
