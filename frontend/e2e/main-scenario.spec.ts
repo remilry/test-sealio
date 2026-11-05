@@ -85,7 +85,10 @@ test("I auto-fill Annex 7 from my documents, correct a field and download it in 
   await address.click();
   const addressCard = fields.getByRole("listitem", { name: "Business address" });
   await expect(addressCard.getByText("Filled automatically")).toBeVisible();
-  await expect(addressCard.getByText("Commercial register extract, page 1")).toBeVisible();
+  await expect(
+    addressCard.getByRole("button", { name: "Open the source: Commercial register extract" }),
+  ).toBeVisible();
+  await expect(addressCard.getByText("· p.1")).toBeVisible();
   await expect(addressCard.locator("blockquote")).toContainText(
     "Pfingstweidstrasse 31, 8005 Zurich",
   );

@@ -401,7 +401,7 @@ function FieldInput({
         {selected && <FieldStatus field={field} context={context} />}
         {valueInput}
         {selected && !choosing(field) && (
-          <FieldSources field={field} expanded onOpenSource={onOpenSource} />
+          <FieldSources field={field} expanded context={context} onOpenSource={onOpenSource} />
         )}
         {selected && (
           <ReviewActions
@@ -522,7 +522,7 @@ function YesNoInput({
         {choices}
       </fieldset>
       {selected && !choosing(field) && (
-        <FieldSources field={field} expanded onOpenSource={onOpenSource} />
+        <FieldSources field={field} expanded context={context} onOpenSource={onOpenSource} />
       )}
       {selected && (
         <ReviewActions
@@ -719,7 +719,6 @@ function ReviewActions({ field, onSettle, focusInput, ...props }: ActionProps) {
  */
 function ConflictChoice({ field, context, onSettle, focusInput, onOpenSource }: ActionProps) {
   const t = useTranslations("fieldList");
-  const tSource = useTranslations("source");
   const [chosen, setChosen] = useState(field.value ?? field.candidates[0].value);
   const name = `choice-${field.id}`;
   // Where each candidate's quotes start in the field's sources (the Source tab's numbering).
@@ -750,50 +749,23 @@ function ConflictChoice({ field, context, onSettle, focusInput, onOpenSource }: 
             <span className="flex min-w-0 flex-col gap-1">
               <span className="font-medium">{candidate.value}</span>
               {candidate.citations.slice(0, 1).map((citation) => (
-                <span
+                <SourceLine
                   key="source"
-                  className="flex flex-wrap items-center gap-1.5 text-[11.5px] text-muted-foreground"
+                  citation={citation}
+                  date={candidate.source_date?.date ?? null}
+                  context={context}
+                  onOpen={() => onOpenSource(field.id, firstSource[index])}
                 >
-                  <FormatBadge format={formatOf(context, citation.document_id)} />
-                  <button
-                    type="button"
-                    aria-label={tSource("open", { name: citation.document_name })}
-                    onClick={(event) => {
-                      event.preventDefault();
-                      onOpenSource(field.id, firstSource[index]);
-                    }}
-                    className="font-medium text-primary underline-offset-2 hover:underline"
-                  >
-                    {citation.document_name}
-                  </button>
-                  {citation.page !== null && (
-                    <span>{t("sourcePage", { page: citation.page + 1 })}</span>
-                  )}
-                  {candidate.source_date && (
-                    <span>{t("sourceDate", { date: formatDate(candidate.source_date.date) })}</span>
-                  )}
                   {index === 0 && candidate.source_date && (
                     <span className="rounded-[5px] bg-success/12 px-1.5 py-px text-[10.5px] font-semibold text-success">
                       {t("mostRecentTag")}
                     </span>
                   )}
-                </span>
+                </SourceLine>
               ))}
               {on &&
                 candidate.citations.map((citation, quote) => (
-                  <blockquote
-                    key={quote}
-                    className="mt-0.5 rounded-md border bg-muted/40 px-2 py-1.5 text-xs leading-relaxed text-foreground/80"
-                  >
-                    {t.rich("quoteMarked", {
-                      quote: citation.quote,
-                      mark: (chunks) => (
-                        <mark className="rounded-[2px] bg-yellow-200 px-0.5 text-inherit dark:bg-yellow-300/40">
-                          {chunks}
-                        </mark>
-                      ),
-                    })}
-                  </blockquote>
+                  <QuoteBox key={quote} quote={citation.quote} />
                 ))}
             </span>
           </label>
@@ -926,50 +898,95 @@ const SETTLED_MESSAGE = {
 function FieldSources({
   field,
   expanded,
+  context,
   onOpenSource,
 }: {
   field: QueueField;
   expanded: boolean;
+  context: FieldContext | undefined;
   onOpenSource: (fieldId: number, index: number) => void;
 }) {
   const t = useTranslations("fieldList");
-  const tSource = useTranslations("source");
-  const citations = fieldSources(field).map(({ citation }) => citation);
-  if (citations.length === 0) return null;
+  const sources = fieldSources(field);
+  if (sources.length === 0) return null;
   if (!expanded) {
     return (
-      <p className="text-xs text-muted-foreground">
-        {t("sourceCount", { count: citations.length })}
-      </p>
+      <p className="text-xs text-muted-foreground">{t("sourceCount", { count: sources.length })}</p>
     );
   }
   return (
-    <ul aria-label={t("sources")} className="flex flex-col gap-1.5 border-t pt-2">
-      {citations.map((citation, index) => (
-        <li key={index} className="text-xs">
-          <button
-            type="button"
-            aria-label={tSource("open", { name: citation.document_name })}
-            onClick={(event) => {
-              event.stopPropagation();
-              onOpenSource(field.id, index);
-            }}
-            className="text-left font-medium text-primary underline-offset-2 hover:underline"
-          >
-            <SourceName citation={citation} />
-          </button>
-          <blockquote className="text-muted-foreground">
-            {t("quote", { quote: citation.quote })}
-          </blockquote>
+    <ul aria-label={t("sources")} className="flex flex-col gap-2.5 border-t pt-2.5">
+      {sources.map(({ citation, candidate }, index) => (
+        <li key={index} className="flex flex-col gap-1.5">
+          <SourceLine
+            citation={citation}
+            date={candidate.source_date?.date ?? null}
+            context={context}
+            onOpen={() => onOpenSource(field.id, index)}
+          />
+          <QuoteBox quote={citation.quote} />
         </li>
       ))}
     </ul>
   );
 }
 
-function SourceName({ citation }: { citation: Schema<"Citation"> }) {
+/**
+ * Where a value comes from, as in the mockups: the document's format, its name (opens it in the
+ * Source tab), the page and the document's date.
+ */
+function SourceLine({
+  citation,
+  date,
+  context,
+  onOpen,
+  children,
+}: {
+  citation: Schema<"Citation">;
+  date: string | null;
+  context: FieldContext | undefined;
+  onOpen: () => void;
+  children?: ReactNode;
+}) {
   const t = useTranslations("fieldList");
-  if (citation.document_id === null) return t("tenderDetails");
-  if (citation.page === null) return t("sourceNoPage", { document: citation.document_name });
-  return t("source", { document: citation.document_name, page: citation.page + 1 });
+  const tSource = useTranslations("source");
+  const name = citation.document_id === null ? t("tenderDetails") : citation.document_name;
+  return (
+    <span className="flex flex-wrap items-center gap-1.5 text-[11.5px] text-muted-foreground">
+      <FormatBadge format={formatOf(context, citation.document_id)} />
+      <button
+        type="button"
+        aria-label={tSource("open", { name })}
+        onClick={(event) => {
+          // Inside a choice's label: opens the source without choosing the value.
+          event.preventDefault();
+          event.stopPropagation();
+          onOpen();
+        }}
+        className="text-left font-medium text-primary underline-offset-2 hover:underline"
+      >
+        {name}
+      </button>
+      {citation.page !== null && <span>{t("sourcePage", { page: citation.page + 1 })}</span>}
+      {date && <span>{t("sourceDate", { date: formatDate(date) })}</span>}
+      {children}
+    </span>
+  );
+}
+
+/** The words a value was read from, highlighted, in a quiet box. */
+function QuoteBox({ quote }: { quote: string }) {
+  const t = useTranslations("fieldList");
+  return (
+    <blockquote className="rounded-md border bg-muted/40 px-2 py-1.5 text-xs leading-relaxed text-foreground/80">
+      {t.rich("quoteMarked", {
+        quote,
+        mark: (chunks) => (
+          <mark className="rounded-[2px] bg-yellow-200 px-0.5 text-inherit dark:bg-yellow-300/40">
+            {chunks}
+          </mark>
+        ),
+      })}
+    </blockquote>
+  );
 }

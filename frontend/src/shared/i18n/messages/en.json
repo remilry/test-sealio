@@ -157,8 +157,6 @@
     "mostRecentTag": "most recent",
     "quoteMarked": "“<mark>{quote}</mark>”",
     "useThisOne": "Use this one",
-    "sourceDated": " · dated {date}",
-    "mostRecent": " · most recent",
     "empty": "Empty — exported blank",
     "searching": "Searching your documents…",
     "writing": "Writing…",
@@ -193,12 +191,9 @@
     "conflict": "{count} sources disagree",
     "outdated": "Source expired on {date}",
     "outdatedOld": "Source dated {date}, check it is still current",
-    "source": "{document}, page {page}",
-    "sourceNoPage": "{document}",
     "tenderDetails": "Tender details",
     "sourceCount": "{count, plural, one {# source} other {# sources}}",
-    "sources": "Sources",
-    "quote": "“{quote}”"
+    "sources": "Sources"
   },
   "saveStatus": {
     "idle": "All changes saved",

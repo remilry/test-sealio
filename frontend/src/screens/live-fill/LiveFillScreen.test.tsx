@@ -869,8 +869,12 @@ describe("Live fill (status and source of each answer)", () => {
     // Then it says it was filled automatically, with its source
     expect(card("Name and legal form").getByText("Filled automatically")).toBeInTheDocument();
     expect(
-      card("Name and legal form").getByText("Commercial register extract, page 2"),
+      card("Name and legal form").getByRole("button", {
+        name: "Open the source: Commercial register extract",
+      }),
     ).toBeInTheDocument();
+    expect(card("Name and legal form").getByText("pdf")).toBeInTheDocument();
+    expect(card("Name and legal form").getByText("· p.2")).toBeInTheDocument();
     expect(card("Name and legal form").getByText(/“?Alpenlogic AG, Zurich”?/)).toBeInTheDocument();
   });
 
@@ -890,9 +894,7 @@ describe("Live fill (status and source of each answer)", () => {
     await user.click(await screen.findByRole("textbox", { name: "Name and legal form" }));
 
     // Then the source reads page 1
-    expect(
-      card("Name and legal form").getByText("Commercial register extract, page 1"),
-    ).toBeInTheDocument();
+    expect(card("Name and legal form").getByText("· p.1")).toBeInTheDocument();
   });
 
   it("shows the source of the selected field only, the others are collapsed", async () => {
@@ -915,8 +917,10 @@ describe("Live fill (status and source of each answer)", () => {
     await user.click(screen.getByRole("textbox", { name: "Name and legal form" }));
 
     // Then only its source shows
-    expect(card("Name and legal form").getByText("Register A, page 1")).toBeInTheDocument();
-    expect(card("Business address").queryByText("Register B, page 1")).not.toBeInTheDocument();
+    expect(
+      card("Name and legal form").getByRole("button", { name: "Open the source: Register A" }),
+    ).toBeInTheDocument();
+    expect(card("Business address").queryByRole("button", { name: /Open the source/ })).toBeNull();
     // (its line only names its source)
     expect(card("Business address").getByText("Register B")).toBeInTheDocument();
   });
@@ -1139,7 +1143,9 @@ describe("Live fill (status and source of each answer)", () => {
 
     // Then it says I entered it, and the source is still there
     expect(card("Name and legal form").getByText(/Entered by you/)).toBeInTheDocument();
-    expect(card("Name and legal form").getByText("Register A, page 1")).toBeInTheDocument();
+    expect(
+      card("Name and legal form").getByRole("button", { name: "Open the source: Register A" }),
+    ).toBeInTheDocument();
   });
 
   describe("discarding the answers", () => {
@@ -1737,7 +1743,9 @@ describe("Live fill (Source tab)", () => {
 
     // Then the quote is shown
     expect(screen.getByRole("heading", { name: "Tender details" })).toBeInTheDocument();
-    expect(screen.getByText("Buyer: Canton of Zurich")).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("figure")).getByText("Buyer: Canton of Zurich"),
+    ).toBeInTheDocument();
   });
 });
 
