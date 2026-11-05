@@ -1,12 +1,16 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from "react";
-import { renderAsync } from "docx-preview";
+import { parseAsync, renderDocument } from "docx-preview";
 import { useTranslations } from "next-intl";
 import { cn } from "@/shared/lib/utils";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { useDocumentFile } from "./document-preview.queries";
+import { withFontFallbacks, type DocumentFont } from "./docx-fonts";
+import { showImages } from "./docx-images";
 import { findParagraph, writePreviewValue } from "./docx-locator";
+import { paginate } from "./docx-pages";
+import { withWordLineSpacing } from "./docx-spacing";
 import { TONES, type PreviewZone, type WordPlace } from "./zones";
 
 const ZONE = "cursor-pointer rounded-[2px] ring-1 transition-shadow";
@@ -19,9 +23,9 @@ type WordZone = PreviewZone & { place: WordPlace };
 /**
  * A Word document rendered in the page (docx-preview), each field highlighted where the export
  * writes its value, the value shown there as it is typed. The document is rendered once per file;
- * the zones are then drawn onto it at every change. Pages break where the document says (page
- * breaks, sections), not at the marks Word leaves where it last broke them: those split a paragraph
- * in two, and the paragraphs would no longer be counted as the export counts them.
+ * the zones are then drawn onto it at every change. Pages break as on paper (`paginate`), not at
+ * the marks Word leaves where it last broke them: those split a paragraph in two, and the
+ * paragraphs would no longer be counted as the export counts them.
  */
 export function WordDocument({
   fileUrl,
@@ -44,18 +48,10 @@ export function WordDocument({
     const target = container.current;
     const blob = file.data;
     if (!blob || !target) return;
-    // Rendered apart, then put in place only if still wanted: a rendering that ends after a newer
-    // one (a new file, React running effects twice) never replaces it.
-    const pages = document.createElement("div");
-    pages.className = "flex flex-col gap-4";
+    // A rendering that ends after a newer one (a new file, React running effects twice) is dropped.
     let current = true;
-    renderAsync(blob, pages, undefined, { inWrapper: false, className: "docx" })
-      .then(() => {
-        if (!current) return;
-        hideUnreadableImages(pages);
-        target.replaceChildren(pages);
-        setRendered(blob);
-      })
+    renderPages(blob, target, () => current)
+      .then((done) => done && setRendered(blob))
       .catch(() => current && setRenderFailed(true));
     return () => {
       current = false;
@@ -101,20 +97,42 @@ export function WordDocument({
     );
   }
   return (
-    <>
+    <div className="relative">
       {!ready && <Skeleton className="aspect-[595/842] w-full" />}
-      {/* docx-preview owns this element's children; React never renders into it. */}
+      {/* docx-preview owns this element's children; React never renders into it. While it renders,
+          it is laid out but unseen: its pages are measured to break them as on paper. */}
       <div
         ref={container}
         onClick={select}
         className={cn(
           "text-black [&_section.docx]:bg-white [&_section.docx]:shadow-sm [&_section.docx]:ring-1 [&_section.docx]:ring-border",
           "[&_[data-preview-empty]]:inline-block [&_[data-preview-empty]]:h-[1em] [&_[data-preview-empty]]:min-w-16 [&_[data-preview-empty]]:align-middle",
-          !ready && "hidden",
+          !ready && "pointer-events-none invisible absolute inset-x-0 top-0",
         )}
       />
-    </>
+    </div>
   );
+}
+
+const RENDER_OPTIONS = { inWrapper: false, className: "docx" };
+
+/**
+ * Render the document apart, then, if still wanted, put it in `target` and lay it out as on paper:
+ * the document's fallback fonts, pages of the paper's height, its images. False when dropped.
+ */
+async function renderPages(blob: Blob, target: HTMLElement, isCurrent: () => boolean) {
+  const document_ = await parseAsync(blob, RENDER_OPTIONS);
+  const nodes = await renderDocument(document_, RENDER_OPTIONS);
+  if (!isCurrent()) return false;
+  const pages = document.createElement("div");
+  pages.className = "flex flex-col gap-4";
+  pages.append(...nodes);
+  withFontFallbacks(pages, (document_.fontTablePart?.fonts ?? []) as DocumentFont[]);
+  withWordLineSpacing(pages);
+  target.replaceChildren(pages);
+  paginate(pages);
+  void showImages(pages);
+  return true;
 }
 
 /** Scale the rendered pages to `root`'s width, now and when it changes; returns the cleanup. */
@@ -141,17 +159,6 @@ function pageWidth(pages: HTMLElement): number {
     return match[2] === "pt" ? (Number(match[1]) * 4) / 3 : Number(match[1]);
   });
   return Math.max(0, ...widths);
-}
-
-/** An image the browser cannot show (a TIFF, for instance) keeps its room, without the broken icon. */
-function hideUnreadableImages(pages: HTMLElement) {
-  for (const image of pages.querySelectorAll("img")) {
-    const hide = () => {
-      image.style.visibility = "hidden";
-    };
-    if (image.complete && image.naturalWidth === 0 && image.src) hide();
-    else image.addEventListener("error", hide, { once: true });
-  }
 }
 
 /** Write each zone's value into the rendered document and mark where each field is. */

@@ -1,4 +1,5 @@
 import type { Schema } from "@/shared/api";
+import { CONTINUED } from "./docx-pages";
 
 export type DocxLocator = Schema<"DocxLocator">;
 
@@ -20,8 +21,9 @@ export function findParagraph(root: Element, locator: DocxLocator): HTMLElement 
   if (locator.table === undefined || locator.table === null) {
     return asElement(paragraphsOf(body)[locator.paragraph]);
   }
-  const table = body.filter((node) => node.tagName === "TABLE")[locator.table];
-  const row = table && rowsOf(table)[locator.row ?? 0];
+  const tables = body.filter((node) => node.tagName === "TABLE" && !node.hasAttribute(CONTINUED));
+  const table = tables[locator.table];
+  const row = table && rowsAcrossPages(body, table)[locator.row ?? 0];
   const cell = row && cellsOf(row)[locator.cell ?? 0];
   return asElement(cell && paragraphsOf([...cell.children])[locator.paragraph]);
 }
@@ -106,6 +108,16 @@ function markOf(locator: DocxLocator): string {
 
 function asElement(node: Element | undefined): HTMLElement | null {
   return node instanceof HTMLElement ? node : null;
+}
+
+/** A table's rows, those carried over to the next pages included. */
+function rowsAcrossPages(body: Element[], table: Element): Element[] {
+  const rows = rowsOf(table);
+  for (const next of body.slice(body.indexOf(table) + 1)) {
+    if (next.tagName !== "TABLE" || !next.hasAttribute(CONTINUED)) break;
+    rows.push(...rowsOf(next));
+  }
+  return rows;
 }
 
 function rowsOf(table: Element): Element[] {

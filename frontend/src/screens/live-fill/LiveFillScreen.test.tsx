@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { StrictMode } from "react";
-import { renderAsync } from "docx-preview";
+import { renderDocument } from "docx-preview";
 import { delay, http } from "msw";
 import { API_URL } from "@/shared/api";
 import { handlers, renderScreen, server } from "@/shared/test";
@@ -32,7 +32,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
 // The real docx-preview, watched: a Word document must be rendered once, not at every keystroke.
 vi.mock("docx-preview", async (original) => {
   const actual = await original<typeof import("docx-preview")>();
-  return { ...actual, renderAsync: vi.fn(actual.renderAsync) };
+  return { ...actual, renderDocument: vi.fn(actual.renderDocument) };
 });
 
 beforeEach(() => {
@@ -1064,13 +1064,13 @@ describe("Live fill on a Word form", () => {
     await findZone(COMPANY.id);
     // And, coming back, a first rendering slower than the next one (React runs effects twice in
     // development when a screen mounts with its data ready)
-    const render = vi.mocked(renderAsync);
+    const render = vi.mocked(renderDocument);
     const actual = render.getMockImplementation()!;
     let release = () => {};
     let late: Promise<unknown> = Promise.resolve();
     render.mockImplementationOnce((...args) => {
       late = new Promise<void>((resolve) => (release = resolve)).then(() => actual(...args));
-      return late as ReturnType<typeof renderAsync>;
+      return late as ReturnType<typeof renderDocument>;
     });
     rerender(
       <StrictMode>
@@ -1123,7 +1123,7 @@ describe("Live fill on a Word form", () => {
     // Given the Annex 4 open
     const { user } = givenWord();
     await findZone(COMPANY.id);
-    vi.mocked(renderAsync).mockClear();
+    vi.mocked(renderDocument).mockClear();
 
     // When I type a few characters and leave the field
     await user.type(fieldList().getByRole("textbox", { name: "Exact company name" }), "Alpen");
@@ -1131,7 +1131,7 @@ describe("Live fill on a Word form", () => {
     await waitFor(() => expect(zone(COMPANY.id)).toHaveAttribute("data-tone", "entered"));
 
     // Then the document was not rendered again, and still shows the value
-    expect(renderAsync).not.toHaveBeenCalled();
+    expect(renderDocument).not.toHaveBeenCalled();
     expect(zone(COMPANY.id)).toHaveTextContent("Alpen");
   });
 
