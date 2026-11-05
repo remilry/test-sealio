@@ -5,7 +5,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeftIcon, CircleAlertIcon, FileXIcon, MoreHorizontalIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { DocumentPreview, type PreviewZone, type ZoneTone } from "@/features/document-preview";
+import {
+  DocumentPreview,
+  PreviewLegend,
+  type PreviewZone,
+  type ZoneTone,
+} from "@/features/document-preview";
 import {
   DiscardFillDialog,
   FillProgress,
@@ -43,6 +48,8 @@ import {
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu";
 import { Skeleton } from "@/shared/ui/skeleton";
+import { cn } from "@/shared/lib/utils";
+import { SourceView } from "./SourceView";
 
 /**
  * Live fill (docs/USER_FLOW.md §3.4): the fields on the left, the original form on the right,
@@ -182,6 +189,11 @@ function FillWorkspace({
   // the selection would jump at every answer).
   const firstOpen = nextOpen(fields, -1) ?? (fillable[0] ?? fields[0])?.id;
   const selectedId = chosenId ?? (filling ? null : (firstOpen ?? null));
+  const selectedField = fields.find((field) => field.id === selectedId);
+  // The right column shows the form, or where the selected field's value comes from.
+  const [viewer, setViewer] = useState<Viewer>("form");
+  // The source chosen among several for a field (the first one otherwise).
+  const [source, setSource] = useState<{ fieldId: number; index: number } | null>(null);
 
   const focusField = (fieldId: number) => {
     setChosenId(fieldId);
@@ -303,18 +315,43 @@ function FillWorkspace({
             }}
             onNext={focusNext}
             onDraft={setDraft}
+            onOpenSource={(fieldId, index) => {
+              setChosenId(fieldId);
+              setSource({ fieldId, index });
+              setViewer("source");
+            }}
           />
         </div>
-        <div className="min-h-0 overflow-y-auto bg-muted/40 p-6">
-          <div className="mx-auto max-w-[760px]">
-            <DocumentPreview
-              fileUrl={originalFileUrl(form.id)}
-              fileFormat={form.file_format}
-              pages={form.pages}
-              zones={zones}
-              selectedId={selectedId}
-              onSelect={focusField}
-            />
+        <div className="flex min-h-0 flex-col bg-muted/40">
+          <ViewerBar
+            viewer={viewer}
+            onViewer={setViewer}
+            label={viewer === "form" ? form.title : (selectedField?.label ?? "")}
+          />
+          <div className="min-h-0 flex-1 overflow-y-auto p-6">
+            {/* The form stays rendered under the Source tab: back to it at once, as it was. */}
+            <div hidden={viewer !== "form"} className="mx-auto max-w-[760px]">
+              <DocumentPreview
+                fileUrl={originalFileUrl(form.id)}
+                fileFormat={form.file_format}
+                pages={form.pages}
+                zones={zones}
+                selectedId={selectedId}
+                onSelect={focusField}
+              />
+            </div>
+            {viewer === "source" && (
+              <div className="mx-auto max-w-[760px]">
+                <SourceView
+                  field={selectedField}
+                  sourceIndex={source?.fieldId === selectedId ? source.index : 0}
+                  onSourceIndex={(index) =>
+                    selectedId !== null && setSource({ fieldId: selectedId, index })
+                  }
+                  documents={knowledge?.documents}
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -377,6 +414,48 @@ function FillHeader({
       </h2>
       <p className="text-xs text-muted-foreground">{t("instructions")}</p>
     </header>
+  );
+}
+
+type Viewer = "form" | "source";
+
+/** Above the document: Form or Source, what is shown, and what the colours of the form mean. */
+function ViewerBar({
+  viewer,
+  onViewer,
+  label,
+}: {
+  viewer: Viewer;
+  onViewer: (viewer: Viewer) => void;
+  label: string;
+}) {
+  const t = useTranslations("source");
+  return (
+    <div className="flex h-11 flex-none items-center gap-3 overflow-hidden border-b bg-card px-4 text-xs text-muted-foreground">
+      <div
+        role="tablist"
+        aria-label={t("tabs")}
+        className="inline-flex flex-none gap-0.5 rounded-md border bg-muted/50 p-0.5"
+      >
+        {(["form", "source"] as const).map((option) => (
+          <button
+            key={option}
+            type="button"
+            role="tab"
+            aria-selected={viewer === option}
+            onClick={() => onViewer(option)}
+            className={cn(
+              "rounded-[5px] px-2.5 py-0.5 font-medium transition-colors",
+              viewer === option ? "bg-card text-foreground shadow-xs" : "hover:text-foreground",
+            )}
+          >
+            {t(option)}
+          </button>
+        ))}
+      </div>
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+      {viewer === "form" && <PreviewLegend className="hidden min-w-0 overflow-hidden xl:flex" />}
+    </div>
   );
 }
 

@@ -7,6 +7,7 @@ import { API_URL } from "@/shared/api";
 import { handlers, renderScreen, server } from "@/shared/test";
 import {
   aiAnswer,
+  annualReportFile,
   candidate,
   citation,
   knowledgeBase,
@@ -130,7 +131,10 @@ describe("Live fill (manual)", () => {
     expect(preview().querySelectorAll("[data-field-id]")).toHaveLength(10);
     expect(zone(6)).toHaveAccessibleName("Telephone");
     expect(zone(6).style.left).toBe(`${((143.9 - 2) / 595.3) * 100}%`);
-    expect(within(preview()).getByText("Sign by hand")).toBeInTheDocument();
+    // And the colours are explained above it
+    expect(
+      within(screen.getByRole("list", { name: "Legend" })).getByText("Sign by hand"),
+    ).toBeInTheDocument();
   });
 
   it("shows where I am: tender, form, how many fields are filled", async () => {
@@ -501,7 +505,7 @@ describe("Live fill (watching the automatic fill)", () => {
     );
     expect(card("Name and legal form").queryByText("Searching your documents…")).toBeNull();
     expect(within(await findZone(3)).getByText("Alpenlogic AG")).toBeInTheDocument();
-    const legend = within(within(preview()).getByRole("list", { name: "Legend" }));
+    const legend = within(screen.getByRole("list", { name: "Legend" }));
     expect(legend.getAllByRole("listitem").map((item) => item.textContent)).toEqual([
       "Filled automatically",
       "To check",
@@ -1544,5 +1548,145 @@ describe("Export (what the review left open)", () => {
     // Then the export closes and the telephone is selected, its input focused
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(screen.getByRole("textbox", { name: "Telephone" })).toHaveFocus();
+  });
+});
+
+describe("Live fill (Source tab)", () => {
+  const sourceTab = () => screen.getByRole("tab", { name: "Source" });
+  const formTab = () => screen.getByRole("tab", { name: "Form" });
+  const card = (label: string) => within(fieldList().getByRole("listitem", { name: label }));
+
+  /** Annex 7 with one answer, its company documents listed (the annual report readable). */
+  function givenAnswer(found: Answer) {
+    server.use(handlers.documentFile(9, annualReportFile()));
+    return given(annex7(), fillState([found]));
+  }
+
+  it("opens a Word source at the quote, highlighted, from the card", async () => {
+    // Given an address read in the annual report
+    const quote = "Pfingstweidstrasse 31, 8005 Zurich";
+    const { user } = givenAnswer(
+      aiAnswer(4, quote, "outdated", undefined, {
+        candidates: [
+          candidate(
+            quote,
+            [citation({ quote, document_id: 9, document_name: "Annual report 2024", page: null })],
+            {
+              source_date: { date: "2025-03-28", citation: citation() },
+            },
+          ),
+        ],
+      }),
+    );
+    await user.click(await screen.findByRole("textbox", { name: "Business address" }));
+
+    // When I open its source from the card
+    await user.click(
+      card("Business address").getByRole("button", { name: "Open the source: Annual report 2024" }),
+    );
+
+    // Then the Source tab shows the document, the quote highlighted, and what it is used for
+    expect(sourceTab()).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("heading", { name: "Annual report 2024" })).toBeInTheDocument();
+    expect(screen.getByText("Used for: Business address")).toBeInTheDocument();
+    expect(screen.getByText("dated 28.03.2025")).toBeInTheDocument();
+    const document = await screen.findByRole("region", { name: "Preview of Annual report 2024" });
+    await waitFor(() =>
+      expect([...document.querySelectorAll("mark")].map((mark) => mark.textContent).join("")).toBe(
+        quote,
+      ),
+    );
+    // And the form is still there, behind the Form tab
+    await user.click(formTab());
+    expect(preview()).toBeVisible();
+  });
+
+  it("opens a PDF source at the cited page", async () => {
+    // Given a name read on page 2 of the commercial register extract
+    const { user } = givenAnswer(
+      aiAnswer(3, "Alpenlogic AG", "conflict", undefined, {
+        candidates: [
+          candidate("Alpenlogic AG", [citation({ document_id: 1, page: 1 })]),
+          candidate("Alpenlogic SA", [
+            citation({
+              document_id: 9,
+              document_name: "Annual report 2024",
+              quote: "Alpenlogic AG - Annual Report 2024",
+            }),
+          ]),
+        ],
+      }),
+    );
+    await user.click(await screen.findByRole("textbox", { name: "Name and legal form" }));
+
+    // When I switch to the Source tab
+    await user.click(sourceTab());
+
+    // Then the extract is shown, its second page carrying the highlighted text
+    expect(
+      screen.getByRole("heading", { name: "Commercial register extract" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("page 2")).toBeInTheDocument();
+    const page2 = await screen.findByLabelText("Page 2");
+    expect(page2).toHaveAttribute("aria-current", "page");
+    expect(page2.querySelector("[data-text-layer]")).not.toBeNull();
+    expect(screen.getByLabelText("Page 1").querySelector("[data-text-layer]")).toBeNull();
+
+    // When I choose the other source of the conflict
+    await user.click(
+      within(screen.getByRole("group", { name: "Sources of this value" })).getByRole("button", {
+        name: "Alpenlogic SA",
+      }),
+    );
+
+    // Then that document is shown instead
+    expect(screen.getByRole("heading", { name: "Annual report 2024" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("region", { name: "Preview of Annual report 2024" }),
+    ).toBeInTheDocument();
+  });
+
+  it("says when a field has no source", async () => {
+    // Given a field nothing was found for
+    const { user } = givenAnswer(aiAnswer(4, null, "missing"));
+    await user.click(await screen.findByRole("textbox", { name: "Business address" }));
+
+    // When I look at its source
+    await user.click(sourceTab());
+
+    // Then I am told the documents were searched
+    expect(screen.getByRole("heading", { name: "No source for this field" })).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "We searched all 2 documents in your company knowledge and found nothing that answers “Business address”.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("shows a quote from the tender details as it is", async () => {
+    // Given a value read in the tender details
+    const { user } = givenAnswer(
+      aiAnswer(2, "Canton of Zurich", "auto", undefined, {
+        candidates: [
+          candidate("Canton of Zurich", [
+            citation({
+              document_id: null,
+              document_name: "Tender details",
+              quote: "Buyer: Canton of Zurich",
+              page: null,
+            }),
+          ]),
+        ],
+      }),
+    );
+    await user.click(await screen.findByRole("button", { name: "Show" }));
+    await user.click(screen.getByRole("textbox", { name: "Name of the contracting authority" }));
+
+    // When I look at its source
+    await user.click(sourceTab());
+
+    // Then the quote is shown
+    expect(screen.getByRole("heading", { name: "Tender details" })).toBeInTheDocument();
+    expect(screen.getByText("Buyer: Canton of Zurich")).toBeInTheDocument();
   });
 });

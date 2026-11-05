@@ -164,6 +164,22 @@
     "saved": "Saved",
     "failed": "Couldn't save — press Enter in the field to try again"
   },
+  "source": {
+    "tabs": "Show",
+    "form": "Form",
+    "source": "Source",
+    "sources": "Sources of this value",
+    "page": "page {number}",
+    "dated": "dated {date}",
+    "usedFor": "Used for: {label}",
+    "noFieldTitle": "No field selected",
+    "noField": "Select a field to see where its value comes from.",
+    "noSourceTitle": "No source for this field",
+    "noSourceSearched": "We searched all {count, plural, one {# document} other {# documents}} in your company knowledge and found nothing that answers “{label}”.",
+    "noSource": "This value does not come from your documents.",
+    "documentRemoved": "This document is no longer in your company knowledge.",
+    "open": "Open the source: {name}"
+  },
   "preview": {
     "label": "Form preview",
     "legend": "Legend",

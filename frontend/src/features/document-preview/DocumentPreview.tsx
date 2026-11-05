@@ -34,14 +34,6 @@ export function DocumentPreview({
   const t = useTranslations("preview");
   return (
     <section aria-label={t("label")} className="flex flex-col gap-3">
-      <ul aria-label={t("legend")} className="flex flex-wrap gap-4 text-xs text-muted-foreground">
-        {LEGEND.map((tone) => (
-          <li key={tone} className="flex items-center gap-1.5">
-            <span aria-hidden className={cn("h-2 w-3.5 rounded-xs", TONES[tone].swatch)} />
-            {t(`tone.${tone}`)}
-          </li>
-        ))}
-      </ul>
       {fileFormat === "docx" ? (
         <WordDocument fileUrl={fileUrl} zones={zones} selectedId={selectedId} onSelect={onSelect} />
       ) : (
@@ -54,6 +46,24 @@ export function DocumentPreview({
         />
       )}
     </section>
+  );
+}
+
+/** What the tones of the zones mean (shown above the document). */
+export function PreviewLegend({ className }: { className?: string }) {
+  const t = useTranslations("preview");
+  return (
+    <ul
+      aria-label={t("legend")}
+      className={cn("flex gap-4 text-xs whitespace-nowrap text-muted-foreground", className)}
+    >
+      {LEGEND.map((tone) => (
+        <li key={tone} className="flex items-center gap-1.5">
+          <span aria-hidden className={cn("h-2 w-3.5 rounded-xs", TONES[tone].swatch)} />
+          {t(`tone.${tone}`)}
+        </li>
+      ))}
+    </ul>
   );
 }
 

@@ -8,7 +8,14 @@ import type { Schema } from "@/shared/api";
 import { Button, buttonVariants } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { formatDate, formatTime } from "@/shared/utils/date";
-import { groupFields, isOpen, reviewGroup, settledAs, type ReviewGroup } from "./review";
+import {
+  fieldSources,
+  groupFields,
+  isOpen,
+  reviewGroup,
+  settledAs,
+  type ReviewGroup,
+} from "./review";
 
 /** A field as the list shows it: what the user sees and edits, nothing of the file layout. */
 export type QueueField = {
@@ -51,6 +58,8 @@ type CardHandlers = {
   onSettle: (fieldId: number, value: string | null) => void;
   onNext: (fieldId: number) => void;
   onDraft: (fieldId: number, text: string) => void;
+  /** Show where the value comes from: the field's `index`-th source (`fieldSources`). */
+  onOpenSource: (fieldId: number, index: number) => void;
 };
 
 /**
@@ -243,6 +252,7 @@ function FieldInput({
   onSettle,
   onNext,
   onDraft,
+  onOpenSource,
 }: CardProps) {
   const inputId = `field-${field.id}`;
   const input = useRef<HTMLInputElement | null>(null);
@@ -295,7 +305,7 @@ function FieldInput({
         onBlur={(event) => saveIfChanged(event.currentTarget)}
       />
       <FieldStatus field={field} context={context} />
-      <FieldSources field={field} expanded={selected} />
+      <FieldSources field={field} expanded={selected} onOpenSource={onOpenSource} />
       {selected && <ReviewActions field={field} onSettle={onSettle} focusInput={focusInput} />}
     </form>
   );
@@ -311,6 +321,7 @@ function YesNoInput({
   onSelect,
   onSave,
   onSettle,
+  onOpenSource,
 }: CardProps) {
   const t = useTranslations("fieldList");
   const name = `field-${field.id}`;
@@ -351,7 +362,7 @@ function YesNoInput({
         </div>
       </fieldset>
       <FieldStatus field={field} context={context} />
-      <FieldSources field={field} expanded={selected} />
+      <FieldSources field={field} expanded={selected} onOpenSource={onOpenSource} />
       {selected && <ReviewActions field={field} onSettle={onSettle} focusInput={focusInput} />}
     </div>
   );
@@ -536,10 +547,18 @@ const SETTLED_MESSAGE = {
  * Where the value comes from: every source when they disagree, else the selected one. Open for
  * the selected field; the others show a count (clicking the card selects it).
  */
-function FieldSources({ field, expanded }: { field: QueueField; expanded: boolean }) {
+function FieldSources({
+  field,
+  expanded,
+  onOpenSource,
+}: {
+  field: QueueField;
+  expanded: boolean;
+  onOpenSource: (fieldId: number, index: number) => void;
+}) {
   const t = useTranslations("fieldList");
-  const candidates = field.type === "conflict" ? field.candidates : field.candidates.slice(0, 1);
-  const citations = candidates.flatMap((candidate) => candidate.citations);
+  const tSource = useTranslations("source");
+  const citations = fieldSources(field).map(({ citation }) => citation);
   if (citations.length === 0) return null;
   if (!expanded) {
     return (
@@ -552,9 +571,17 @@ function FieldSources({ field, expanded }: { field: QueueField; expanded: boolea
     <ul aria-label={t("sources")} className="flex flex-col gap-1.5 border-t pt-2">
       {citations.map((citation, index) => (
         <li key={index} className="text-xs">
-          <p className="font-medium">
+          <button
+            type="button"
+            aria-label={tSource("open", { name: citation.document_name })}
+            onClick={(event) => {
+              event.stopPropagation();
+              onOpenSource(field.id, index);
+            }}
+            className="text-left font-medium text-primary underline-offset-2 hover:underline"
+          >
             <SourceName citation={citation} />
-          </p>
+          </button>
           <blockquote className="text-muted-foreground">
             {t("quote", { quote: citation.quote })}
           </blockquote>

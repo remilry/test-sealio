@@ -10,9 +10,10 @@ import { markPageFields, numberPages } from "./docx-fields";
 import { withFontFallbacks, type DocumentFont } from "./docx-fonts";
 import { showImages } from "./docx-images";
 import { findParagraph, writePreviewValue } from "./docx-locator";
+import { markQuote, unmarkQuotes } from "./quote-highlight";
 import { paginate } from "./docx-pages";
 import { withWordLineSpacing } from "./docx-spacing";
-import { TONES, type PreviewZone, type WordPlace } from "./zones";
+import { TONES, type PreviewZone, type QuoteFocus, type WordPlace } from "./zones";
 
 const ZONE = "cursor-pointer rounded-[2px] ring-1 transition-shadow";
 const SELECTED = "ring-2 ring-primary";
@@ -27,17 +28,21 @@ type WordZone = PreviewZone & { place: WordPlace };
  * the zones are then drawn onto it at every change. Pages break as on paper (`paginate`), not at
  * the marks Word leaves where it last broke them: those split a paragraph in two, and the
  * paragraphs would no longer be counted as the export counts them.
+ *
+ * With a `focus`, the quote is marked where it is written and scrolled to (else its page).
  */
 export function WordDocument({
   fileUrl,
   zones,
   selectedId,
   onSelect,
+  focus,
 }: {
   fileUrl: string;
   zones: PreviewZone[];
   selectedId: number | null;
   onSelect: (id: number) => void;
+  focus?: QuoteFocus;
 }) {
   const t = useTranslations("preview");
   const file = useDocumentFile(fileUrl);
@@ -78,6 +83,17 @@ export function WordDocument({
     );
   }, [ready, zones, selectedId]);
 
+  const focusPage = focus?.page ?? null;
+  const focusQuote = focus?.quote ?? null;
+  useEffect(() => {
+    const root = container.current;
+    if (!ready || !root || focusQuote === null) return;
+    const mark = markQuote(root, focusQuote);
+    const target = mark ?? root.querySelectorAll("section.docx")[focusPage ?? 0] ?? null;
+    target?.scrollIntoView?.({ block: mark ? "center" : "start" });
+    return () => unmarkQuotes(root);
+  }, [ready, focusPage, focusQuote]);
+
   useEffect(() => {
     if (!ready || selectedId === null) return;
     container.current
@@ -107,6 +123,7 @@ export function WordDocument({
         onClick={select}
         className={cn(
           "text-black [&_section.docx]:bg-white [&_section.docx]:shadow-sm [&_section.docx]:ring-1 [&_section.docx]:ring-border",
+          "[&_mark]:rounded-[2px] [&_mark]:bg-yellow-200 [&_mark]:text-inherit",
           "[&_[data-preview-empty]]:inline-block [&_[data-preview-empty]]:h-[1em] [&_[data-preview-empty]]:min-w-16 [&_[data-preview-empty]]:align-middle",
           !ready && "pointer-events-none invisible absolute inset-x-0 top-0",
         )}

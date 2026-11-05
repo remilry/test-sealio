@@ -7,6 +7,9 @@ export type ZoneTone =
 /** The tones explained under the document, in this order (a searched zone explains itself). */
 export const LEGEND = ["auto", "toCheck", "empty", "entered", "signature"] as const;
 
+/** A quoted passage to show in a document: its page (0-based, when known) and its words. */
+export type QuoteFocus = { page: number | null; quote: string };
+
 /** Where a field is on a PDF page. */
 export type PdfPlace = {
   format: "pdf";
