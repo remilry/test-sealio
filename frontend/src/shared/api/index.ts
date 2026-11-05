@@ -1,5 +1,6 @@
 export { api, API_URL } from "./client";
 export { ApiError, isNotFound, unwrap } from "./errors";
+export { isTransient, retryDelay, retryQuery, retryWrite } from "./retry";
 export type { components, paths } from "./schema.gen";
 
 import type { components } from "./schema.gen";

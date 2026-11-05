@@ -7,6 +7,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
+import { retryDelay, retryWrite } from "@/shared/api";
 import { now } from "@/shared/utils/date";
 import { initialRun, reduceRun, type FillEvent, type FillRun } from "./fill-events";
 import { fillApi, type Answer, type FillState } from "./fill-session.api";
@@ -70,6 +71,9 @@ export function useSaveAnswer(
   return useMutation({
     mutationKey: fillKeys.save(formId),
     mutationFn: ({ fieldId, value }: SaveVariables) => fillApi.saveAnswer(formId, fieldId, value),
+    // Saving the same value twice is harmless: a passing failure is tried again.
+    retry: retryWrite,
+    retryDelay,
     onMutate: async ({ fieldId, value }) => {
       await queryClient.cancelQueries({ queryKey: answersKey });
       const previous = queryClient
@@ -171,6 +175,9 @@ export function useDiscardFill(formId: number) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: () => fillApi.discardFill(formId),
+    // Deleting twice is harmless: a passing failure is tried again.
+    retry: retryWrite,
+    retryDelay,
     onSuccess: () => {
       queryClient.removeQueries({ queryKey: fillKeys.form(formId) });
       return queryClient.invalidateQueries({ queryKey: TENDERS_KEY });

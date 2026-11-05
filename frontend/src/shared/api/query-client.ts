@@ -1,9 +1,11 @@
 import { QueryClient } from "@tanstack/react-query";
+import { retryDelay, retryQuery } from "./retry";
 
 export function makeQueryClient() {
   return new QueryClient({
     defaultOptions: {
-      queries: { staleTime: 30_000, refetchOnWindowFocus: false },
+      // A read that fails for a passing reason is tried again; "not found" shows at once.
+      queries: { staleTime: 30_000, refetchOnWindowFocus: false, retry: retryQuery, retryDelay },
     },
   });
 }

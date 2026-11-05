@@ -310,9 +310,15 @@ describe("Live fill (manual)", () => {
   });
 
   it("keeps what I typed when it could not be saved, so I can try again", async () => {
-    // Given the back refuses the save
+    // Given the back keeps failing
     const { saved } = given();
-    server.use(handlers.error("/forms/2/fields/6", 500, "Boom", "patch"));
+    let failures = 0;
+    server.use(
+      http.patch(`${API_URL}/forms/2/fields/6`, () => {
+        failures += 1;
+        return new Response("Boom", { status: 500 });
+      }),
+    );
     const user = userEvent.setup();
 
     // When I type a value and leave the field
@@ -320,9 +326,12 @@ describe("Live fill (manual)", () => {
     await user.type(telephone, "044");
     await user.tab();
 
-    // Then I am told it is not saved, without technical details, and the form does not pretend it is
-    expect(await screen.findByRole("status")).toHaveTextContent(
-      "Couldn't save — press Enter in the field to try again",
+    // Then, once it has tried again by itself, I am told it is not saved, without technical
+    // details, and the form does not pretend it is
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent(
+        "Couldn't save — press Enter in the field to try again",
+      ),
     );
     expect(screen.getByText("0 / 9 filled · 9 empty · 0 doubts")).toBeInTheDocument();
     // But what I typed is still there, on the form too
@@ -330,6 +339,8 @@ describe("Live fill (manual)", () => {
     expect(card.getByRole("textbox")).toHaveValue("044");
     expect(card.getByText("Not saved — press Enter to try again")).toBeInTheDocument();
     expect(within(await findZone(6)).getByText("044")).toBeInTheDocument();
+    // After trying twice more by itself
+    expect(failures).toBe(3);
 
     // And when the back is reachable again, Enter saves it
     server.use(saved.handler);
@@ -337,6 +348,50 @@ describe("Live fill (manual)", () => {
     await waitFor(() => expect(saved.requests).toEqual([{ fieldId: 6, value: "044" }]));
     expect(await screen.findByText("1 / 9 filled · 8 empty · 0 doubts")).toBeInTheDocument();
     expect(card.queryByText(/Not saved/)).not.toBeInTheDocument();
+  });
+
+  it("saves a value whose first save failed for a passing reason, without telling me", async () => {
+    // Given the back fails once, then answers
+    const { saved } = given();
+    let failures = 0;
+    server.use(
+      http.patch(`${API_URL}/forms/2/fields/6`, () => {
+        failures += 1;
+        return failures === 1 ? new Response("Boom", { status: 500 }) : undefined;
+      }),
+    );
+    const user = userEvent.setup();
+
+    // When I type a value and leave the field
+    const telephone = await screen.findByRole("textbox", { name: "Telephone" });
+    await user.type(telephone, "044");
+    await user.tab();
+
+    // Then it is saved on the second try, and never shown as not saved
+    await waitFor(() => expect(saved.requests).toEqual([{ fieldId: 6, value: "044" }]));
+    expect(await screen.findByText("1 / 9 filled · 8 empty · 0 doubts")).toBeInTheDocument();
+    expect(screen.queryByText(/Not saved/)).not.toBeInTheDocument();
+  });
+
+  it("does not try again a value the back refused", async () => {
+    // Given the back refuses the value
+    given();
+    let requests = 0;
+    server.use(
+      http.patch(`${API_URL}/forms/2/fields/6`, () => {
+        requests += 1;
+        return Response.json({ detail: "Invalid" }, { status: 422 });
+      }),
+    );
+    const user = userEvent.setup();
+
+    // When I type a value and leave the field
+    await user.type(await screen.findByRole("textbox", { name: "Telephone" }), "044");
+    await user.tab();
+
+    // Then it is not saved, after a single request
+    expect(await screen.findByText("Not saved — press Enter to try again")).toBeInTheDocument();
+    expect(requests).toBe(1);
   });
 
   it("tells me when a form cannot be filled yet (format not supported)", async () => {
