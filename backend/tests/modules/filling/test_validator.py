@@ -334,3 +334,45 @@ def test_a_value_is_written_on_one_line() -> None:
     )
 
     assert [c.value for c in result.candidates] == ["Company name Alpenlogic AG"]
+
+
+@pytest.mark.parametrize("ellipsis", ["...", "…", " … "])
+def test_a_quote_shortened_with_an_ellipsis_is_kept_when_each_piece_is_in_the_passage(
+    ellipsis: str,
+) -> None:
+    quote = f"Company name: Alpenlogic AG{ellipsis}Share capital: CHF 500'000"
+    [kept] = validate_field(
+        FieldKind.TEXT, answer(candidate("Alpenlogic AG", ("P1", quote))), PASSAGES
+    ).candidates
+
+    assert kept.citations[0].document_name == "Commercial register extract"
+
+
+def test_the_pieces_of_a_shortened_quote_must_come_in_the_passage_order() -> None:
+    quote = "Share capital: CHF 500'000 ... Company name: Alpenlogic AG"
+
+    result = validate_field(
+        FieldKind.TEXT, answer(candidate("Alpenlogic AG", ("P1", quote))), PASSAGES
+    )
+
+    assert result.candidates == []
+
+
+def test_a_shortened_quote_with_an_invented_piece_is_rejected() -> None:
+    quote = "Company name: Alpenlogic AG ... Share capital: CHF 900'000"
+
+    result = validate_field(
+        FieldKind.TEXT, answer(candidate("Alpenlogic AG", ("P1", quote))), PASSAGES
+    )
+
+    assert result.candidates == []
+
+
+def test_the_pieces_of_a_shortened_quote_must_be_in_the_same_passage() -> None:
+    quote = "Company name: Alpenlogic AG ... Valid until 31 October 2026"
+
+    result = validate_field(
+        FieldKind.TEXT, answer(candidate("Alpenlogic AG", ("P1", quote))), PASSAGES
+    )
+
+    assert result.candidates == []

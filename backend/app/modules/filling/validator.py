@@ -78,6 +78,10 @@ class ValidatedField:
     rejected: list[str] = field(default_factory=list)
 
 
+# Where a quote was shortened: "...", "…".
+ELLIPSIS = re.compile(r"\.{3,}|…")
+
+
 def validate_field(
     kind: FieldKind, answer: LLMFieldAnswer | None, passages: list[SourcePassage]
 ) -> ValidatedField:
@@ -110,14 +114,17 @@ def validate_field(
 
 
 def find_citation(citation: LLMCitation, passages: list[SourcePassage]) -> Citation | None:
-    """The citation if its quote is in a passage sent (the labelled one first), else None."""
-    wanted = _letters(citation.quote)
-    if len(wanted) < MIN_QUOTE_CHARS:
+    """The citation if its quote is in a passage sent (the labelled one first), else None.
+
+    A quote shortened with an ellipsis ("Alpenlogic AG … has been assessed") is found when each
+    of its pieces is, in that order, in the same passage."""
+    pieces = [piece for piece in map(_letters, ELLIPSIS.split(citation.quote)) if piece]
+    if sum(map(len, pieces)) < MIN_QUOTE_CHARS:
         return None
     labelled = [p for p in passages if p.label == citation.passage.strip()]
     others = [p for p in passages if p.label != citation.passage.strip()]
     for passage in labelled + others:
-        if wanted in _letters(passage.text):
+        if _contains_in_order(_letters(passage.text), pieces):
             return Citation(
                 quote=citation.quote.strip(),
                 document_name=passage.document_name,
@@ -126,6 +133,16 @@ def find_citation(citation: LLMCitation, passages: list[SourcePassage]) -> Citat
                 page=passage.page,
             )
     return None
+
+
+def _contains_in_order(text: str, pieces: list[str]) -> bool:
+    start = 0
+    for piece in pieces:
+        found = text.find(piece, start)
+        if found < 0:
+            return False
+        start = found + len(piece)
+    return True
 
 
 def value_is_supported(value: str, quotes: list[str]) -> bool:

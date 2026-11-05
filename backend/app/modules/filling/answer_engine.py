@@ -42,17 +42,20 @@ candidate.
 written in the form: the value only, without the document's labels or surrounding words ("14", \
 not "14 with higher professional training"; "+41 44 555 01 20", not "Reception +41 44 555 01 20"). \
 When the field asks for several facts (a name and a legal form), combine them in that one value, \
-with one quote per fact. When the passages list several people, numbers or addresses, choose the \
-one that fits the field: they are options, not a disagreement.
+with one quote per fact; a field asking for an office, a company or a person with its address \
+gets the name and the address. When the passages list several people, numbers or addresses, \
+choose the one that fits the field: they are options, not a disagreement.
 - A number must count exactly what the field asks for: a broader or different category ("other \
 staff and apprentices" for auxiliary staff) is not an answer.
-- Give a second candidate only when the sources disagree about the same fact (two documents \
-giving two different addresses for the same office, two different headcounts), the most recent or \
-most official first.
+- When different documents give different values for the same fact (two addresses for the same \
+office, two headcounts), give one candidate per value, each with its own quotes and its \
+document's date, even when you think one of them is out of date: do not choose between documents \
+yourself, the user decides. Give a second candidate only in that case.
 - Each value must be made only of words found in its quotes, and each quote copied exactly from \
 the passage it cites: a short excerpt taken from a single line of a single passage (quote two \
-lines as two quotes). Prefer the current state over history (superseded entries, former \
-addresses); when the only figure found comes from an older document (a past year's report), \
+lines as two quotes). Within one document, prefer the current state over the history it \
+records itself (an entry it marks as modified or deleted, a former address it names as such); \
+when the only figure found comes from an older document (a past year's report), \
 still give it, with that document's date.
 - For a Yes/No field, answer "yes" or "no" only if a passage states it; quote that statement. A \
 passage saying that the rule asked about does not apply to the bidder (no collective agreement \

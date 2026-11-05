@@ -22,13 +22,13 @@ from datetime import date
 from app.core.config import REPO_ROOT, get_settings
 from app.core.db import SessionLocal
 from app.core.migrations import upgrade_to_head
-from app.llm.facade import LLMUsage
-from app.llm.fake_adapter import RecordingLLM
+from app.llm.facade import LLM, LLMUsage
+from app.llm.fake_adapter import FakeLLM, RecordingLLM
 from app.llm.openai_adapter import OpenAILLM
 from app.modules.filling.answer_engine import SectionResult, answer_section, request_key
 from app.modules.filling.groups import CallGroup, FieldToAnswer, call_groups
 from app.modules.filling.job import knowledge_search, run_groups
-from app.modules.filling.rules import decide
+from app.modules.filling.rules import AnswerType, decide
 from app.modules.forms import service as forms_service
 from app.modules.forms.parsing.schema import FieldKind
 from app.modules.forms.schemas import FormDetail
@@ -36,8 +36,11 @@ from app.modules.knowledge import service as knowledge_service
 from app.modules.tenants import service as tenants_service
 from app.modules.tenders import service as tenders_service
 from app.seed import seed
+from scripts.ground_truth import ANNEX_4, check
 
 DEMO_DOCUMENTS = REPO_ROOT / "knowledge-base" / "documents"
+# Expected answers by form (knowledge-base/GROUND_TRUTH.md), by the start of its recording key.
+GROUND_TRUTH = {"annex-4": ANNEX_4}
 
 
 def main() -> None:
@@ -51,19 +54,28 @@ def main() -> None:
         "--form",
         help="only the forms whose file name, slugged, starts with this (e.g. annex-4)",
     )
+    parser.add_argument(
+        "--replay",
+        action="store_true",
+        help="replay the saved recordings instead (free): checks the current validator and rules",
+    )
     args = parser.parse_args()
     settings = get_settings()
-    if settings.openai_api_key is None:
-        raise SystemExit("OPENAI_API_KEY is not set (backend/.env).")
-    llm = RecordingLLM(
-        OpenAILLM(
-            api_key=settings.openai_api_key.get_secret_value(),
-            model=settings.llm_model,
-            reasoning_effort=settings.llm_reasoning_effort,
-            prices=settings.llm_prices(),
-        ),
-        settings.llm_recordings_dir,
-    )
+    llm: LLM
+    if args.replay:
+        llm = FakeLLM.from_dir(settings.llm_recordings_dir)
+    else:
+        if settings.openai_api_key is None:
+            raise SystemExit("OPENAI_API_KEY is not set (backend/.env).")
+        llm = RecordingLLM(
+            OpenAILLM(
+                api_key=settings.openai_api_key.get_secret_value(),
+                model=settings.llm_model,
+                reasoning_effort=settings.llm_reasoning_effort,
+                prices=settings.llm_prices(),
+            ),
+            settings.llm_recordings_dir,
+        )
     upgrade_to_head(settings.database_url)
     with SessionLocal() as session:
         seed(session, settings)
@@ -131,6 +143,7 @@ def main() -> None:
     )
     wall = time.monotonic() - started
     total, search_seconds = LLMUsage(), 0.0
+    answers: dict[str, dict[str, tuple[AnswerType, str | None]]] = {}
     for key, group, result in results:
         total += result.usage
         search_seconds += result.search_seconds
@@ -140,9 +153,22 @@ def main() -> None:
             decision = decide(field.kind, evidence, today)
             if decision is not None:
                 print(f"  {field.key:45} {decision.type:12} {decision.value!r}")
+                form_key = key.split("--")[0]
+                answers.setdefault(form_key, {})[field.key] = (decision.type, decision.value)
             for reason in evidence.rejected:
                 print(f"  {'':45} rejected: {reason}")
     print(f"\nTotal: {wall:.1f}s wall · search {search_seconds:.1f}s · model {total.describe()}")
+    for form_key, form_answers in answers.items():
+        expected = GROUND_TRUTH.get(form_key.split("-conditions")[0])
+        if expected is not None:
+            _print_check(form_key, check(expected, form_answers))
+
+
+def _print_check(form_key: str, problems: dict[str, str | None]) -> None:
+    wrong = {key: problem for key, problem in problems.items() if problem is not None}
+    print(f"\nGround truth, {form_key}: {len(problems) - len(wrong)}/{len(problems)} OK")
+    for key, problem in wrong.items():
+        print(f"  KO {key}: {problem}")
 
 
 def _slug(text: str) -> str:
