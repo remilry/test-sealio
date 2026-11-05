@@ -139,36 +139,67 @@ export function FieldList({
   );
   return (
     <div className="flex flex-col gap-3">
-      <div role="group" aria-label={t("filter")} className="flex flex-wrap gap-1.5">
-        {groups.map(({ group, fields: inGroup, open }) => (
-          <Button
-            key={group}
-            size="xs"
-            variant="outline"
-            aria-pressed={filter === group}
-            onClick={() => setFilter((current) => (current === group ? null : group))}
-            className={cn("rounded-full", filter === group && "border-foreground bg-muted")}
-          >
-            <span aria-hidden className={cn("size-2 rounded-full", GROUP_DOT[group])} />
-            {t(`group.${group}.pill`, { count: group === "automatic" ? inGroup.length : open })}
-          </Button>
-        ))}
+      <div role="group" aria-label={t("filter")} className="grid grid-cols-3 gap-1.5">
+        {groups.map(({ group, fields: inGroup, open }) => {
+          const count = group === "automatic" ? inGroup.length : open;
+          return (
+            <button
+              key={group}
+              type="button"
+              aria-pressed={filter === group}
+              aria-label={t(`group.${group}.pill`, { count })}
+              onClick={() => setFilter((current) => (current === group ? null : group))}
+              className={cn(
+                "flex flex-col gap-1.5 rounded-lg border bg-card px-2.5 py-2 text-left transition-colors hover:bg-muted/60",
+                filter === group && "border-foreground bg-muted",
+              )}
+            >
+              <span className={cn("text-lg leading-none font-semibold", GROUP_TEXT[group])}>
+                {count}
+              </span>
+              <span className="flex items-center gap-1.5 text-[11px] whitespace-nowrap text-muted-foreground">
+                <span aria-hidden className={cn("size-1.5 rounded-full", GROUP_DOT[group])} />
+                {t(`group.${group}.tile`)}
+              </span>
+            </button>
+          );
+        })}
       </div>
       <ol aria-label={t("label")} className="flex flex-col gap-4">
-        {shown.map(({ group, fields: inGroup }) => (
+        {shown.map(({ group, fields: inGroup, open }) => (
           <GroupSection
             key={group}
             title={t(`group.${group}.title`)}
+            count={inGroup.length}
             action={
-              group === "automatic" && (
+              group === "automatic" ? (
                 <Button variant="ghost" size="xs" onClick={() => setShowAutomatic(!automaticOpen)}>
                   {automaticOpen ? t("hide") : t("show")}
                 </Button>
+              ) : (
+                <span
+                  className={cn(
+                    "text-xs font-medium",
+                    open === 0 ? "text-success" : "text-muted-foreground",
+                  )}
+                >
+                  {open === 0 ? t("groupDone") : t("groupOpen", { count: open })}
+                </span>
               )
             }
           >
             {group === "automatic" && !automaticOpen ? (
-              <li className="rounded-lg border border-dashed px-3.5 py-2.5 text-xs text-muted-foreground">
+              // Opens like the Show button above it (which is the way in with the keyboard).
+              <li
+                onClick={() => setShowAutomatic(true)}
+                className="flex cursor-pointer items-center gap-2.5 rounded-lg border bg-muted/30 px-3 py-2.5 text-xs text-muted-foreground hover:bg-muted/60"
+              >
+                <span
+                  aria-hidden
+                  className="grid size-5 flex-none place-items-center rounded-md bg-success/12 text-success"
+                >
+                  <CheckIcon className="size-3" />
+                </span>
                 {t("automaticCollapsed", { count: inGroup.length })}
               </li>
             ) : (
@@ -184,6 +215,12 @@ export function FieldList({
   );
 }
 
+const GROUP_TEXT: Record<ReviewGroup, string> = {
+  toCheck: "text-warning",
+  noValue: "text-destructive",
+  automatic: "text-primary",
+};
+
 const GROUP_DOT: Record<ReviewGroup, string> = {
   toCheck: "bg-warning",
   noValue: "bg-destructive",
@@ -192,22 +229,26 @@ const GROUP_DOT: Record<ReviewGroup, string> = {
 
 function GroupSection({
   title,
+  count,
   action,
   children,
 }: {
   title: string;
+  /** How many fields the group holds, after its title. */
+  count?: number;
   action?: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <li aria-label={title} className="flex flex-col gap-2">
-      <div className="flex items-center justify-between gap-2">
-        <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-          {title}
-        </h3>
+    <li aria-label={title} className="flex flex-col gap-1">
+      <div className="flex items-center justify-between gap-2 px-1">
+        <div className="flex items-baseline gap-1.5 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+          <h3>{title}</h3>
+          {count !== undefined && <span aria-hidden>· {count}</span>}
+        </div>
         {action}
       </div>
-      <ol aria-label={title} className="flex flex-col gap-2">
+      <ol aria-label={title} className="flex flex-col gap-0.5">
         {children}
       </ol>
     </li>

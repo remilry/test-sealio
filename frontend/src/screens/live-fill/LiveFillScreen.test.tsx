@@ -556,7 +556,7 @@ describe("Live fill (watching the automatic fill)", () => {
     startSearch(back);
     back.searching(4);
     back.writing(4, "Bahnhofstrasse 1");
-    expect(within(await findZone(4)).getByText("Bahnhofstrasse 1")).toBeInTheDocument();
+    expect(await within(await findZone(4)).findByText("Bahnhofstrasse 1")).toBeInTheDocument();
 
     // When the check finds no quote for it: the field is answered without a value
     back.answered(4, null, "missing");
@@ -1701,5 +1701,40 @@ describe("Live fill (Source tab)", () => {
     // Then the quote is shown
     expect(screen.getByRole("heading", { name: "Tender details" })).toBeInTheDocument();
     expect(screen.getByText("Buyer: Canton of Zurich")).toBeInTheDocument();
+  });
+});
+
+describe("Live fill (layout)", () => {
+  it("tells me nothing is left to check, and lets me export from there", async () => {
+    // Given every field answered by me
+    server.use(handlers.exportSummary(2, exportSummary(ALL_FILLED)));
+    const answers = ALL_FILLED.map((id) => answer(id, `value ${id}`, "2026-11-03T13:45:00Z"));
+    const { user } = given(annex7(), fillState(answers));
+
+    // Then the list says so, how many documents the answers come from, and how to move
+    expect(await screen.findByText("Nothing left to check")).toBeInTheDocument();
+    expect(screen.getByText("All 9 fields are handled. Ready to export.")).toBeInTheDocument();
+    expect(await screen.findByText("from 2 documents")).toBeInTheDocument();
+    expect(screen.getByText("confirm & next")).toBeInTheDocument();
+    expect(screen.queryByText(/to review/)).not.toBeInTheDocument();
+
+    // When I export from the banner
+    await user.click(screen.getByRole("button", { name: "Export" }));
+
+    // Then the export opens
+    expect(
+      await within(await screen.findByRole("dialog")).findByRole("heading", {
+        name: "Ready to submit",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows how many fields are left to review in the top bar", async () => {
+    // Given the fill found nothing yet (9 fields to fill)
+    given();
+
+    // Then the top bar counts them
+    expect(await screen.findByText("9 to review")).toBeInTheDocument();
+    expect(screen.queryByText("Nothing left to check")).not.toBeInTheDocument();
   });
 });
